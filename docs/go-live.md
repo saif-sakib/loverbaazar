@@ -87,12 +87,12 @@ When it says `failures: 0`, commit and push. Images keep their same URLs and bec
 
 **Publish button:** on GitHub, create a fine-grained token for this repo with **Contents: Read and write**. Add `GITHUB_REPO` (`YOUR-NAME/loverbaazar`) and `GITHUB_TOKEN` on Render.
 
-**GitHub Actions secrets:**
+**GitHub Actions secrets** (repo Settings → Secrets and variables → Actions → **Secrets** tab). Until the two Cloudflare ones exist, pushes build the site but skip deploying:
 
 | Name | Value |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare token, "Edit Cloudflare Workers" template |
-| `CLOUDFLARE_ACCOUNT_ID` | From the Cloudflare dashboard |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → Create Token → "Edit Cloudflare Workers" template |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages, right sidebar |
 | `BACKUP_DATABASE_URL` | Neon **direct** string |
 | `BACKUP_PASSPHRASE` | A long password. Save it safely |
 
