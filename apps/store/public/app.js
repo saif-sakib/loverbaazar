@@ -46,5 +46,5 @@ function account() { const el = $("[data-account]"); if (!el) return; const show
   $$("[data-form]").forEach(f => f.onsubmit = async e => { e.preventDefault(); const er = $(".err", f); er.textContent = ""; try { await api("/" + f.dataset.form, Object.fromEntries(new FormData(f))); show(); } catch (x) { er.textContent = x.message; } }); show(); }
 function contact() { const f = $("[data-contact]"); if (!f) return; f.onsubmit = async e => { e.preventDefault(); const er = $(".err", f); try { await api("/contact", Object.fromEntries(new FormData(f))); f.reset(); er.textContent = ""; toast("Message sent. Thank you!"); } catch (x) { er.textContent = x.message; } }; }
 badges(); grids(); renderCart(); renderWish(); track(); account(); contact();
-fetch(document.currentScript?.dataset.stock || $("script[data-stock]").dataset.stock).then(r => r.json()).then(s => { stock = s; index = null; applyStock(); search(); checkout(); renderCart(); }).catch(() => { search(); checkout(); });
+fetch("/api/stock").then(r => { if (!r.ok) throw 0; return r.json(); }).then(s => { stock = s; index = null; applyStock(); search(); checkout(); renderCart(); }).catch(() => { search(); checkout(); });
 })();

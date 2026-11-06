@@ -1,3 +1,4 @@
 { "name": "loverbaazar", "main": "../../edge/worker.js", "compatibility_date": "2026-11-01",
+  "triggers": { "crons": ["*/10 * * * *"] },
   "assets": { "directory": "./dist", "not_found_handling": "404-page", "run_worker_first": ["/api/*"] },
-  "vars": { "API_ORIGIN": "https://REPLACE-WITH-LAMBDA-FUNCTION-URL.lambda-url.ap-southeast-1.on.aws" } }
+  "vars": { "API_ORIGIN": "https://REPLACE-ME.onrender.com" } }

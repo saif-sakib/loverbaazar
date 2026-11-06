@@ -1,0 +1,34 @@
+# LoverBaazar
+
+Bangladesh home-appliance shop. Replaces WordPress at loverbaazar.com.
+
+**Hard rule: $0 running cost.** No card on any account, and nothing that can bill past a limit. Only the domain costs money. So no AWS, R2, Vercel Pro or paid plans until the owner asks to migrate.
+
+**Stack:** Astro static store and admin (`apps/store`) · Go API, chi + pgx (`apps/api/main.go`) · Cloudflare Worker (`edge/worker.js`) · Neon Postgres · Render Free · Cloudinary · Brevo.
+
+## Run and check
+
+    ./scripts/dev.sh                     # shop on :8787, API on :8080, Ctrl+C stops
+    cd apps/api && gofmt -l . && go vet .
+
+`astro dev` cannot reach `/api`. Always test through `dev.sh`. Local admin token: `local-admin-token-for-this-computer-only`.
+
+## Rules
+
+- Browsing must never touch the database. Prices and stock come from `/api/stock`, an in-memory snapshot. Only writes refresh it.
+- The server computes every total. Never trust browser prices.
+- Change stock only with relative updates: `SET stock=stock-$1 WHERE stock>=$1`.
+- Money is whole taka in BIGINT. No ×100.
+- `/api/health` must never touch the database.
+- Keep all old URLs: `/product/x/`, `/product-category/a/b/`, `/product-tag/x/`, trailing slashes.
+- Escape customer text with `esc()` in `app.js` and the admin page.
+- Admin edits to names, photos or new products need Publish. Price and stock are live.
+
+## Saving tokens
+
+- Don't read `apps/store/src/data/*`, `apps/api/seed/*`, `data/raw/*` or `dist`. They're large generated data.
+- Read only the file you're changing. `docs/go-live.md` is for launch only.
+- Don't start long-running commands in the foreground.
+- Don't use `pkill -f` with text that appears in your own command. It kills your shell.
+
+Skills: `run-local`, `test-shop`, `go-live`. Stack reasons: `PLAN.md`.

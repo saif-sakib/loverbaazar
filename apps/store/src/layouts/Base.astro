@@ -12,7 +12,7 @@ const canon = new URL(Astro.url.pathname, Astro.site);
 <meta property="og:title" content={full} /><meta property="og:description" content={description} /><meta property="og:site_name" content="LoverBaazar" />
 {image && <meta property="og:image" content={image} />}<meta name="theme-color" content="#b3122e" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23b3122e'/><text x='16' y='23' font-size='20' font-weight='800' text-anchor='middle' fill='white' font-family='sans-serif'>L</text></svg>" />
-<slot name="head" /><script is:inline src="/app.js" defer data-stock={import.meta.env.PUBLIC_STOCK_URL || "/stock.json"}></script></head>
+<slot name="head" /><script is:inline src="/app.js" defer></script></head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <div class="ticker"><div><span>Wholesale prices on home appliances</span><span>Cash on delivery across Bangladesh</span><span>Call {SHOP.phone}</span><span>bKash, Nagad and Rocket accepted</span></div></div>

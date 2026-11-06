@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine AS b
+FROM golang:1.26-alpine AS b
 WORKDIR /s
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags='-s -w' -o /server .

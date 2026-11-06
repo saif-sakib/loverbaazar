@@ -1,10 +1,11 @@
-// LoverBaazar API. One binary: AWS Lambda when AWS_LAMBDA_RUNTIME_API is set, otherwise a plain HTTP server.
+// LoverBaazar API. A single stateless HTTP server: runs on Render, a VPS or AWS unchanged.
 package main
 
 import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/subtle"
 	_ "embed"
@@ -14,18 +15,17 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
-	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,8 +37,7 @@ var schema string
 
 var (
 	db      *pgxpool.Pool
-	r2      *s3.Client
-	bucket  = os.Getenv("R2_BUCKET")
+	stock   atomic.Pointer[[]byte] // price and stock snapshot, so browsing never wakes the database
 	errGone = errors.New("out of stock")
 	phoneRe = regexp.MustCompile(`^01[3-9]\d{8}$`)
 )
@@ -54,18 +53,11 @@ func main() {
 	if db, err = pgxpool.NewWithConfig(ctx, cfg); err != nil {
 		log.Fatal(err)
 	}
-	if id := os.Getenv("R2_ACCOUNT_ID"); id != "" {
-		r2 = s3.New(s3.Options{Region: "auto", BaseEndpoint: aws.String("https://" + id + ".r2.cloudflarestorage.com"),
-			Credentials: credentials.NewStaticCredentialsProvider(os.Getenv("R2_KEY"), os.Getenv("R2_SECRET"), "")})
-	}
 	if len(os.Args) == 3 && os.Args[1] == "seed" {
 		must(seed(ctx, os.Args[2]))
 		return
 	}
 	h := router()
-	if os.Getenv("AWS_LAMBDA_RUNTIME_API") != "" {
-		lambda.Start(httpadapter.NewV2(h).ProxyWithContext)
-	}
 	addr := "127.0.0.1:8080"
 	if p := os.Getenv("PORT"); p != "" {
 		addr = ":" + p
@@ -98,11 +90,11 @@ func seed(ctx context.Context, file string) error {
 		}
 		j, _ := json.Marshal(p)
 		if _, err = db.Exec(ctx, `INSERT INTO products(id,slug,price,regular,stock,data) VALUES($1,$2,$3,$4,$5,$6::jsonb)
-			ON CONFLICT(id) DO UPDATE SET slug=$2,data=$6::jsonb`, int64(p["id"].(float64)), p["slug"], int64(p["price"].(float64)), int64(p["regular"].(float64)), stock, string(j)); err != nil {
+			ON CONFLICT(id) DO NOTHING`, int64(p["id"].(float64)), p["slug"], int64(p["price"].(float64)), int64(p["regular"].(float64)), stock, string(j)); err != nil {
 			return err
 		}
 	}
-	return publishStock(ctx)
+	return nil
 }
 
 func router() http.Handler {
@@ -110,6 +102,7 @@ func router() http.Handler {
 	r.Use(originGuard)
 	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	r.Get("/api/catalog", catalog)
+	r.Get("/api/stock", stockFile)
 	r.Post("/api/checkout", checkout)
 	r.Get("/api/track", track)
 	r.Post("/api/contact", contact)
@@ -333,25 +326,26 @@ func notify(subject, text string) {
 	}
 }
 
-// publishStock writes prices and availability where browsers read them, so browsing never wakes the database.
+// publishStock refreshes the snapshot browsers read. Only writes call it, so browsing stays away from Neon.
 func publishStock(ctx context.Context) error {
-	rows, err := db.Query(ctx, `SELECT coalesce(jsonb_object_agg(id,jsonb_build_array(price,regular,CASE WHEN stock>0 THEN 1 ELSE 0 END)),'{}')::text FROM products WHERE active`)
-	if err != nil {
-		return err
+	var b []byte
+	err := db.QueryRow(ctx, `SELECT coalesce(jsonb_object_agg(id,jsonb_build_array(price,regular,CASE WHEN stock>0 THEN 1 ELSE 0 END)),'{}')::text FROM products WHERE active`).Scan(&b)
+	if err == nil {
+		stock.Store(&b)
 	}
-	s, err := pgx.CollectExactlyOneRow(rows, pgx.RowTo[string])
-	if err != nil {
-		return err
-	}
-	if f := os.Getenv("STOCK_FILE"); f != "" {
-		return os.WriteFile(f, []byte(s), 0o644)
-	}
-	if r2 == nil {
-		return nil
-	}
-	_, err = r2.PutObject(ctx, &s3.PutObjectInput{Bucket: &bucket, Key: aws.String("stock.json"), Body: strings.NewReader(s),
-		ContentType: aws.String("application/json"), CacheControl: aws.String("public, max-age=60")})
 	return err
+}
+
+func stockFile(w http.ResponseWriter, r *http.Request) {
+	if stock.Load() == nil {
+		if err := publishStock(r.Context()); err != nil {
+			oops(w, err)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	w.Write(*stock.Load())
 }
 
 func track(w http.ResponseWriter, r *http.Request) {
@@ -596,10 +590,6 @@ func adminMessages(w http.ResponseWriter, r *http.Request) {
 }
 
 func adminImage(w http.ResponseWriter, r *http.Request) {
-	if r2 == nil {
-		fail(w, 501, "image storage is not configured")
-		return
-	}
 	b, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 5<<20))
 	if err != nil {
 		fail(w, 413, "image must be under 5 MB")
@@ -610,26 +600,82 @@ func adminImage(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "not an image")
 		return
 	}
-	key := "uploads/" + token(8) + "." + strings.TrimPrefix(ct, "image/")
-	if _, err = r2.PutObject(r.Context(), &s3.PutObjectInput{Bucket: &bucket, Key: &key, Body: bytes.NewReader(b), ContentType: &ct, CacheControl: aws.String("public, max-age=31536000, immutable")}); err != nil {
+	var url string
+	if dir := os.Getenv("LOCAL_UPLOADS"); dir != "" {
+		name := token(8) + "." + strings.TrimPrefix(ct, "image/")
+		os.MkdirAll(dir, 0o755)
+		err = os.WriteFile(filepath.Join(dir, name), b, 0o644)
+		url = "/uploads/" + name
+	} else {
+		url, err = cloudinary(b)
+	}
+	if err != nil {
 		oops(w, err)
 		return
 	}
-	ok(w, map[string]string{"url": strings.TrimRight(os.Getenv("IMAGE_BASE"), "/") + "/" + key})
+	ok(w, map[string]string{"url": url})
 }
 
-// adminPublish rebuilds the static storefront through a Cloudflare deploy hook.
-func adminPublish(w http.ResponseWriter, _ *http.Request) {
-	hook := os.Getenv("DEPLOY_HOOK")
-	if hook == "" {
-		fail(w, 501, "deploy hook is not configured")
+// cloudinary stores an upload on the free plan, which needs no card.
+func cloudinary(file []byte) (string, error) {
+	cloud, key, secret := os.Getenv("CLOUDINARY_CLOUD"), os.Getenv("CLOUDINARY_KEY"), os.Getenv("CLOUDINARY_SECRET")
+	if cloud == "" {
+		return "", errors.New("image storage is not configured")
+	}
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	sig := sha1.Sum([]byte("timestamp=" + ts + secret))
+	var body bytes.Buffer
+	m := multipart.NewWriter(&body)
+	m.WriteField("api_key", key)
+	m.WriteField("timestamp", ts)
+	m.WriteField("signature", hex.EncodeToString(sig[:]))
+	part, _ := m.CreateFormFile("file", "upload")
+	part.Write(file)
+	m.Close()
+	res, err := http.Post("https://api.cloudinary.com/v1_1/"+cloud+"/image/upload", m.FormDataContentType(), &body)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	var out struct {
+		URL string `json:"secure_url"`
+	}
+	if err = json.NewDecoder(res.Body).Decode(&out); err != nil || out.URL == "" {
+		return "", fmt.Errorf("cloudinary upload failed: %d", res.StatusCode)
+	}
+	return strings.Replace(out.URL, "/upload/", "/upload/f_auto,q_auto/", 1), nil
+}
+
+// adminPublish rebuilds the static storefront from the database.
+func adminPublish(w http.ResponseWriter, r *http.Request) {
+	if dir := os.Getenv("DEV_BUILD_DIR"); dir != "" {
+		go func() { // the rebuild restarts the local dev server, so it cannot finish inside this request
+			cmd := exec.Command("npx", "astro", "build")
+			cmd.Dir, cmd.Env = dir, append(os.Environ(), "CATALOG_URL=http://127.0.0.1:8080/api/catalog")
+			if out, err := cmd.CombinedOutput(); err != nil {
+				log.Printf("build: %s", out)
+			}
+		}()
+		ok(w, map[string]string{"message": "Rebuilding the storefront. Refresh the shop in about 20 seconds."})
 		return
 	}
-	res, err := http.Post(hook, "application/json", nil)
+	repo, tok := os.Getenv("GITHUB_REPO"), os.Getenv("GITHUB_TOKEN")
+	if repo == "" || tok == "" {
+		fail(w, 501, "publishing is not configured")
+		return
+	}
+	req, _ := http.NewRequestWithContext(r.Context(), "POST", "https://api.github.com/repos/"+repo+"/dispatches", strings.NewReader(`{"event_type":"publish"}`))
+	req.Header.Set("Authorization", "Bearer "+tok)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		oops(w, err)
 		return
 	}
 	res.Body.Close()
-	ok(w, map[string]bool{"ok": res.StatusCode < 300})
+	if res.StatusCode >= 300 {
+		fail(w, 502, "GitHub refused the publish request")
+		return
+	}
+	ok(w, map[string]string{"message": "Rebuild started. The shop updates in about 3 minutes."})
 }

@@ -1,0 +1,17 @@
+name: Nightly backup
+on:
+  schedule: [{ cron: "0 20 * * *" }] # 02:00 Bangladesh time
+  workflow_dispatch:
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Dump and encrypt
+        env: { DB: "${{ secrets.BACKUP_DATABASE_URL }}", PASS: "${{ secrets.BACKUP_PASSPHRASE }}" }
+        run: |
+          set -o pipefail
+          docker run --rm postgres:17-alpine pg_dump "$DB" -Fc | gpg --batch --yes --pinentry-mode loopback --passphrase "$PASS" --symmetric -o backup.dump.gpg
+          test -s backup.dump.gpg
+      - uses: actions/upload-artifact@v4
+        with: { name: "backup-${{ github.run_number }}", path: backup.dump.gpg, retention-days: 30 }

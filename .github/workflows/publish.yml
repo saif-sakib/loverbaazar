@@ -1,0 +1,26 @@
+name: Publish store
+on:
+  push: { branches: [main] }
+  repository_dispatch: { types: [publish] }
+  workflow_dispatch:
+concurrency: { group: publish, cancel-in-progress: true }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults: { run: { working-directory: apps/store } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm i --no-audit --no-fund
+      - run: npx astro build
+        env:
+          CATALOG_URL: ${{ vars.CATALOG_URL }}
+          PUBLIC_SHIP_DHAKA: ${{ vars.SHIP_DHAKA }}
+          PUBLIC_SHIP_OUTSIDE: ${{ vars.SHIP_OUTSIDE }}
+          PUBLIC_TURNSTILE_SITE: ${{ vars.TURNSTILE_SITE }}
+      - run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

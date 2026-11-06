@@ -6,3 +6,5 @@ dist
 data/raw
 apps/api/server
 apps/api/bootstrap
+apps/api/app
+apps/store/public/uploads
