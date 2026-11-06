@@ -1,0 +1,36 @@
+---
+import "@fontsource-variable/plus-jakarta-sans";
+import "../styles/site.css";
+import { MENU, SHOP, catUrl } from "../lib/shop";
+const { title, description = "Rice cookers, pressure cookers, nonstick cookware, chairs, tables and wardrobes at wholesale prices in Bangladesh, with cash on delivery.", image, noindex } = Astro.props;
+const full = title ? `${title} | LoverBaazar` : "LoverBaazar | Home appliances and furniture in Bangladesh";
+const canon = new URL(Astro.url.pathname, Astro.site);
+---
+<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>{full}</title><meta name="description" content={description} /><link rel="canonical" href={canon} />
+{noindex && <meta name="robots" content="noindex" />}
+<meta property="og:title" content={full} /><meta property="og:description" content={description} /><meta property="og:site_name" content="LoverBaazar" />
+{image && <meta property="og:image" content={image} />}<meta name="theme-color" content="#b3122e" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23b3122e'/><text x='16' y='23' font-size='20' font-weight='800' text-anchor='middle' fill='white' font-family='sans-serif'>L</text></svg>" />
+<slot name="head" /><script is:inline src="/app.js" defer data-stock={import.meta.env.PUBLIC_STOCK_URL || "/stock.json"}></script></head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="ticker"><div><span>Wholesale prices on home appliances</span><span>Cash on delivery across Bangladesh</span><span>Call {SHOP.phone}</span><span>bKash, Nagad and Rocket accepted</span></div></div>
+<header class="top"><div class="wrap bar">
+  <a href="/" class="logo">Lover<em>Baazar</em></a>
+  <form action="/search/" class="find" role="search"><input name="q" type="search" placeholder="Search rice cooker, chair, wardrobe…" aria-label="Search products" /><button aria-label="Search">⌕</button></form>
+  <nav class="icons"><a href="/wishlist/">♥<i data-wish-count hidden></i><span>Wishlist</span></a><a href="/my-account/">●<span>Account</span></a><a href="/cart/">🛒<i data-cart-count hidden></i><span>Cart</span></a></nav>
+</div>
+<div class="wrap nav"><a href="/shop/">Shop all</a>
+  {MENU.map((g) => <details class="mega"><summary>{g.title}</summary><div>{g.items.map((c: any) => <a href={catUrl(c)}>{c.name}</a>)}</div></details>)}
+  <a href="/product-category/latest-product/">New</a><a href="/product-category/popular-item/">Popular</a><a href="/blog/">Blog</a><a href="/track/">Track order</a><a href="/contact-us/">Contact</a>
+</div></header>
+<main id="main"><slot /></main>
+<footer><div class="wrap cols">
+  <div><a href="/" class="logo">Lover<em>Baazar</em></a><p>Your trusted place for home appliances and furniture, at wholesale prices.</p><p><a href={SHOP.facebook}>Facebook</a> · <a href={SHOP.youtube}>YouTube</a></p></div>
+  <div><h4>Company</h4><a href="/about-us/">About us</a><a href="/how-to-buy/">How to buy</a><a href="/contact-us/">Contact us</a><a href="/blog/">Blog</a></div>
+  <div><h4>Policies</h4><a href="/privacy-policy/">Privacy policy</a><a href="/terms-conditions/">Terms and conditions</a><a href="/track/">Track your order</a></div>
+  <div><h4>Payment</h4><p>bKash: {SHOP.bkash}<br />Nagad: {SHOP.nagad}<br />Rocket: {SHOP.rocket}<br />Cash on delivery</p></div>
+</div><p class="legal">© {new Date().getFullYear()} LoverBaazar</p></footer>
+<a class="call" href={`tel:${SHOP.tel}`} aria-label="Call us">☎</a><div class="toast" role="status" data-toast></div>
+</body></html>

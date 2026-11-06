@@ -1,0 +1,50 @@
+(() => {
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const get = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+const put = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const taka = n => "৳" + Number(n).toLocaleString("en-IN");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const toast = m => { const t = $("[data-toast]"); t.textContent = m; t.classList.add("on"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("on"), 2200); };
+let cart = get("cart", {}), wish = get("wish", []), index, stock = {};
+const api = async (path, body, method) => {
+  const r = await fetch("/api" + path, { method: method || (body ? "POST" : "GET"), headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined, credentials: "same-origin" });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "Service is busy. Please call 01710-076076."); return j; };
+const items = async () => { if (index) return index; index = await (await fetch("/search-index.json")).json();
+  index.forEach(p => { const s = stock[p.id]; if (s) { p.price = s[0]; p.regular = s[1]; p.inStock = !!s[2]; } }); return index; };
+function badges() { const c = Object.values(cart).reduce((a, b) => a + b, 0);
+  $$("[data-cart-count]").forEach(e => { e.textContent = c; e.hidden = !c; }); $$("[data-wish-count]").forEach(e => { e.textContent = wish.length; e.hidden = !wish.length; });
+  $$("[data-wish]").forEach(b => b.classList.toggle("on", wish.includes(+b.dataset.wish))); }
+function saveCart() { put("cart", cart); badges(); }
+function applyStock() { $$("[data-price-for]").forEach(e => { const s = stock[e.dataset.priceFor]; if (s) e.innerHTML = `<b>${taka(s[0])}</b>${s[1] > s[0] ? `<s>${taka(s[1])}</s>` : ""}`; });
+  $$("[data-add]").forEach(b => { const s = stock[b.dataset.add]; if (s) { b.disabled = !s[2]; if (!s[2]) b.textContent = "Sold out"; } }); }
+document.addEventListener("click", e => { const t = e.target.closest("[data-add],[data-wish],[data-del],[data-thumb]"); if (!t) return;
+  if (t.dataset.add) { const q = +($("[data-qty]")?.value || 1) || 1; cart[t.dataset.add] = (cart[t.dataset.add] || 0) + q; saveCart(); toast("Added to cart"); if (t.dataset.go) location.href = "/checkout/"; }
+  if (t.dataset.wish) { const id = +t.dataset.wish; wish = wish.includes(id) ? wish.filter(x => x !== id) : [...wish, id]; put("wish", wish); badges(); toast(wish.includes(id) ? "Saved to wishlist" : "Removed"); if ($("[data-wishlist]")) renderWish(); }
+  if (t.dataset.del) { delete cart[t.dataset.del]; saveCart(); renderCart(); }
+  if (t.dataset.thumb) $("[data-main]").src = t.dataset.thumb; });
+const PAGE = 24; function grids() { $$("[data-grid]").forEach(g => { const cards = () => $$("[data-card]", g), more = g.nextElementSibling?.matches("[data-more]") ? g.nextElementSibling : null; let n = PAGE;
+  const show = () => { cards().forEach((c, i) => c.hidden = i >= n); if (more) more.hidden = cards().length <= n; }; if (more) more.onclick = () => { n += PAGE; show(); };
+  const sel = g.previousElementSibling?.querySelector("[data-sort]"); if (sel) sel.onchange = () => { const v = sel.value, l = cards(), by = { asc: (a, b) => a.dataset.price - b.dataset.price, desc: (a, b) => b.dataset.price - a.dataset.price, name: (a, b) => a.dataset.name.localeCompare(b.dataset.name) }[v] || ((a, b) => b.dataset.id - a.dataset.id); l.sort(by).forEach(c => g.append(c)); show(); }; show(); }); }
+const card = p => `<article class="card"><a class="thumb" href="/product/${esc(p.slug)}/"><img loading="lazy" src="${esc(p.thumb)}" alt="${esc(p.name)}"></a><button class="heart" data-wish="${p.id}" aria-label="Wishlist">♥</button><div class="body"><a class="name" href="/product/${esc(p.slug)}/">${esc(p.name)}</a><div class="price"><b>${taka(p.price)}</b></div><button class="btn small" data-add="${p.id}" ${p.inStock ? "" : "disabled"}>${p.inStock ? "Add to cart" : "Sold out"}</button></div></article>`;
+async function renderWish() { const el = $("[data-wishlist]"); if (!el) return; const l = (await items()).filter(p => wish.includes(p.id)); el.innerHTML = l.map(card).join("") || "<p>Your wishlist is empty.</p>"; badges(); }
+async function search() { const el = $("[data-results]"); if (!el) return; const q = new URLSearchParams(location.search).get("q")?.trim().toLowerCase() || ""; $("[data-q]").textContent = q; if ($(".find input")) $(".find input").value = q; const words = q.split(/\s+/).filter(Boolean);
+  const l = (await items()).filter(p => words.length && words.every(w => p.text.includes(w))); el.innerHTML = l.map(card).join("") || "<p>No products found. Try a shorter word.</p>"; badges(); }
+const totals = async () => { const all = await items(), lines = Object.entries(cart).map(([id, qty]) => ({ p: all.find(x => x.id == id), qty })).filter(l => l.p); return { lines, sub: lines.reduce((a, l) => a + l.p.price * l.qty, 0) }; };
+async function renderCart() { const el = $("[data-cart]"); if (!el) return; const { lines, sub } = await totals();
+  el.innerHTML = lines.map(l => `<div class="line"><img src="${esc(l.p.thumb)}" alt=""><div><a href="/product/${esc(l.p.slug)}/">${esc(l.p.name)}</a><br>${taka(l.p.price)} ${l.p.inStock ? "" : "<b>Sold out</b>"}<br><button class="link" data-del="${l.p.id}">Remove</button></div><input type="number" min="1" max="20" value="${l.qty}" data-line="${l.p.id}" aria-label="Quantity"></div>`).join("") || "<p>Your cart is empty. <a class='link' href='/shop/'>Start shopping</a></p>";
+  $("[data-sub]").textContent = taka(sub); $("[data-go]")?.toggleAttribute("hidden", !lines.length);
+  $$("[data-line]").forEach(i => i.onchange = () => { cart[i.dataset.line] = Math.min(20, Math.max(1, +i.value || 1)); saveCart(); renderCart(); }); }
+async function checkout() { const f = $("[data-checkout]"); if (!f) return; const { lines, sub } = await totals(); if (!lines.length) { $("[data-empty]").hidden = false; f.hidden = true; return; }
+  const ship = () => +f.area.selectedOptions[0].dataset.fee; const paint = () => { $("[data-sum]").innerHTML = lines.map(l => `<div class="row"><span>${esc(l.p.name)} × ${l.qty}</span><b>${taka(l.p.price * l.qty)}</b></div>`).join("") + `<div class="row"><span>Delivery</span><b>${taka(ship())}</b></div><div class="row total"><span>Total</span><span>${taka(sub + ship())}</span></div>`;
+    const m = f.payment.value; $("[data-txn]").hidden = m === "cod"; $("[data-pay]").textContent = m === "cod" ? "" : `Send money to ${f.payment.selectedOptions[0].dataset.no}, then enter the transaction ID.`; }; f.onchange = paint; paint();
+  api("/me").then(u => { f.name.value = u.name; f.phone.value = u.phone; }).catch(() => {});
+  f.onsubmit = async e => { e.preventDefault(); const b = $("button[type=submit]", f), err = $("[data-err]"); b.disabled = true; err.textContent = ""; try { const d = Object.fromEntries(new FormData(f)); const r = await api("/checkout", { items: lines.map(l => ({ id: l.p.id, qty: l.qty })), name: d.name, phone: d.phone, address: d.address, area: d.area, payment: d.payment, txnid: d.txnid, note: d.note, turnstile: d["cf-turnstile-response"] || "" }); cart = {}; saveCart(); location.href = `/track/?order=${r.number}&phone=${encodeURIComponent(d.phone)}&new=1`; } catch (x) { err.textContent = x.message; b.disabled = false; } }; }
+const orderHtml = o => `<div class="panel" style="margin-top:14px"><h3>${esc(o.number)} <small>(${esc(o.status)})</small></h3>${(o.items || []).map(i => `<div class="row"><span>${esc(i.name)} × ${i.qty}</span><b>${taka(i.price * i.qty)}</b></div>`).join("")}<div class="row"><span>Delivery</span><b>${taka(o.shipping)}</b></div><div class="row total"><span>Total</span><span>${taka(o.total)}</span></div></div>`;
+function track() { const f = $("[data-track]"); if (!f) return; const q = new URLSearchParams(location.search), out = $("[data-order]"); const go = async () => { $("[data-err]").textContent = ""; try { out.innerHTML = (q.get("new") ? "<p class='note'>Thank you! Your order is placed. We'll call you to confirm.</p>" : "") + orderHtml(await api(`/track?order=${encodeURIComponent(f.order.value)}&phone=${encodeURIComponent(f.phone.value)}`)); } catch (x) { $("[data-err]").textContent = x.message; } };
+  f.onsubmit = e => { e.preventDefault(); go(); }; if (q.get("order")) { f.order.value = q.get("order"); f.phone.value = q.get("phone") || ""; go(); } }
+function account() { const el = $("[data-account]"); if (!el) return; const show = async () => { try { const u = await api("/me"); $("[data-auth]").hidden = true; el.innerHTML = `<div class="panel"><h2>Hello, ${esc(u.name)}</h2><p>${esc(u.phone)}</p><button class="btn ghost" data-out>Log out</button></div>${u.orders.map(orderHtml).join("") || "<p>No orders yet.</p>"}`; $("[data-out]").onclick = async () => { await api("/logout", {}); location.reload(); }; } catch { $("[data-auth]").hidden = false; } };
+  $$("[data-form]").forEach(f => f.onsubmit = async e => { e.preventDefault(); const er = $(".err", f); er.textContent = ""; try { await api("/" + f.dataset.form, Object.fromEntries(new FormData(f))); show(); } catch (x) { er.textContent = x.message; } }); show(); }
+function contact() { const f = $("[data-contact]"); if (!f) return; f.onsubmit = async e => { e.preventDefault(); const er = $(".err", f); try { await api("/contact", Object.fromEntries(new FormData(f))); f.reset(); er.textContent = ""; toast("Message sent. Thank you!"); } catch (x) { er.textContent = x.message; } }; }
+badges(); grids(); renderCart(); renderWish(); track(); account(); contact();
+fetch(document.currentScript?.dataset.stock || $("script[data-stock]").dataset.stock).then(r => r.json()).then(s => { stock = s; index = null; applyStock(); search(); checkout(); renderCart(); }).catch(() => { search(); checkout(); });
+})();

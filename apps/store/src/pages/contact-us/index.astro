@@ -1,0 +1,4 @@
+---
+import Base from "../../layouts/Base.astro"; import { SHOP } from "../../lib/shop";
+---
+<Base title="Contact us"><div class="wrap"><h1 style="margin-top:20px">Contact us</h1><div class="two"><form class="panel" data-contact><label class="field">Name<input name="name" required /></label><label class="field">Phone or email<input name="contact" required /></label><label class="field">Message<textarea name="body" rows="5" required></textarea></label><p class="err"></p><button class="btn small">Send message</button></form><aside class="panel"><p><b>Phone</b><br /><a href={`tel:${SHOP.tel}`}>{SHOP.phone}</a></p><p><b>Email</b><br /><a href={`mailto:${SHOP.email}`}>{SHOP.email}</a></p></aside></div></div></Base>

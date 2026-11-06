@@ -1,0 +1,8 @@
+node_modules
+dist
+.astro
+.wrangler
+.env
+data/raw
+apps/api/server
+apps/api/bootstrap

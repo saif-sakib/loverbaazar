@@ -1,0 +1,4 @@
+---
+import Base from "../../layouts/Base.astro"; import { posts } from "../../lib/shop";
+---
+<Base title="Blog"><div class="wrap"><div class="pagehead"><h1 style="margin-top:20px">Blog</h1></div><section class="cats" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">{posts.map((p) => <a href={`/${p.slug}/`} style="text-align:left">{p.title}<small>{p.date}</small><small>{p.excerpt}</small></a>)}</section></div></Base>

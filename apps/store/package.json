@@ -1,0 +1,2 @@
+{"name":"loverbaazar-store","private":true,"type":"module","scripts":{"dev":"astro dev","build":"astro build","deploy":"astro build && wrangler deploy"},
+"dependencies":{"astro":"^5","@astrojs/sitemap":"^3","@fontsource-variable/plus-jakarta-sans":"^5"},"devDependencies":{"wrangler":"^4"}}
