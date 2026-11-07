@@ -66,8 +66,8 @@ func main() {
 		return
 	}
 	if !dev {
-		if err := checkSecrets(os.Getenv("ADMIN_TOKEN"), os.Getenv("ORIGIN_SECRET")); err != nil {
-			log.Fatal(err)
+		if err := checkConfig(os.Getenv("DATABASE_URL"), os.Getenv("ADMIN_TOKEN"), os.Getenv("ORIGIN_SECRET")); err != nil {
+			log.Fatal("STARTUP STOPPED: ", err, ". Fix it in Render, under Environment, then redeploy")
 		}
 	}
 	go func() { // in the background, so /api/health answers even while the database wakes up
@@ -95,14 +95,18 @@ func main() {
 	}
 }
 
-// checkSecrets stops a live shop starting with weak secrets. The local admin token is public
-// (it's in the README) and long enough to pass a length check, so it is refused by name.
-func checkSecrets(admin, origin string) error {
+// checkConfig stops a live shop starting with missing settings or weak secrets. The local admin
+// token is public (it's in the README) and long enough to pass a length check, so it is refused by name.
+func checkConfig(database, admin, origin string) error {
 	switch {
+	case !strings.HasPrefix(database, "postgres"):
+		return errors.New("DATABASE_URL must be the Neon connection string, starting with postgres, with no quotes")
 	case admin == localAdminToken:
-		return errors.New("ADMIN_TOKEN is the public local token. Generate one with: openssl rand -hex 32")
-	case len(admin) < 32 || len(origin) < 32:
-		return errors.New("ADMIN_TOKEN and ORIGIN_SECRET must each be at least 32 characters")
+		return errors.New("ADMIN_TOKEN is the public local token. Generate your own with: openssl rand -hex 32")
+	case len(admin) < 32:
+		return errors.New("ADMIN_TOKEN is missing or under 32 characters. Generate one with: openssl rand -hex 32")
+	case len(origin) < 32:
+		return errors.New("ORIGIN_SECRET is missing or under 32 characters. Generate one with: openssl rand -hex 32")
 	}
 	return nil
 }
@@ -213,11 +217,12 @@ func router() http.Handler {
 	return r
 }
 
-// originGuard rejects requests that did not come through the Cloudflare Worker.
+// originGuard rejects requests that did not come through the Cloudflare Worker. /api/health is
+// open because Render's own health check can't send the secret, and it reveals nothing.
 func originGuard(next http.Handler) http.Handler {
 	want := os.Getenv("ORIGIN_SECRET")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if want != "" && !same(r.Header.Get("X-Origin-Secret"), want) {
+		if want != "" && r.URL.Path != "/api/health" && !same(r.Header.Get("X-Origin-Secret"), want) {
 			fail(w, 403, "forbidden")
 			return
 		}

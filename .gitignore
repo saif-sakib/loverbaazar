@@ -2,6 +2,7 @@
 node_modules
 dist
 .astro
+__pycache__
 .wrangler
 apps/api/server
 apps/api/bootstrap

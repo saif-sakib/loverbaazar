@@ -8,8 +8,7 @@
 | API routing | Cloudflare Worker | `/api` pauses until 06:00 BD time; browsing continues |
 | API | Go on Render Free, Singapore | Service stops or sleeps |
 | Database | PostgreSQL on Neon Free, Singapore | Database stops until next month |
-| Old images | Static files on Cloudflare | No traffic limit |
-| New images | Cloudinary Free | Uploads or delivery stop |
+| Images, old and new | Cloudinary Free | Uploads or delivery stop |
 | Order email | Brevo Free | Emails stop; orders still save |
 | Deploys, backups | GitHub Actions, private repo | Runs stop until next month |
 

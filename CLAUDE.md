@@ -28,6 +28,7 @@ Bangladesh home-appliance shop. Replaces WordPress at loverbaazar.com.
 - Checkout needs no login. Keep it that way: guests are protected by `fraudCheck`, rate limits and Turnstile.
 - Escape customer text with `esc()` in `app.js` and the admin page.
 - Admin edits to names, photos, new products, categories, pages or `site` settings need Publish. Price, stock, coupons and `live` settings are live.
+- All images live in the `loverbaazar` Cloudinary folder. `IMAGE_BASE` in `wrangler.jsonc` moves old addresses at build time, and the Worker redirects old links.
 - Settings defaults live only in `apps/api/defaults.json`. Don't hard-code shop details, delivery charges or payment numbers.
 - `script-src` has no `unsafe-inline`: keep JavaScript in `public/*.js`.
 

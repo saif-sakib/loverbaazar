@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -647,19 +648,38 @@ func adminImage(w http.ResponseWriter, r *http.Request) {
 	ok(w, map[string]string{"url": url})
 }
 
+// uploadFolder holds every shop image. scripts/images_to_cloudinary.py puts the old ones here too.
+const uploadFolder = "loverbaazar"
+
+// signUpload is Cloudinary's rule: sorted name=value pairs, then the secret, hashed with SHA-1.
+func signUpload(params map[string]string, secret string) string {
+	keys := slices.Sorted(maps.Keys(params))
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = k + "=" + params[k]
+	}
+	sum := sha1.Sum([]byte(strings.Join(parts, "&") + secret))
+	return hex.EncodeToString(sum[:])
+}
+
 // cloudinary stores an upload on the free plan, which needs no card.
 func cloudinary(file []byte) (string, error) {
 	cloud, key, secret := os.Getenv("CLOUDINARY_CLOUD"), os.Getenv("CLOUDINARY_KEY"), os.Getenv("CLOUDINARY_SECRET")
 	if cloud == "" {
 		return "", userErr{501, "image storage is not configured. Add the Cloudinary keys on Render"}
 	}
-	ts := strconv.FormatInt(time.Now().Unix(), 10)
-	sig := sha1.Sum([]byte("timestamp=" + ts + secret))
+	params := map[string]string{
+		"asset_folder": uploadFolder,
+		"public_id":    uploadFolder + "/new/" + strings.ToLower(token(8)),
+		"timestamp":    strconv.FormatInt(time.Now().Unix(), 10),
+	}
 	var body bytes.Buffer
 	m := multipart.NewWriter(&body)
 	m.WriteField("api_key", key)
-	m.WriteField("timestamp", ts)
-	m.WriteField("signature", hex.EncodeToString(sig[:]))
+	m.WriteField("signature", signUpload(params, secret))
+	for k, v := range params {
+		m.WriteField(k, v)
+	}
 	part, _ := m.CreateFormFile("file", "upload")
 	part.Write(file)
 	m.Close()

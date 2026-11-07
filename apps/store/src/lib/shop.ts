@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import localProducts from "../data/products.json";
 import localContent from "../data/content.json";
 import defaults from "../../../api/defaults.json";
@@ -18,13 +19,19 @@ async function fetchJson(url: string) {
   }
 }
 
-const list: any[] = remote ? await fetchJson(remote) : localProducts;
+// Old images live on Cloudinary with the same paths, so one change moves every address, including
+// those inside descriptions and blog posts. IMAGE_BASE is set in wrangler.jsonc, shared with the Worker.
+const BASE = readFileSync("wrangler.jsonc", "utf8").match(/"IMAGE_BASE":\s*"([^"]*)"/)?.[1];
+const OLD_IMAGES = /https?:\/\/(www\.)?loverbaazar\.com\/wp-content\/uploads/g;
+const moved = <T>(v: T): T => (BASE ? JSON.parse(JSON.stringify(v).replace(OLD_IMAGES, BASE)) : v);
+
+const list: any[] = moved(remote ? await fetchJson(remote) : localProducts);
 const store: any = remote ? await fetchJson(remote.replace(/catalog\/?$/, "storefront")) : {};
 // An empty answer must stop the deploy, never publish an empty shop.
 if (!Array.isArray(list) || list.length === 0) throw new Error("The catalogue came back empty. Not publishing.");
 
 export const products: any[] = list.map((p) => ({ cats: [], tags: [], images: [], attrs: [], reviews: [], short: "", desc: "", ...p }));
-const pick = (key: "cats" | "tags" | "pages" | "posts"): any[] => (store[key]?.length ? store[key] : (localContent as any)[key]);
+const pick = (key: "cats" | "tags" | "pages" | "posts"): any[] => moved(store[key]?.length ? store[key] : (localContent as any)[key]);
 export const cats = pick("cats"),
   tags = pick("tags"),
   pages = pick("pages");
@@ -32,8 +39,7 @@ export const posts = [...pick("posts")].sort((a, b) => String(b.date).localeComp
 export const SITE: any = { ...defaults.site, ...store.site };
 export const LIVE: any = { ...defaults.live, ...store.live }; // only a fallback: the browser reads /api/stock
 
-const BASE = import.meta.env.PUBLIC_IMAGE_BASE;
-export const img = (u = "") => (!u ? "/placeholder.svg" : BASE ? u.replace("https://loverbaazar.com/wp-content/uploads", BASE) : u);
+export const img = (u = "") => (u || "/placeholder.svg");
 export const taka = (n: number) => "৳" + Number(n).toLocaleString("en-IN");
 export const off = (p: any) => (p.regular > p.price ? Math.round(((p.regular - p.price) / p.regular) * 100) : 0);
 export const inCat = (slug: string) => products.filter((p) => p.cats.includes(slug));

@@ -57,16 +57,41 @@ func TestCSVSafe(t *testing.T) {
 	}
 }
 
-func TestCheckSecrets(t *testing.T) {
-	good := strings.Repeat("a", 64)
-	if err := checkSecrets(good, good); err != nil {
+func TestCheckConfig(t *testing.T) {
+	good, db := strings.Repeat("a", 64), "postgresql://u:p@host/db?sslmode=require"
+	if err := checkConfig(db, good, good); err != nil {
 		t.Error(err)
 	}
-	if checkSecrets(localAdminToken, good) == nil {
-		t.Error("the public local token must be refused")
+	for name, err := range map[string]error{
+		"local token": checkConfig(db, localAdminToken, good),
+		"short admin": checkConfig(db, "short", good),
+		"no origin":   checkConfig(db, good, ""),
+		"no database": checkConfig("", good, good),
+		"quoted url":  checkConfig("'postgres://u:p@host/db'", good, good),
+	} {
+		if err == nil {
+			t.Error(name + " must be refused")
+		}
 	}
-	if checkSecrets("short", good) == nil || checkSecrets(good, "") == nil {
-		t.Error("weak secrets must be refused")
+}
+
+func TestHealthPassesTheOriginGuard(t *testing.T) {
+	t.Setenv("ORIGIN_SECRET", "a-secret-only-the-worker-knows")
+	h := originGuard(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	for path, want := range map[string]int{"/api/health": 200, "/api/catalog": 403, "/api/admin/orders": 403} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		if rec.Code != want {
+			t.Errorf("%s: %d, want %d", path, rec.Code, want)
+		}
+	}
+}
+
+func TestSignUpload(t *testing.T) {
+	// The worked example in Cloudinary's signature documentation.
+	got := signUpload(map[string]string{"eager": "w_400,h_300,c_pad|w_260,h_200,c_crop", "public_id": "sample_image", "timestamp": "1315060510"}, "abcd")
+	if got != "bfd09f95f331f558cbd1320e67aa8d488770583e" {
+		t.Error(got)
 	}
 }
 
