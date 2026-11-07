@@ -732,3 +732,30 @@ func TestSeedKeepsDeletedContentDeleted(t *testing.T) {
 		t.Error("seed brought a deleted post back")
 	}
 }
+
+func TestProductTextNeverTouchesNameOrPrice(t *testing.T) {
+	reset(t)
+	if _, err := db.Exec(bg, `INSERT INTO content(kind,slug,data) VALUES('page','x','{"title":"x","html":"y"}')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(bg, `UPDATE products SET data=data||'{"name":"Long lastng (Approved by WHO)","short":"Delivery Time 4-7 Days <div class=\"ailtchrm-ai-chat\" style=\"x","desc":"<li>Pan (Approved by WHO)</li><li>1 litre of wate</li><li>of water</li>"}'::jsonb WHERE id=1`); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyContentUpdates(bg); err != nil {
+		t.Fatal(err)
+	}
+	var name, short, desc string
+	var price int64
+	if err := db.QueryRow(bg, `SELECT data->>'name',data->>'short',data->>'desc',price FROM products WHERE id=1`).Scan(&name, &short, &desc, &price); err != nil {
+		t.Fatal(err)
+	}
+	if name != "Long lastng (Approved by WHO)" || price != 1000 {
+		t.Errorf("name or price changed: %q %d", name, price)
+	}
+	if short != "Delivery time 4-7 days." {
+		t.Errorf("short: %q", short)
+	}
+	if desc != "<li>Pan</li><li>1 litre of water</li><li>of water</li>" {
+		t.Errorf("desc: %q", desc)
+	}
+}

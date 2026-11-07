@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -194,6 +195,7 @@ func applyContentUpdates(ctx context.Context) error {
 		}
 		Names  []struct{ Kind, Slug, Name string }
 		Remove []struct{ Kind, Slug string }
+		Text   []struct{ Field, Find, To string } // product wording only, never a name or price
 		SQL    []string
 	}
 	if err := json.Unmarshal(contentUpdates, &list); err != nil {
@@ -223,6 +225,14 @@ func applyContentUpdates(ctx context.Context) error {
 			}
 			for _, r := range u.Remove { // a category a product uses is kept: only empty leftovers go
 				if _, err = tx.Exec(ctx, `DELETE FROM content WHERE kind=$1 AND slug=$2 AND NOT EXISTS(SELECT 1 FROM products WHERE data->'cats' @> to_jsonb($2::text))`, r.Kind, r.Slug); err != nil {
+					return err
+				}
+			}
+			for _, t := range u.Text {
+				if t.Field != "short" && t.Field != "desc" {
+					return fmt.Errorf("content update %s: field %q is not product wording", u.ID, t.Field)
+				}
+				if _, err = tx.Exec(ctx, `UPDATE products SET data=jsonb_set(data,ARRAY[$1::text],to_jsonb(replace(data->>$1::text,$2::text,$3::text))) WHERE position($2::text in coalesce(data->>$1::text,''))>0`, t.Field, t.Find, t.To); err != nil {
 					return err
 				}
 			}

@@ -17,7 +17,7 @@
 #tabs a { display: block; padding: 7px 11px; border-radius: 9px; font-weight: 500; font-size: 14px; }
 #tabs a:hover { background: #fff; }
 #tabs a.on { background: var(--ink); color: #fff; }
-.adminactions { display: flex; justify-content: space-between; gap: 12px; padding: 0 11px; font-size: 13px; }
+.adminactions { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 0 11px; font-size: 13px; }
 #head h1 { font-size: 28px; margin: 0 0 4px; }
 #head p { margin: 0 0 18px; font-size: 14px; }
 .dirtybar { position: sticky; top: 12px; z-index: 6; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--butter); border: 1px solid #ecdcae; border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; font-weight: 600; font-size: 14px; }

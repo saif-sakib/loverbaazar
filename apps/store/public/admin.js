@@ -1317,6 +1317,7 @@
 
   addEventListener("hashchange", go);
   $("#pub").onclick = publish;
+  $("#pub2").onclick = publish;
   document.addEventListener("input", (e) => {
     if (e.target.closest("#view form")) unsaved = true;
   });

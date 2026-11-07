@@ -31,6 +31,8 @@ You'll collect several secret values. Keep them in a password manager, or in one
 | Render URL | Your API's address | Step 5 |
 | Cloudinary cloud name, API key, API secret | Image storage | Step 6 |
 | Backup passphrase | Unlocks your backups. If you lose it, the backups are useless | Step 9 |
+| Brevo API key | Lets the shop send you order emails | Step 9 |
+| Turnstile site key and secret key | Bot protection at checkout | Step 9 |
 
 On a Linux computer, you can run every command below in a terminal, from the project folder unless a step says otherwise.
 
@@ -47,7 +49,7 @@ On a Linux computer, you can run every command below in a terminal, from the pro
 
 Your code is already at `github.com/saif-sakib/loverbaazar`, so just confirm these two things:
 
-1. Open the repo on GitHub. It should say **Private** next to its name. If not, go to **Settings → General → Danger Zone → Change visibility**.
+1. Open the repo on GitHub. It can be **Public** or **Private**: both are free and both work. Because a public repo can be read by anyone, never commit a real password or key. To change it, go to **Settings → General → Danger Zone → Change visibility**.
 2. Send your latest work to GitHub:
 
        git status
@@ -117,6 +119,7 @@ Save the first result as `ADMIN_TOKEN` and the second as `ORIGIN_SECRET`. Each o
 
 6. Open **Advanced**, and set **Health Check Path** to `/api/health`.
 7. Click **Deploy Web Service**, and wait for the log to say the service is live. The first build takes a few minutes.
+   Then open **Settings** and check that **Auto-Deploy** is on. If it's off, new code on GitHub never reaches your live API until you click **Manual Deploy → Deploy latest commit**.
 8. Copy the address at the top of the page, such as `https://loverbaazar-api.onrender.com`. Save it as **Render URL**.
 
 Only ever create **one** Render service. The free 750 hours cover one service for a full month.
@@ -191,7 +194,7 @@ All images go in one Cloudinary folder called `loverbaazar`, sorted like `produc
 
 ## Step 8: Automatic publishing (GitHub)
 
-This makes the **Publish storefront** button in admin work.
+This makes the **Publish** buttons in admin work.
 
 **Create the token:**
 
@@ -216,74 +219,197 @@ This makes the **Publish storefront** button in admin work.
 4. On the **Secrets** tab, add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 5. On the **Variables** tab, add `CATALOG_URL`, set to your `workers.dev` address followed by `/api/catalog`.
 
-**Check:** in admin, click **Publish storefront**. In the GitHub repo's **Actions** tab, **Publish store** should run and turn green in about 3 minutes.
+**Check:** in admin, click **Publish now** at the bottom of the left menu. In the GitHub repo's **Actions** tab, **Publish store** should start within a few seconds and turn green in about 3 minutes.
 
-## Step 9: Backups, email and bot protection
+## Step 9: Backups, order emails and bot protection
 
-**Nightly backups:**
+Do these three parts in order. Every value here is secret except the Turnstile site key.
 
-1. Make up a long passphrase, and save it safely.
-2. In GitHub's **Secrets** tab, add `BACKUP_DATABASE_URL` (Neon **direct** string) and `BACKUP_PASSPHRASE`.
-3. In the **Actions** tab, open **Nightly backup** and click **Run workflow**.
+### Part A: Nightly backups
 
-**Order emails (Brevo):**
+1. Make up a long passphrase, at least 5 random words, and save it in your notes file.
+2. In the GitHub repo, open **Settings → Secrets and variables → Actions**. On the **Secrets** tab, add:
 
-1. Sign up at [brevo.com](https://brevo.com) on the **Free** plan.
-2. Under **Senders**, add your shop email, and click the link in the email they send.
-3. Under **SMTP & API → API Keys**, create a key.
-4. On Render, add `BREVO_KEY`, and `SHOP_EMAIL` set to the verified address.
+   | Name | Value |
+   |---|---|
+   | `BACKUP_DATABASE_URL` | Neon **direct** string, the one without `-pooler` |
+   | `BACKUP_PASSPHRASE` | Your passphrase |
 
-Emails go to the shop only, not to customers.
+3. Open the **Actions** tab, click **Nightly backup** in the left list, then **Run workflow → Run workflow**.
+4. Wait about a minute, then refresh.
 
-**Bot protection (Turnstile), required before launch.** Checkout needs no login, so this is what keeps bots from filling your orders.
+**Check:** the run has a green tick. After that it runs by itself at 02:00 Bangladesh time. Each backup is encrypted, so it's safe even if the repo is public, as long as your passphrase is strong.
 
-1. In Cloudflare, open **Turnstile → Add widget**.
-2. Add your `workers.dev` address and `loverbaazar.com` as hostnames, and choose **Managed**.
-3. On Render, add `TURNSTILE_SECRET` with the **secret key**.
-4. In GitHub's **Variables** tab, add `TURNSTILE_SITE` with the **site key**.
-5. Click **Publish storefront** in admin.
+### Part B: Order emails (Brevo)
 
-**Check:**
+Brevo emails **you** whenever an order or a contact message arrives. Customers get nothing from it. It's optional: the shop works without it, and every order is always in admin.
 
-1. **Nightly backup** turned green.
-2. A test order sends you an email.
-3. The checkout page shows the Turnstile box, and the order still goes through.
+The menus below come from Brevo's help pages. If a name doesn't match exactly, look for the closest one.
+
+**1. Create the account**
+
+1. Go to [brevo.com](https://brevo.com), and click **Sign up free**.
+2. Use the email address you want order emails sent to, such as your shop Gmail.
+3. Open the confirmation email from Brevo, and click the link.
+4. Fill in the short profile form. Use `LoverBaazar` as the company name. If it asks about a plan, choose **Free**. If it asks for a card, stop (see the rules at the top).
+
+The Free plan allows 300 emails a day, far more than this shop needs.
+
+**2. Confirm your sender address**
+
+1. Click your account name at the top right, then **Senders, Domains & Dedicated IPs**, then the **Senders** tab.
+2. Click **Add sender**.
+3. Enter `LoverBaazar` as the name, and the same email address you signed up with.
+4. Brevo sends a code or link to that address. Open it to confirm.
+
+**Check:** the sender shows as verified.
+
+If you use a Gmail address, Brevo may send from an address ending in `@brevosend.com` instead. That's normal, because Gmail addresses can't be authenticated. The email still reaches you.
+
+**3. Create the API key**
+
+1. Open the same account menu, then **SMTP & API**.
+2. Open the **API Keys** tab, not the SMTP tab.
+3. Click **Generate a new API key**, and name it `loverbaazar-shop`.
+4. Copy the key straight away, and save it in your notes file. Brevo only shows it once.
+
+**Check:** the key starts with `xkeysib-`. If it starts with `xsmtpsib-`, that's an SMTP key and it won't work.
+
+**4. Stop Brevo blocking Render**
+
+Render's free plan has no fixed address, and Brevo can reject calls from addresses it doesn't know.
+
+1. Open the account menu, then **Settings → Security → Authorized IPs**.
+2. Turn off the option that blocks unknown IP addresses.
+
+If you can't find it, carry on. If the test below fails with `401`, come back here, or click the link in any security email Brevo sends you.
+
+**5. Give the key to the shop**
+
+1. On Render, open `loverbaazar-api`, then **Environment**.
+2. Add these two, with no quotes and no spaces:
+
+   | Name | Value |
+   |---|---|
+   | `BREVO_KEY` | The key from part 3 |
+   | `SHOP_EMAIL` | The sender address you confirmed in part 2, exactly |
+
+3. Click **Save, rebuild, and deploy**, and wait for the log to say the service is live.
+
+**6. Test it**
+
+1. Open your shop's **Contact** page, and send yourself a short message.
+2. Wait 2 minutes, and look in your inbox and your Spam folder.
+3. If it's in Spam, open it and click **Not spam**. Do this once and later ones should arrive normally.
+
+**Check:** the message arrives. If it doesn't, on Render open **Logs**, and find what's printed just after you sent it:
+
+| Render log | What it means | Fix |
+|---|---|---|
+| Nothing about Brevo | `BREVO_KEY` or `SHOP_EMAIL` is missing | Add both, then redeploy |
+| `brevo: status 401` | The key is wrong, or Brevo blocked Render | Paste the `xkeysib-` key again, and repeat part 4 |
+| `brevo: status 400` | `SHOP_EMAIL` isn't your verified sender | Make them match exactly |
+
+### Part C: Bot protection (Turnstile)
+
+**Required before launch.** Checkout needs no login, so this is what stops bots filling your orders.
+
+**Follow this order exactly.** If the secret reaches Render before the box is on the shop, every order fails with "bot check failed".
+
+1. In Cloudflare, open **Turnstile** from the left menu, and click **Add widget**.
+2. Fill it in:
+
+   | Field | Value |
+   |---|---|
+   | Widget name | `LoverBaazar checkout` |
+   | Hostnames | Your `workers.dev` address without `https://`, and `loverbaazar.com` |
+   | Widget mode | **Managed** |
+
+3. Click **Create**. Save the **Site key** and the **Secret key**.
+4. In GitHub, open **Settings → Secrets and variables → Actions**. On the **Variables** tab, add `TURNSTILE_SITE` with the **site key**.
+5. In admin, click **Publish now**, and wait for **Publish store** to turn green in the **Actions** tab.
+6. Put an item in your cart, open checkout, and confirm the Turnstile box appears.
+7. Only now, on Render, add `TURNSTILE_SECRET` with the **secret key**. Click **Save, rebuild, and deploy**.
+
+**Check:** place a test order. It should go through, then set it to **Cancelled** in admin.
 
 ## Step 10: Prepare the shop
 
-In admin:
+Open `/admin/`. Your changes appear for customers after you click **Publish changes** in the yellow bar, unless the page says they're live.
 
-1. **Settings:** check the delivery charges, then add delivery times, payment numbers, your address, opening hours and return policy.
-2. **Products:** enter real stock numbers. Every in-stock product currently shows 100.
-3. Click **Publish storefront**.
+1. **Delivery and payment:** check each charge (0 means free), add delivery times, and check every payment number. Send yourself ৳10 to prove each number is right.
+2. **Shop details and logo:** check your phone, WhatsApp, address and email. Add opening hours and your return policy.
+3. **Products:** enter real stock numbers. Most in-stock products still show the imported figure of 100. These save by themselves.
+4. **Pages:** read Terms & Conditions and Privacy Policy carefully. They're your legal promises to customers.
+5. **Publish changes.**
 
-Then test on a real phone: browse, order, track, cancel.
+Then, on a real phone: browse, order, track the order, and cancel it.
 
-**Check:** a friend on another phone can place an order, and you can see it.
+**Check:** a friend on another phone can place an order, and you can see it in admin.
 
 ## Step 11: Switch the domain
 
-Pick a quiet time. **Do the email part first**, or you could lose mail.
+This moves `loverbaazar.com` from your old site to the new shop. Pick a quiet time, late at night, and allow 2 to 3 hours of waiting. Customers see the old site until part 3, and that part only takes about 5 minutes.
 
-1. In Cloudflare, click **Add a site**, enter `loverbaazar.com`, and choose **Free**.
-2. Compare the DNS records it imported with your Namecheap ones, especially any **MX** records for email.
-3. Note the two Cloudflare nameservers it gives you.
-4. In Namecheap, open **Domain List → Manage**. Under **Nameservers**, choose **Custom DNS**, enter the two names, and save. This can take a few hours.
-5. Wait for Cloudflare to say the site is **Active**.
-6. In Cloudflare, open **Email → Email Routing**, and forward your `loverbaazar@...` addresses to your Gmail. Send a test message.
-7. In `apps/store/wrangler.jsonc`, add this line after `"name"`, then commit and push:
+**Don't start until Steps 9 and 10 pass.**
+
+### Part 1: Move the domain to Cloudflare
+
+Nothing changes for customers yet.
+
+1. In Cloudflare, click **Add a domain**, enter `loverbaazar.com`, and choose the **Free** plan.
+2. Cloudflare imports your DNS records. Open cPanel's **Zone Editor** beside it, and compare the two lists, especially **MX** and **TXT** records. Add anything that's missing. These control your email.
+3. Cloudflare shows two nameservers. Write them down.
+4. In Namecheap, open **Domain List → Manage**. Under **Nameservers**, choose **Custom DNS**, enter the two names, and tick to save.
+5. Wait for Cloudflare's email saying the domain is **Active**. It usually takes under an hour, and can take a few.
+
+**Check:** `loverbaazar.com` still opens the old site, and an email sent to your domain still arrives.
+
+### Part 2: Move your email, if you use it
+
+Skip this if nobody uses an `@loverbaazar.com` address.
+
+Your old mailboxes stop working when the hosting ends in Step 12, so forward them to Gmail:
+
+1. Check that you downloaded any mail you want to keep (Step 1).
+2. In Cloudflare, open **Email → Email Routing**, then **Get started**.
+3. Enter the address, such as `info@loverbaazar.com`, and your Gmail address. Confirm the email Cloudflare sends to Gmail.
+4. Click **Add records and enable**.
+
+**Check:** send a test message to that address from a different account. It should reach Gmail.
+
+### Part 3: Point the domain at the new shop
+
+The shop is unavailable for a few minutes here, so have everything ready first.
+
+1. In `apps/store/wrangler.jsonc`, add this line after `"name"`, then save and commit, but **don't push yet**:
 
        "routes": [{ "pattern": "loverbaazar.com", "custom_domain": true }],
 
-8. In GitHub's **Variables** tab, change `CATALOG_URL` to `https://loverbaazar.com/api/catalog`. Then open **Actions → Publish store → Run workflow**.
-9. In Cloudflare, add a **Redirect Rule** from `www.loverbaazar.com` to `loverbaazar.com`.
-10. Add a **Rate Limiting Rule** for `/api/login` and `/api/checkout`.
-11. In [Google Search Console](https://search.google.com/search-console), submit `https://loverbaazar.com/sitemap-index.xml`.
-12. Place a real test order on `loverbaazar.com`.
+       git add apps/store/wrangler.jsonc
+       git commit -m "Serve the shop on loverbaazar.com"
 
-**Check:** the shop opens with a padlock, images show, an old product address still works, and your test order appears in admin.
+2. In Cloudflare, open **DNS → Records** for your domain. Delete the **A** record, and any **CNAME** record, named `loverbaazar.com` or `@`. Leave **MX** and **TXT** records alone. The new address can't be set up while the old one exists.
+3. Straight away, push:
 
-**If something is badly wrong:** put the Namecheap nameservers back. The old site returns within a few hours.
+       git push
+
+4. In the GitHub repo's **Actions** tab, wait for **Publish store** to turn green, about 3 minutes.
+5. Open `https://loverbaazar.com`. You may need a private browser window.
+
+**Check:** the new shop opens with a padlock.
+
+### Part 4: Finish up
+
+1. **Tell the shop its new address.** In GitHub, on the **Variables** tab, change `CATALOG_URL` to `https://loverbaazar.com/api/catalog`. Then open **Actions → Publish store → Run workflow**.
+2. **Make www work.** In Cloudflare **DNS → Records**, add a **CNAME** with name `www`, target `loverbaazar.com`, and the orange cloud on. Then open **Rules**, and create a redirect from `www.loverbaazar.com` to `loverbaazar.com` using the **Redirect from WWW to root** template.
+3. **Add a rate limit.** Open **Security → WAF → Rate limiting rules**, and create one rule. Set it to match when the URI path contains `/api/login` or `/api/checkout`, allow 20 requests per 10 seconds, and block after that. Keep it generous, because many customers in Bangladesh share one mobile address.
+4. **Tell Google.** In [Google Search Console](https://search.google.com/search-console), add `loverbaazar.com` as a **Domain** property, and follow its steps to prove you own it. Then open **Sitemaps**, and submit `https://loverbaazar.com/sitemap-index.xml`.
+5. **Place a real test order** on `loverbaazar.com`, then cancel it.
+
+**Check:** images show, an old product address still works, `www.loverbaazar.com` lands on the shop, the Turnstile box shows, and your test order appears in admin.
+
+**If something is badly wrong:** in Namecheap, put the nameservers back to **Namecheap BasicDNS** or your hosting's nameservers. The old site returns within a few hours.
 
 ## Step 12: After launch
 
@@ -322,9 +448,23 @@ After changing a setting, click **Manual Deploy → Deploy latest commit**.
 | `/admin/` says the token is wrong | Paste `ADMIN_TOKEN` again, with no spaces |
 | Orders fail with a database error | Try the Neon **direct** string for `DATABASE_URL` |
 | Images are missing | Re-run the image script while the old site is online |
+| New code on GitHub isn't live | On Render, click **Manual Deploy → Deploy latest commit**, then **Publish now** in admin. Check **Auto-Deploy** is on |
+| A delivery charge, page or blog change doesn't show | Click **Publish now** in admin. Render must finish deploying first |
+| Every order says "bot check failed" | Remove `TURNSTILE_SECRET` from Render, then redo Step 9 Part C in order |
+| `wrangler` says the domain already has DNS records | Delete the A and CNAME records for `loverbaazar.com`, as in Step 11 Part 3 |
 | Publish button says "not configured" | Add `GITHUB_REPO` and `GITHUB_TOKEN` on Render |
 | Publish store fails on `CATALOG_URL` | Add that variable in GitHub, as in Step 8 |
 | Pushes build the site but don't deploy | Add the two Cloudflare secrets from Step 8 |
+
+### Changing the database password
+
+Do this if the password may ever have been seen by anyone else.
+
+1. In Neon, open **Roles**, find your role, and click **Reset password**.
+2. On Neon's **Connect** screen, copy both new strings, pooled and direct.
+3. On Render, update `DATABASE_URL` with the **pooled** string, then deploy.
+4. In GitHub's **Secrets** tab, update `BACKUP_DATABASE_URL` with the **direct** string.
+5. Update your notes file. Run **Nightly backup** once to prove it still works.
 
 ## What happens at each free limit
 
@@ -342,11 +482,10 @@ None of these can bill you without a card.
 
 - That each signup really needs no card (rule 2 covers this).
 - Render's Singapore region on Free, its limits, and whether its terms allow the 10-minute keep-awake ping. If not, remove the cron from `wrangler.jsonc`; checkout will sometimes wait about a minute.
-- That the Go API works on Neon's pooled connection. It's only been tested on local Postgres. If orders fail, try the direct string.
-- That the Actions workflows run. They haven't been run yet.
 - Real speed from Bangladesh.
 - That Cloudflare's edge cache works on a `workers.dev` address. It's only been tested locally. If not, `/api/stock` is still correct, and the cache starts working on your own domain.
-- The image script and admin uploads on a real Cloudinary account. They've only been tested against a simulated one.
+- Admin photo uploads on a real Cloudinary account. They've only been tested against a simulated one.
+- Brevo's exact menu names. Its help site couldn't be read directly when this was written.
 
 ## Before taking online payments
 

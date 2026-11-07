@@ -309,5 +309,82 @@
       "UPDATE settings SET data=data||'{\"whatsapp\":\"01710-076076\"}' WHERE key='site' AND coalesce(data->>'whatsapp','')=''",
       "UPDATE settings SET data=data||'{\"address\":\"Vekutia, Jashore\"}' WHERE key='site' AND coalesce(data->>'address','')=''"
     ]
+  },
+  {
+    "id": "2026-11-product-text",
+    "docs": [],
+    "names": [],
+    "remove": [],
+    "sql": [
+      "UPDATE products SET data=jsonb_set(data,'{short}',to_jsonb(rtrim(regexp_replace(data->>'short','\\s*<div class=\"ailtchrm.*$','','s')))) WHERE data->>'short' LIKE '%ailtchrm%'",
+      "UPDATE products SET data=jsonb_set(data,'{desc}',to_jsonb(regexp_replace(data->>'desc','\\yof wate\\y','of water','g'))) WHERE data->>'desc' ~ '\\yof wate\\y'"
+    ],
+    "text": [
+      {
+        "field": "short",
+        "find": "Delivery Charge Free for Jashore region",
+        "to": "Free delivery in Jashore."
+      },
+      {
+        "field": "short",
+        "find": "Delivery Time 4-7 Days",
+        "to": "Delivery time 4-7 days."
+      },
+      {
+        "field": "short",
+        "find": "Delivery Available Only For Jashore Region",
+        "to": "Delivery available only in Jashore."
+      },
+      {
+        "field": "short",
+        "find": "Cash On Delivery available",
+        "to": "Cash on delivery available."
+      },
+      {
+        "field": "short",
+        "find": "Cash On Delivery Available",
+        "to": "Cash on delivery available."
+      },
+      {
+        "field": "desc",
+        "find": "stainless stel",
+        "to": "stainless steel"
+      },
+      {
+        "field": "desc",
+        "find": "Long lastng",
+        "to": "Long lasting"
+      },
+      {
+        "field": "desc",
+        "find": "Measurment",
+        "to": "Measurement"
+      },
+      {
+        "field": "desc",
+        "find": "Weather prof",
+        "to": "Weather proof"
+      },
+      {
+        "field": "desc",
+        "find": "LxWxW",
+        "to": "LxWxH"
+      },
+      {
+        "field": "desc",
+        "find": "Purification purification",
+        "to": "Purification"
+      },
+      {
+        "field": "desc",
+        "find": "Above this reason its called Super Food",
+        "to": "For these reasons it is called a super food"
+      },
+      {
+        "field": "desc",
+        "find": " (Approved by WHO)",
+        "to": ""
+      }
+    ]
   }
 ]
