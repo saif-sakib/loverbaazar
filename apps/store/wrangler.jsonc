@@ -1,4 +1,4 @@
 { "name": "loverbaazar", "main": "../../edge/worker.js", "compatibility_date": "2026-11-01",
   "triggers": { "crons": ["*/10 * * * *"] },
   "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "404-page", "run_worker_first": ["/api/*", "/wp-content/uploads/*"] },
-  "vars": { "API_ORIGIN": "https://REPLACE-ME.onrender.com", "IMAGE_BASE": "" } }
+  "vars": { "API_ORIGIN": "https://loverbaazar-api.onrender.com", "IMAGE_BASE": "https://res.cloudinary.com/lt9yihbz/image/upload/f_auto,q_auto/loverbaazar" } }
