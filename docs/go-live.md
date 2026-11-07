@@ -125,7 +125,7 @@ Only ever create **one** Render service. The free 750 hours cover one service fo
 
 ## Step 6: Images (Cloudinary)
 
-Old and new images all go in one Cloudinary folder called `loverbaazar`. Your old site must still be online for this step.
+All images go in one Cloudinary folder called `loverbaazar`, sorted like `products/rice-cooker/kiam-rice-cooker-1`. Old images move later, in Step 7.
 
 1. Go to [cloudinary.com](https://cloudinary.com), and sign up for the **Free** plan.
 2. In the console, open **Settings → API Keys** (or the **Dashboard**). Save the **Cloud name**, **API Key** and **API Secret**.
@@ -135,18 +135,7 @@ Old and new images all go in one Cloudinary folder called `loverbaazar`. Your ol
        export CLOUDINARY_KEY=your-api-key
        export CLOUDINARY_SECRET=your-api-secret
 
-4. Copy the 1,724 old images. This can take an hour, because the old site is slow:
-
-       python3 scripts/images_to_cloudinary.py
-
-5. When it ends, read the last line. If `failed` isn't 0, run the same command again. It skips images already copied. If a few keep failing, check the addresses it prints in a browser. Some may already be broken on the old site.
-6. In `apps/store/wrangler.jsonc`, set `IMAGE_BASE`, using your cloud name:
-
-       "IMAGE_BASE": "https://res.cloudinary.com/your-cloud-name/image/upload/f_auto,q_auto/loverbaazar"
-
-   Don't add a slash at the end. This one line moves every old image address, including those inside descriptions and blog posts, and keeps old links working.
-
-7. On Render, open your service, then **Environment**, and add these so admin can upload new photos. Saving restarts the service.
+4. On Render, open your service, then **Environment**, and add these so admin can upload new photos. Saving restarts the service.
 
    | Name | Value |
    |---|---|
@@ -154,7 +143,7 @@ Old and new images all go in one Cloudinary folder called `loverbaazar`. Your ol
    | `CLOUDINARY_KEY` | Your API key |
    | `CLOUDINARY_SECRET` | Your API secret |
 
-**Check:** in Cloudinary's **Media Library**, the `loverbaazar` folder has your images. Copy any one image's address into a browser, and it should open.
+**Check:** Render restarts, and `/api/health` still shows `ok`.
 
 ## Step 7: Store (Cloudflare)
 
@@ -183,7 +172,12 @@ Old and new images all go in one Cloudinary folder called `loverbaazar`. Your ol
        npx wrangler deploy
        cd ../..
 
-7. Save your `wrangler.jsonc` change:
+7. Move the old images while your old site is online. It copies only images the shop uses, gives them clear names, and updates every address. It's safe to re-run until it says `failed: 0`:
+
+       export SHOP=https://YOUR-SHOP.workers.dev ADMIN_TOKEN=... CLOUDINARY_CLOUD=... CLOUDINARY_KEY=... CLOUDINARY_SECRET=...
+       python3 scripts/images_to_cloudinary.py
+
+8. Save your `wrangler.jsonc` change:
 
        git add apps/store/wrangler.jsonc
        git commit -m "Set API and image addresses"
@@ -327,7 +321,7 @@ After changing a setting, click **Manual Deploy → Deploy latest commit**.
 | The shop opens but checkout shows an error | `ORIGIN_SECRET` must match on Render and in the Worker. Repeat Step 7, part 4 |
 | `/admin/` says the token is wrong | Paste `ADMIN_TOKEN` again, with no spaces |
 | Orders fail with a database error | Try the Neon **direct** string for `DATABASE_URL` |
-| Images are missing | Check `IMAGE_BASE`, then re-run the image script while the old site is online |
+| Images are missing | Re-run the image script while the old site is online |
 | Publish button says "not configured" | Add `GITHUB_REPO` and `GITHUB_TOKEN` on Render |
 | Publish store fails on `CATALOG_URL` | Add that variable in GitHub, as in Step 8 |
 | Pushes build the site but don't deploy | Add the two Cloudflare secrets from Step 8 |

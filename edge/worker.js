@@ -40,11 +40,6 @@ async function stock(request, env, url, ctx) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    // Old image links, such as those Google has indexed, keep working after WordPress is gone.
-    if (url.pathname.startsWith("/wp-content/uploads/")) {
-      if (!env.IMAGE_BASE) return env.ASSETS.fetch(request);
-      return Response.redirect(env.IMAGE_BASE + url.pathname.slice("/wp-content/uploads".length), 301);
-    }
     if (url.pathname === "/api/stock" && request.method === "GET") return stock(request, env, url, ctx);
     try {
       return await forward(request, env, url);

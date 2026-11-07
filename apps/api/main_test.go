@@ -87,6 +87,15 @@ func TestHealthPassesTheOriginGuard(t *testing.T) {
 	}
 }
 
+func TestUploadPlace(t *testing.T) {
+	if dir, id := uploadPlace("products/rice-cooker", "kiam-1"); dir != "loverbaazar/products/rice-cooker" || id != dir+"/kiam-1" {
+		t.Error(dir, id)
+	}
+	if dir, id := uploadPlace("../secret", "a/b"); dir != "loverbaazar/uploads" || !strings.Contains(id, "/image-") {
+		t.Error(dir, id)
+	}
+}
+
 func TestSignUpload(t *testing.T) {
 	// The worked example in Cloudinary's signature documentation.
 	got := signUpload(map[string]string{"eager": "w_400,h_300,c_pad|w_260,h_200,c_crop", "public_id": "sample_image", "timestamp": "1315060510"}, "abcd")

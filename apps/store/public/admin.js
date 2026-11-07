@@ -114,7 +114,12 @@
     if (box && e.target.type === "checkbox") $("summary", box).textContent = `${$$("input:checked", box).length} chosen`;
   });
 
-  const upload = async (file) => (await api("/image", { body: file })).url;
+  // Images get readable names. Without a name, the file's own name is used.
+  const asciiName = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const upload = async (file, folder = "pages", name = "") => {
+    const base = name || asciiName(file.name.replace(/\.\w+$/, ""));
+    return (await api(`/image?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(base)}`, { body: file })).url;
+  };
 
   // Editable rows: delivery areas, payment methods, homepage sections and so on.
   function rows(host, items, fields, blank) {
@@ -158,7 +163,7 @@
           .join("") + `<button type="button" class="btn ghost small add" data-add-row>Add</button>`;
       $$("[data-up]", host).forEach((inp) => {
         inp.onchange = run(async () => {
-          $("input[data-k]", inp.parentElement).value = await upload(inp.files[0]);
+          $("input[data-k]", inp.parentElement).value = await upload(inp.files[0], "site");
         });
       });
       $$(".rep", host).forEach((row, i) => {
@@ -547,7 +552,11 @@
     };
     $("#up").onchange = run(async (e) => {
       say("Uploading…");
-      for (const file of e.target.files) addImage(await upload(file));
+      const cat = (new FormData(f).getAll("cat").find((c) => !["latest-product", "popular-item"].includes(c)) || "other").replace(/[^a-z0-9-]/g, "");
+      const stem = asciiName(f.slug.value) || "product";
+      const taken = images.map((i) => +(i.src.match(new RegExp(`${stem}-(\d+)\.`))?.[1] || 0));
+      let n = Math.max(0, ...taken);
+      for (const file of e.target.files) addImage(await upload(file, `products/${cat}`, `${stem}-${++n}`));
       say("");
       e.target.value = "";
     });
@@ -964,7 +973,7 @@
       { label: "", url: "/" },
     );
     $("#logoup").onchange = run(async (e) => {
-      f.logo.value = await upload(e.target.files[0]);
+      f.logo.value = await upload(e.target.files[0], "site", "logo");
     });
     f.onsubmit = run(async (e) => {
       e.preventDefault();

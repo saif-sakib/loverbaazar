@@ -639,7 +639,8 @@ func adminImage(w http.ResponseWriter, r *http.Request) {
 		err = os.WriteFile(filepath.Join(dir, name), b, 0o644)
 		url = "/uploads/" + name
 	} else {
-		url, err = cloudinary(b)
+		q := r.URL.Query()
+		url, err = cloudinary(b, q.Get("folder"), q.Get("name"))
 	}
 	if err != nil {
 		oops(w, err)
@@ -648,8 +649,26 @@ func adminImage(w http.ResponseWriter, r *http.Request) {
 	ok(w, map[string]string{"url": url})
 }
 
-// uploadFolder holds every shop image. scripts/images_to_cloudinary.py puts the old ones here too.
+// uploadFolder holds every shop image, in readable places such as
+// loverbaazar/products/rice-cooker/kiam-rice-cooker-1. scripts/images_to_cloudinary.py follows the same plan.
 const uploadFolder = "loverbaazar"
+
+var (
+	folderRe = regexp.MustCompile(`^[a-z0-9-]+(/[a-z0-9-]+)*$`)
+	nameRe   = regexp.MustCompile(`^[a-z0-9-]+$`)
+)
+
+// uploadPlace falls back to a dated name, so a missing hint can't overwrite another image.
+func uploadPlace(folder, name string) (dir, publicID string) {
+	if !folderRe.MatchString(folder) {
+		folder = "uploads"
+	}
+	if !nameRe.MatchString(name) {
+		name = "image-" + time.Now().Format("2006-01-02-150405")
+	}
+	dir = uploadFolder + "/" + folder
+	return dir, dir + "/" + name
+}
 
 // signUpload is Cloudinary's rule: sorted name=value pairs, then the secret, hashed with SHA-1.
 func signUpload(params map[string]string, secret string) string {
@@ -663,14 +682,16 @@ func signUpload(params map[string]string, secret string) string {
 }
 
 // cloudinary stores an upload on the free plan, which needs no card.
-func cloudinary(file []byte) (string, error) {
+func cloudinary(file []byte, folder, name string) (string, error) {
 	cloud, key, secret := os.Getenv("CLOUDINARY_CLOUD"), os.Getenv("CLOUDINARY_KEY"), os.Getenv("CLOUDINARY_SECRET")
 	if cloud == "" {
 		return "", userErr{501, "image storage is not configured. Add the Cloudinary keys on Render"}
 	}
+	dir, id := uploadPlace(folder, name)
 	params := map[string]string{
-		"asset_folder": uploadFolder,
-		"public_id":    uploadFolder + "/new/" + strings.ToLower(token(8)),
+		"asset_folder": dir,
+		"invalidate":   "true",
+		"public_id":    id,
 		"timestamp":    strconv.FormatInt(time.Now().Unix(), 10),
 	}
 	var body bytes.Buffer
