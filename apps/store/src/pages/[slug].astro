@@ -1,6 +1,19 @@
 ---
-import Base from "../layouts/Base.astro"; import { pages, posts } from "../lib/shop";
+import Base from "../layouts/Base.astro";
+import { pages, posts } from "../lib/shop";
 export const getStaticPaths = () => [...pages, ...posts].map((p) => ({ params: { slug: p.slug }, props: { p } }));
 const { p } = Astro.props;
 ---
-<Base title={p.title} description={p.excerpt}><div class="wrap" style="max-width:860px"><p class="crumbs"><a href="/">Home</a> / {p.title}</p><h1>{p.title}</h1>{p.date && <p class="meta">{p.date}</p>}<article class="prose"><Fragment set:html={p.html} /></article></div></Base>
+
+<Base title={p.title} description={p.excerpt}>
+  <div class="wrap" style="max-width:860px">
+    <p class="crumbs">
+      <a href="/">Home</a> / {p.title}
+    </p>
+    <h1>{p.title}</h1>
+    {p.date && <p class="meta">{p.date}</p>}
+    <article class="prose">
+      <Fragment set:html={p.html} />
+    </article>
+  </div>
+</Base>

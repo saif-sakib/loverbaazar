@@ -1,6 +1,20 @@
 ---
-import Base from "../../layouts/Base.astro"; import Grid from "../../components/Grid.astro"; import { tags, products } from "../../lib/shop";
+import Base from "../../layouts/Base.astro";
+import Grid from "../../components/Grid.astro";
+import { tags, products } from "../../lib/shop";
 export const getStaticPaths = () => tags.map((t) => ({ params: { slug: t.slug }, props: { t } }));
-const { t } = Astro.props; const items = products.filter((p) => p.tags.includes(t.slug));
+const { t } = Astro.props;
+const items = products.filter((p) => p.tags.includes(t.slug));
 ---
-<Base title={t.name}><div class="wrap"><p class="crumbs"><a href="/">Home</a> / <a href="/shop/">Shop</a> / {t.name}</p><div class="pagehead"><h1>{t.name}</h1></div><Grid items={items} /></div></Base>
+
+<Base title={t.name}>
+  <div class="wrap">
+    <p class="crumbs">
+      <a href="/">Home</a> / <a href="/shop/">Shop</a> / {t.name}
+    </p>
+    <div class="pagehead">
+      <h1>{t.name}</h1>
+    </div>
+    <Grid items={items} />
+  </div>
+</Base>

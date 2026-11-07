@@ -2,10 +2,15 @@
 import Card from "./Card.astro";
 const { items } = Astro.props;
 ---
+
 <div class="tools">
-  <span><b data-count>{items.length}</b> products</span>
+  <span>
+    <b data-count>{items.length}</b> products
+  </span>
   <div class="filters">
-    <label class="check"><input type="checkbox" data-instock /> In stock</label>
+    <label class="check">
+      <input type="checkbox" data-instock /> In stock
+    </label>
     <input type="number" min="0" inputmode="numeric" placeholder="Min ৳" aria-label="Lowest price" data-min />
     <input type="number" min="0" inputmode="numeric" placeholder="Max ৳" aria-label="Highest price" data-max />
     <select data-sort aria-label="Sort">
@@ -16,6 +21,14 @@ const { items } = Astro.props;
     </select>
   </div>
 </div>
-<div class="grid" data-grid>{items.map((p: any, i: number) => <Card p={p} eager={i < 4} />)}</div>
-<p data-nomatch hidden>No products match these filters.</p>
-<button class="btn ghost more" data-more hidden>Show more</button>
+<div class="grid" data-grid>
+  {items.map((p: any, i: number) => (
+    <Card p={p} eager={i < 4} />
+  ))}
+</div>
+<p data-nomatch hidden>
+  No products match these filters.
+</p>
+<button class="btn ghost more" data-more hidden>
+  Show more
+</button>

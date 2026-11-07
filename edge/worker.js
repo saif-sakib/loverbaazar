@@ -1,10 +1,17 @@
 // Forwards /api/* to the Go API. Static pages never run this code.
 const forward = (request, env, url, init = {}) => {
   const headers = new Headers(request.headers);
+  headers.delete("Host"); // Render routes by host name, so it must see its own
   headers.set("X-Origin-Secret", env.ORIGIN_SECRET);
   // Set here, not read from the browser, so nobody can dodge the API's rate limits.
   headers.set("X-Client-IP", request.headers.get("CF-Connecting-IP") || "");
-  return fetch(new URL(url.pathname + url.search, env.API_ORIGIN), { method: request.method, headers, body: request.body, redirect: "manual", ...init });
+  return fetch(new URL(url.pathname + url.search, env.API_ORIGIN), {
+    method: request.method,
+    headers,
+    body: request.body,
+    redirect: "manual",
+    ...init,
+  });
 };
 
 // Kept for a day: if the API is asleep or down, browsers still get recent prices straight away.
@@ -23,7 +30,10 @@ async function stock(request, env, url, ctx) {
     }
     return res;
   } catch {
-    return (await cache.match(staleKey(url))) || new Response('{"error":"unavailable"}', { status: 503, headers: { "Content-Type": "application/json" } });
+    return (
+      (await cache.match(staleKey(url))) ||
+      new Response('{"error":"unavailable"}', { status: 503, headers: { "Content-Type": "application/json" } })
+    );
   }
 }
 
@@ -34,7 +44,10 @@ export default {
     try {
       return await forward(request, env, url);
     } catch {
-      return new Response('{"error":"The shop is busy right now. Please try again in a minute."}', { status: 503, headers: { "Content-Type": "application/json" } });
+      return new Response('{"error":"The shop is busy right now. Please try again in a minute."}', {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      });
     }
   },
   // Render sleeps after 15 idle minutes. /api/health does not touch the database, so Neon still sleeps.

@@ -1,10 +1,25 @@
+# Dependencies and build output
 node_modules
 dist
 .astro
 .wrangler
-.env
-data/raw
 apps/api/server
 apps/api/bootstrap
 apps/api/app
+
+# Secrets: real values never go in git. .env.example lists every setting.
+.env
+.env.*
+!.env.example
+.dev.vars*
+*.dump
+*.dump.gpg
+
+# Local data
+data/raw
 apps/store/public/uploads
+
+# Editors and systems
+.DS_Store
+.idea
+.vscode

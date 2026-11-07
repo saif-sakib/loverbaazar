@@ -3,15 +3,34 @@ import { img, taka, off } from "../lib/shop";
 const { p, eager } = Astro.props;
 const d = off(p);
 ---
+
 <article class="card" data-card data-name={p.name.toLowerCase()} data-price={p.price} data-id={p.id} data-stocked={p.inStock ? "1" : "0"}>
   <a href={`/product/${p.slug}/`} class="thumb">
-    <img src={img(p.images[0]?.thumb)} alt={p.images[0]?.alt || p.name} loading={eager ? "eager" : "lazy"} decoding="async" width="300" height="300" />
-    <span class="badge" data-off={p.id} hidden={d === 0}>-{d}%</span>
+    <img
+      src={img(p.images[0]?.thumb)}
+      alt={p.images[0]?.alt || p.name}
+      loading={eager ? "eager" : "lazy"}
+      decoding="async"
+      width="300"
+      height="300"
+    />
+    <span class="badge" data-off={p.id} hidden={d === 0}>
+      -{d}%
+    </span>
   </a>
-  <button class="heart" data-wish={p.id} aria-label={`Add ${p.name} to wishlist`}>♥</button>
+  <button class="heart" data-wish={p.id} aria-label={`Add ${p.name} to wishlist`}>
+    ♥
+  </button>
   <div class="body">
-    <a href={`/product/${p.slug}/`} class="name">{p.name}</a>
-    <div class="price" data-price-for={p.id}><b>{taka(p.price)}</b>{p.regular > p.price && <s>{taka(p.regular)}</s>}</div>
-    <button class="btn small" data-add={p.id} data-label="Add to cart" disabled={!p.inStock}>{p.inStock ? "Add to cart" : "Sold out"}</button>
+    <a href={`/product/${p.slug}/`} class="name">
+      {p.name}
+    </a>
+    <div class="price" data-price-for={p.id}>
+      <b>{taka(p.price)}</b>
+      {p.regular > p.price && <s>{taka(p.regular)}</s>}
+    </div>
+    <button class="btn small" data-add={p.id} data-label="Add to cart" disabled={!p.inStock}>
+      {p.inStock ? "Add to cart" : "Sold out"}
+    </button>
   </div>
 </article>

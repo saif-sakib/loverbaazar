@@ -2,6 +2,8 @@
 # Starts everything locally. Run from anywhere: ./scripts/dev.sh  (Ctrl+C stops it)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Optional services for local testing. The local values below always win, so a .env can't reach production.
+if [ -f "$ROOT/.env" ]; then set -a; . "$ROOT/.env"; set +a; fi
 docker start lbpg >/dev/null 2>&1 || docker run -d --name lbpg -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb -p 55432:5432 postgres:17-alpine >/dev/null
 until docker exec lbpg pg_isready -U postgres -d lb -q; do sleep 0.5; done; sleep 1
 export DATABASE_URL='postgres://postgres:dev@127.0.0.1:55432/lb?sslmode=disable' DEV=1 PORT=8080

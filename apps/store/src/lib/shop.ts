@@ -25,7 +25,9 @@ if (!Array.isArray(list) || list.length === 0) throw new Error("The catalogue ca
 
 export const products: any[] = list.map((p) => ({ cats: [], tags: [], images: [], attrs: [], reviews: [], short: "", desc: "", ...p }));
 const pick = (key: "cats" | "tags" | "pages" | "posts"): any[] => (store[key]?.length ? store[key] : (localContent as any)[key]);
-export const cats = pick("cats"), tags = pick("tags"), pages = pick("pages");
+export const cats = pick("cats"),
+  tags = pick("tags"),
+  pages = pick("pages");
 export const posts = [...pick("posts")].sort((a, b) => String(b.date).localeCompare(String(a.date)));
 export const SITE: any = { ...defaults.site, ...store.site };
 export const LIVE: any = { ...defaults.live, ...store.live }; // only a fallback: the browser reads /api/stock
@@ -39,5 +41,7 @@ export const catUrl = (c: any) => `/product-category/${c.path}/`;
 export const telOf = (phone: string) => "+88" + phone.replace(/\D/g, "").replace(/^88/, "");
 export const waOf = (phone: string) => "https://wa.me/88" + phone.replace(/\D/g, "").replace(/^88/, "");
 const cat = (s: string) => cats.find((c: any) => c.slug === s);
-export const MENU = SITE.menu.map((g: any) => ({ title: g.title, items: g.cats.map(cat).filter(Boolean) })).filter((g: any) => g.items.length);
+export const MENU = SITE.menu
+  .map((g: any) => ({ title: g.title, items: g.cats.map(cat).filter(Boolean) }))
+  .filter((g: any) => g.items.length);
 export const rating = (p: any) => (p.reviews.length ? p.reviews.reduce((a: number, r: any) => a + r.rating, 0) / p.reviews.length : 0);

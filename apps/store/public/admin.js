@@ -3,15 +3,34 @@
   "use strict";
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const esc = (s) =>
+    String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const money = (n) => "৳" + Number(n || 0).toLocaleString("en-IN");
-  const when = (s) => new Date(s).toLocaleString("en-GB", { timeZone: "Asia/Dhaka", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
-  const slugify = (s) => String(s).toLowerCase().trim().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
+  const when = (s) =>
+    new Date(s).toLocaleString("en-GB", { timeZone: "Asia/Dhaka", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  const slugify = (s) =>
+    String(s)
+      .toLowerCase()
+      .trim()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "");
   const asciiId = (s) => slugify(s).replace(/[^a-z0-9-]/g, "") || "opt-" + Date.now().toString(36);
   const view = () => $("#view");
 
   const STATUSES = ["pending", "confirmed", "shipped", "delivered", "cancelled", "returned"];
-  const TABS = { dashboard: "Dashboard", orders: "Orders", products: "Products", categories: "Categories", coupons: "Coupons", customers: "Customers", reviews: "Reviews", messages: "Messages", pages: "Pages", blog: "Blog", settings: "Settings" };
+  const TABS = {
+    dashboard: "Dashboard",
+    orders: "Orders",
+    products: "Products",
+    categories: "Categories",
+    coupons: "Coupons",
+    customers: "Customers",
+    reviews: "Reviews",
+    messages: "Messages",
+    pages: "Pages",
+    blog: "Blog",
+    settings: "Settings",
+  };
 
   let token = sessionStorage.getItem("t") || "";
   let site = null; // shop details, for invoices
@@ -33,7 +52,10 @@
     return j;
   }
 
-  const say = (m) => { $("#ok").textContent = m; $("#ok").hidden = !m; };
+  const say = (m) => {
+    $("#ok").textContent = m;
+    $("#ok").hidden = !m;
+  };
   const logout = (msg) => {
     sessionStorage.removeItem("t");
     token = "";
@@ -42,19 +64,26 @@
     $("#app").hidden = true;
   };
   // Runs an action and shows any failure at the top of the page.
-  const run = (f) => async (...a) => {
-    $("#err").textContent = "";
-    try {
-      return await f(...a);
-    } catch (e) {
-      if (e.auth) logout(e.message);
-      else { $("#err").textContent = e.message; scrollTo(0, 0); }
-    }
-  };
+  const run =
+    (f) =>
+    async (...a) => {
+      $("#err").textContent = "";
+      try {
+        return await f(...a);
+      } catch (e) {
+        if (e.auth) logout(e.message);
+        else {
+          $("#err").textContent = e.message;
+          scrollTo(0, 0);
+        }
+      }
+    };
   // Saved, but customers only see it after Publish.
   const needsPublish = (m) => {
     say(m + " Click Publish storefront when you have finished.");
-    try { localStorage.setItem("dirty", "1"); } catch {}
+    try {
+      localStorage.setItem("dirty", "1");
+    } catch {}
     $("#pub").classList.add("attention");
   };
 
@@ -65,14 +94,19 @@
 
   // ---- Reusable form parts ----
 
-  const checkList = (name, chosen) => `<details class="picker"><summary>${chosen.length} chosen</summary><input type="search" placeholder="Filter" data-pick-filter aria-label="Filter categories"><div>
+  const checkList = (
+    name,
+    chosen,
+  ) => `<details class="picker"><summary>${chosen.length} chosen</summary><input type="search" placeholder="Filter" data-pick-filter aria-label="Filter categories"><div>
     ${categories.map((c) => `<label class="check" data-pick="${esc(c.name.toLowerCase())}"><input type="checkbox" name="${esc(name)}" value="${esc(c.slug)}" ${chosen.includes(c.slug) ? "checked" : ""}> ${esc(c.name)}</label>`).join("")}
   </div></details>`;
 
   document.addEventListener("input", (e) => {
     if (e.target.matches("[data-pick-filter]")) {
       const q = e.target.value.toLowerCase();
-      $$("[data-pick]", e.target.parentElement).forEach((l) => { l.hidden = !l.dataset.pick.includes(q); });
+      $$("[data-pick]", e.target.parentElement).forEach((l) => {
+        l.hidden = !l.dataset.pick.includes(q);
+      });
     }
   });
   document.addEventListener("change", (e) => {
@@ -88,10 +122,16 @@
     const cell = (f, it) => {
       const v = it[f.k] ?? "";
       const label = `<span>${esc(f.label)}</span>`;
-      if (f.type === "bool") return `<label class="check"><input type="checkbox" data-k="${f.k}" ${v ? "checked" : ""}> ${esc(f.label)}</label>`;
-      if (f.type === "select") return `<label>${label}<select data-k="${f.k}">${f.options().map(([val, text]) => `<option value="${esc(val)}" ${val === v ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
+      if (f.type === "bool")
+        return `<label class="check"><input type="checkbox" data-k="${f.k}" ${v ? "checked" : ""}> ${esc(f.label)}</label>`;
+      if (f.type === "select")
+        return `<label>${label}<select data-k="${f.k}">${f
+          .options()
+          .map(([val, text]) => `<option value="${esc(val)}" ${val === v ? "selected" : ""}>${esc(text)}</option>`)
+          .join("")}</select></label>`;
       if (f.type === "cats") return `<label class="wide">${label}<div data-k="${f.k}" data-cats>${checkList("c", v || [])}</div></label>`;
-      if (f.type === "image") return `<label class="wide">${label}<span class="inline"><input data-k="${f.k}" value="${esc(v)}" placeholder="Image address"><input type="file" accept="image/*" data-up aria-label="Upload image"></span></label>`;
+      if (f.type === "image")
+        return `<label class="wide">${label}<span class="inline"><input data-k="${f.k}" value="${esc(v)}" placeholder="Image address"><input type="file" accept="image/*" data-up aria-label="Upload image"></span></label>`;
       return `<label>${label}<input data-k="${f.k}" type="${f.type || "text"}" value="${esc(v)}"></label>`;
     };
     const read = () => {
@@ -109,19 +149,39 @@
       return list;
     };
     const draw = () => {
-      host.innerHTML = list.map((it) => `<div class="rep">${fields.map((f) => cell(f, it)).join("")}
-        <span class="repbtn"><button type="button" data-up-row aria-label="Move up">▲</button><button type="button" data-down aria-label="Move down">▼</button><button type="button" data-remove aria-label="Remove">✕</button></span></div>`).join("")
-        + `<button type="button" class="btn ghost small add" data-add-row>Add</button>`;
+      host.innerHTML =
+        list
+          .map(
+            (it) => `<div class="rep">${fields.map((f) => cell(f, it)).join("")}
+        <span class="repbtn"><button type="button" data-up-row aria-label="Move up">▲</button><button type="button" data-down aria-label="Move down">▼</button><button type="button" data-remove aria-label="Remove">✕</button></span></div>`,
+          )
+          .join("") + `<button type="button" class="btn ghost small add" data-add-row>Add</button>`;
       $$("[data-up]", host).forEach((inp) => {
-        inp.onchange = run(async () => { $("input[data-k]", inp.parentElement).value = await upload(inp.files[0]); });
+        inp.onchange = run(async () => {
+          $("input[data-k]", inp.parentElement).value = await upload(inp.files[0]);
+        });
       });
       $$(".rep", host).forEach((row, i) => {
-        const swap = (j) => { read(); if (list[j]) { [list[i], list[j]] = [list[j], list[i]]; draw(); } };
+        const swap = (j) => {
+          read();
+          if (list[j]) {
+            [list[i], list[j]] = [list[j], list[i]];
+            draw();
+          }
+        };
         $("[data-up-row]", row).onclick = () => swap(i - 1);
         $("[data-down]", row).onclick = () => swap(i + 1);
-        $("[data-remove]", row).onclick = () => { read(); list.splice(i, 1); draw(); };
+        $("[data-remove]", row).onclick = () => {
+          read();
+          list.splice(i, 1);
+          draw();
+        };
       });
-      $("[data-add-row]", host).onclick = () => { read(); list.push({ ...blank }); draw(); };
+      $("[data-add-row]", host).onclick = () => {
+        read();
+        list.push({ ...blank });
+        draw();
+      };
     };
     draw();
     return read;
@@ -137,27 +197,43 @@
       <button type="button" data-html>HTML</button></div>
       <div class="richbox" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Text"></div>
       <textarea class="richsrc" rows="12" hidden aria-label="HTML"></textarea></div>`;
-    const box = $(".richbox", host), src = $(".richsrc", host);
+    const box = $(".richbox", host),
+      src = $(".richsrc", host);
     box.innerHTML = html || "";
-    const cmd = (c, v) => { box.focus(); document.execCommand(c, false, v); };
-    $$("[data-cmd]", host).forEach((b) => { b.onclick = () => cmd(b.dataset.cmd); });
-    $$("[data-block]", host).forEach((b) => { b.onclick = () => cmd("formatBlock", b.dataset.block); });
-    $("[data-link]", host).onclick = () => { const u = prompt("Link address"); if (u) cmd("createLink", u); };
+    const cmd = (c, v) => {
+      box.focus();
+      document.execCommand(c, false, v);
+    };
+    $$("[data-cmd]", host).forEach((b) => {
+      b.onclick = () => cmd(b.dataset.cmd);
+    });
+    $$("[data-block]", host).forEach((b) => {
+      b.onclick = () => cmd("formatBlock", b.dataset.block);
+    });
+    $("[data-link]", host).onclick = () => {
+      const u = prompt("Link address");
+      if (u) cmd("createLink", u);
+    };
     $("input[type=file]", host).onchange = run(async (e) => {
       const url = await upload(e.target.files[0]);
-      if (src.hidden) cmd("insertImage", url); else src.value += `<img src="${esc(url)}" alt="">`;
+      if (src.hidden) cmd("insertImage", url);
+      else src.value += `<img src="${esc(url)}" alt="">`;
     });
     $("[data-html]", host).onclick = () => {
-      if (src.hidden) src.value = box.innerHTML; else box.innerHTML = src.value;
+      if (src.hidden) src.value = box.innerHTML;
+      else box.innerHTML = src.value;
       src.hidden = !src.hidden;
       box.hidden = !box.hidden;
     };
     return () => (src.hidden ? box.innerHTML : src.value);
   }
 
-  const field = (label, name, value, extra = "", type = "text") => `<label class="field">${esc(label)}<input name="${name}" type="${type}" value="${esc(value ?? "")}" ${extra}></label>`;
-  const area = (label, name, value, n = 3) => `<label class="field">${esc(label)}<textarea name="${name}" rows="${n}">${esc(value ?? "")}</textarea></label>`;
-  const toggle = (label, name, on) => `<label class="check field"><input type="checkbox" name="${name}" ${on ? "checked" : ""}> ${esc(label)}</label>`;
+  const field = (label, name, value, extra = "", type = "text") =>
+    `<label class="field">${esc(label)}<input name="${name}" type="${type}" value="${esc(value ?? "")}" ${extra}></label>`;
+  const area = (label, name, value, n = 3) =>
+    `<label class="field">${esc(label)}<textarea name="${name}" rows="${n}">${esc(value ?? "")}</textarea></label>`;
+  const toggle = (label, name, on) =>
+    `<label class="check field"><input type="checkbox" name="${name}" ${on ? "checked" : ""}> ${esc(label)}</label>`;
 
   // ---- Dashboard ----
 
@@ -189,12 +265,30 @@
       <select id="ost" aria-label="Status"><option value="">All statuses</option>${STATUSES.map((s) => `<option ${s === orderFilter.status ? "selected" : ""}>${s}</option>`).join("")}</select>
       <label class="check">From <input id="ofrom" type="date" value="${esc(orderFilter.from)}"></label><label class="check">To <input id="oto" type="date" value="${esc(orderFilter.to)}"></label>
       <button class="btn ghost" id="csv">Export CSV</button></div><div id="olist"><p>Loading…</p></div>`;
-    const reload = () => { orderFilter.page = 0; drawOrders(); };
+    const reload = () => {
+      orderFilter.page = 0;
+      drawOrders();
+    };
     let t;
-    $("#oq").oninput = (e) => { clearTimeout(t); t = setTimeout(() => { orderFilter.q = e.target.value; reload(); }, 300); };
-    $("#ost").onchange = (e) => { orderFilter.status = e.target.value; reload(); };
-    $("#ofrom").onchange = (e) => { orderFilter.from = e.target.value; reload(); };
-    $("#oto").onchange = (e) => { orderFilter.to = e.target.value; reload(); };
+    $("#oq").oninput = (e) => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        orderFilter.q = e.target.value;
+        reload();
+      }, 300);
+    };
+    $("#ost").onchange = (e) => {
+      orderFilter.status = e.target.value;
+      reload();
+    };
+    $("#ofrom").onchange = (e) => {
+      orderFilter.from = e.target.value;
+      reload();
+    };
+    $("#oto").onchange = (e) => {
+      orderFilter.to = e.target.value;
+      reload();
+    };
     $("#csv").onclick = run(async () => {
       const r = await api("/orders.csv?" + query(), { raw: true });
       const a = document.createElement("a");
@@ -212,7 +306,9 @@
     const pages = Math.ceil(res.total / res.size);
     $("#olist").innerHTML = `<p><b>${res.total}</b> orders · <b>${money(res.sales)}</b> sales, not counting cancelled or returned</p>
     <div class="scroll"><table class="tbl"><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr>
-    ${l.map((o) => `<tr>
+    ${l
+      .map(
+        (o) => `<tr>
       <td><b>${esc(o.number)}</b><br><small>${esc(when(o.created_at))}</small></td>
       <td>${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a><br>${esc(o.address)} (${esc(o.area)})${o.note ? `<br><i>${esc(o.note)}</i>` : ""}</td>
       <td>${(o.items || []).map((i) => `${esc(i.name)} × ${i.qty}`).join("<br>")}</td>
@@ -223,17 +319,37 @@
     </tr>
     <tr id="d-${esc(o.number)}" hidden><td colspan="7"><form class="inlineform" data-n="${esc(o.number)}">
       ${field("Courier", "courier", o.courier)}${field("Tracking number", "tracking", o.tracking)}${field("Private note, customers never see this", "adminNote", o.admin_note)}
-      <button class="btn">Save</button></form></td></tr>`).join("")}</table></div>
+      <button class="btn">Save</button></form></td></tr>`,
+      )
+      .join("")}</table></div>
     ${pages > 1 ? `<div class="pager"><button class="btn ghost" id="prev" ${orderFilter.page ? "" : "disabled"}>Previous</button> Page ${orderFilter.page + 1} of ${pages} <button class="btn ghost" id="next" ${orderFilter.page + 1 < pages ? "" : "disabled"}>Next</button></div>` : ""}`;
     if ($("#prev")) {
-      $("#prev").onclick = () => { orderFilter.page--; drawOrders(); };
-      $("#next").onclick = () => { orderFilter.page++; drawOrders(); };
+      $("#prev").onclick = () => {
+        orderFilter.page--;
+        drawOrders();
+      };
+      $("#next").onclick = () => {
+        orderFilter.page++;
+        drawOrders();
+      };
     }
-    $$("[data-phone]").forEach((a) => { a.onclick = () => { orderFilter.q = a.dataset.phone; orderFilter.page = 0; orders(); }; });
+    $$("[data-phone]").forEach((a) => {
+      a.onclick = () => {
+        orderFilter.q = a.dataset.phone;
+        orderFilter.page = 0;
+        orders();
+      };
+    });
     $$("[data-o]").forEach((s) => {
       s.onchange = run(async () => {
         const previous = l.find((o) => o.number === s.dataset.o).status;
-        if ((s.value === "cancelled" || s.value === "returned") && !confirm(`Mark ${s.dataset.o} as ${s.value}? The stock goes back on sale.`)) { s.value = previous; return; }
+        if (
+          (s.value === "cancelled" || s.value === "returned") &&
+          !confirm(`Mark ${s.dataset.o} as ${s.value}? The stock goes back on sale.`)
+        ) {
+          s.value = previous;
+          return;
+        }
         try {
           await api("/orders/" + encodeURIComponent(s.dataset.o), { method: "PUT", body: { status: s.value } });
           say(`${s.dataset.o} is now ${s.value}.`);
@@ -242,7 +358,12 @@
         }
       });
     });
-    $$("[data-more]").forEach((b) => { b.onclick = () => { const r = $(`[id="d-${b.dataset.more}"]`); r.hidden = !r.hidden; }; });
+    $$("[data-more]").forEach((b) => {
+      b.onclick = () => {
+        const r = $(`[id="d-${b.dataset.more}"]`);
+        r.hidden = !r.hidden;
+      };
+    });
     $$("form[data-n]").forEach((f) => {
       f.onsubmit = run(async (e) => {
         e.preventDefault();
@@ -251,13 +372,17 @@
         await drawOrders();
       });
     });
-    $$("[data-print]").forEach((b) => { b.onclick = () => invoice(l.find((x) => x.number === b.dataset.print)); });
+    $$("[data-print]").forEach((b) => {
+      b.onclick = () => invoice(l.find((x) => x.number === b.dataset.print));
+    });
   });
 
   function invoice(o) {
-    const s = site || {}, w = window.open("");
+    const s = site || {},
+      w = window.open("");
     if (!w) return say("Your browser blocked the invoice window. Please allow pop-ups for this page.");
-    w.document.write(`<!doctype html><title>Invoice ${esc(o.number)}</title><style>body{font:14px/1.5 system-ui,sans-serif;max-width:640px;margin:32px auto;color:#111}table{width:100%;border-collapse:collapse;margin:16px 0}td,th{border:1px solid #bbb;padding:8px;text-align:left}td:last-child,th:last-child{text-align:right}</style>
+    w.document
+      .write(`<!doctype html><title>Invoice ${esc(o.number)}</title><style>body{font:14px/1.5 system-ui,sans-serif;max-width:640px;margin:32px auto;color:#111}table{width:100%;border-collapse:collapse;margin:16px 0}td,th{border:1px solid #bbb;padding:8px;text-align:left}td:last-child,th:last-child{text-align:right}</style>
       <h2>${esc(s.name || "Invoice")}</h2><p>${esc(s.phone)}${s.address ? `<br>${esc(s.address)}` : ""}</p>
       <p><b>Invoice ${esc(o.number)}</b><br>${esc(when(o.created_at))}</p>
       <p><b>${esc(o.name)}</b>, ${esc(o.phone)}<br>${esc(o.address)} (${esc(o.area)})</p>
@@ -283,10 +408,22 @@
       <p class="meta">Change a price or stock number here and it is live for customers within about 2 minutes.</p>
       <div class="scroll"><table class="tbl"><tr><th></th><th>Product</th><th>Price</th><th>Regular price</th><th>Stock</th><th>Visible</th><th></th></tr><tbody id="rows"></tbody></table></div><button class="btn ghost more" id="pmore" hidden>Show more</button>`;
     $("#pshow").value = productFilter.show;
-    $("#new").onclick = () => editProduct({ cats: [], images: [], attrs: [], active: true, price: 0, regular: 0, stock: 0, name: "", slug: "" }, true);
-    const on = (id, key) => { $(id).oninput = (e) => { productFilter[key] = e.target.value; productFilter.limit = 50; drawProducts(); }; };
-    on("#pq", "q"); on("#pcat", "cat"); on("#pshow", "show");
-    $("#pmore").onclick = () => { productFilter.limit += 50; drawProducts(); };
+    $("#new").onclick = () =>
+      editProduct({ cats: [], images: [], attrs: [], active: true, price: 0, regular: 0, stock: 0, name: "", slug: "" }, true);
+    const on = (id, key) => {
+      $(id).oninput = (e) => {
+        productFilter[key] = e.target.value;
+        productFilter.limit = 50;
+        drawProducts();
+      };
+    };
+    on("#pq", "q");
+    on("#pcat", "cat");
+    on("#pshow", "show");
+    $("#pmore").onclick = () => {
+      productFilter.limit += 50;
+      drawProducts();
+    };
     drawProducts();
   });
 
@@ -294,20 +431,34 @@
     const { q, cat, show, limit } = productFilter;
     const text = q.toLowerCase();
     const low = lowStock;
-    const l = allProducts.filter((p) => (p.name + " " + (p.sku || "")).toLowerCase().includes(text)
-      && (!cat || (p.cats || []).includes(cat))
-      && (!show || (show === "low" && p.stock > 0 && p.stock <= low) || (show === "out" && p.stock === 0) || (show === "hidden" && !p.active)));
-    $("#rows").innerHTML = l.slice(0, limit).map((p) => `<tr data-id="${p.id}" class="${p.active ? "" : "off"}">
+    const l = allProducts.filter(
+      (p) =>
+        (p.name + " " + (p.sku || "")).toLowerCase().includes(text) &&
+        (!cat || (p.cats || []).includes(cat)) &&
+        (!show ||
+          (show === "low" && p.stock > 0 && p.stock <= low) ||
+          (show === "out" && p.stock === 0) ||
+          (show === "hidden" && !p.active)),
+    );
+    $("#rows").innerHTML =
+      l
+        .slice(0, limit)
+        .map(
+          (p) => `<tr data-id="${p.id}" class="${p.active ? "" : "off"}">
       <td>${p.images?.[0] ? `<img class="mini" src="${esc(p.images[0].thumb || p.images[0].src)}" alt="" loading="lazy" width="44" height="44">` : ""}</td>
       <td>${esc(p.name)}</td>
       <td><input class="num" type="number" min="0" data-q="price" value="${p.price}" aria-label="Price of ${esc(p.name)}"></td>
       <td><input class="num" type="number" min="0" data-q="regular" value="${p.regular}" aria-label="Regular price of ${esc(p.name)}"></td>
       <td><input class="num" type="number" min="0" data-q="stock" value="${p.stock}" aria-label="Stock of ${esc(p.name)}"></td>
       <td><input type="checkbox" data-q="active" ${p.active ? "checked" : ""} aria-label="${esc(p.name)} visible in shop"></td>
-      <td class="actions"><button class="link" data-e="${p.id}">Edit</button> <button class="link" data-dup="${p.id}">Copy</button></td></tr>`).join("") || `<tr><td colspan="7">No products match.</td></tr>`;
+      <td class="actions"><button class="link" data-e="${p.id}">Edit</button> <button class="link" data-dup="${p.id}">Copy</button></td></tr>`,
+        )
+        .join("") || `<tr><td colspan="7">No products match.</td></tr>`;
     $("#pmore").hidden = l.length <= limit;
     const find = (id) => allProducts.find((p) => p.id === +id);
-    $$("[data-e]").forEach((b) => { b.onclick = () => editProduct(find(b.dataset.e)); });
+    $$("[data-e]").forEach((b) => {
+      b.onclick = () => editProduct(find(b.dataset.e));
+    });
     $$("[data-dup]").forEach((b) => {
       b.onclick = () => {
         const p = find(b.dataset.dup);
@@ -316,14 +467,22 @@
     });
     $$("[data-q]").forEach((i) => {
       i.onchange = run(async () => {
-        const row = i.closest("tr"), p = find(row.dataset.id), key = i.dataset.q, body = {};
-        if (key === "stock") body.stockDelta = (+i.value || 0) - p.stock; // never an absolute number: orders may have come in
+        const row = i.closest("tr"),
+          p = find(row.dataset.id),
+          key = i.dataset.q,
+          body = {};
+        if (key === "stock")
+          body.stockDelta = (+i.value || 0) - p.stock; // never an absolute number: orders may have come in
         else if (key === "active") body.active = i.checked;
         else body[key] = Math.max(0, Math.floor(+i.value) || 0);
         const r = await api("/products/" + p.id, { method: "PATCH", body });
-        if (key === "stock") { p.stock = r.stock; i.value = r.stock; }
-        else if (key === "active") { p.active = i.checked; row.classList.toggle("off", !p.active); }
-        else p[key] = body[key];
+        if (key === "stock") {
+          p.stock = r.stock;
+          i.value = r.stock;
+        } else if (key === "active") {
+          p.active = i.checked;
+          row.classList.toggle("off", !p.active);
+        } else p[key] = body[key];
         say(key === "active" ? `${p.name} is ${p.active ? "visible" : "hidden"}.` : `${p.name} saved. Live within about 2 minutes.`);
       });
     });
@@ -348,13 +507,38 @@
       <div class="stick"><button class="btn">Save</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
     const f = $("#pf");
     const drawImages = () => {
-      $("#imgs").innerHTML = images.map((im, i) => `<figure><img src="${esc(im.thumb || im.src)}" alt="" width="96" height="96"><input value="${esc(im.alt || "")}" placeholder="Describe photo" data-alt="${i}" aria-label="Photo description">
-        <figcaption><button type="button" data-l="${i}" aria-label="Move left">◀</button><button type="button" data-r="${i}" aria-label="Move right">▶</button><button type="button" data-x="${i}" aria-label="Remove photo">✕</button></figcaption></figure>`).join("");
-      const swap = (a, b) => { if (images[b]) { [images[a], images[b]] = [images[b], images[a]]; drawImages(); } };
-      $$("[data-alt]").forEach((b) => { b.oninput = () => { images[+b.dataset.alt].alt = b.value; }; });
-      $$("[data-l]").forEach((b) => { b.onclick = () => swap(+b.dataset.l, +b.dataset.l - 1); });
-      $$("[data-r]").forEach((b) => { b.onclick = () => swap(+b.dataset.r, +b.dataset.r + 1); });
-      $$("[data-x]").forEach((b) => { b.onclick = () => { images.splice(+b.dataset.x, 1); drawImages(); }; });
+      $("#imgs").innerHTML = images
+        .map(
+          (
+            im,
+            i,
+          ) => `<figure><img src="${esc(im.thumb || im.src)}" alt="" width="96" height="96"><input value="${esc(im.alt || "")}" placeholder="Describe photo" data-alt="${i}" aria-label="Photo description">
+        <figcaption><button type="button" data-l="${i}" aria-label="Move left">◀</button><button type="button" data-r="${i}" aria-label="Move right">▶</button><button type="button" data-x="${i}" aria-label="Remove photo">✕</button></figcaption></figure>`,
+        )
+        .join("");
+      const swap = (a, b) => {
+        if (images[b]) {
+          [images[a], images[b]] = [images[b], images[a]];
+          drawImages();
+        }
+      };
+      $$("[data-alt]").forEach((b) => {
+        b.oninput = () => {
+          images[+b.dataset.alt].alt = b.value;
+        };
+      });
+      $$("[data-l]").forEach((b) => {
+        b.onclick = () => swap(+b.dataset.l, +b.dataset.l - 1);
+      });
+      $$("[data-r]").forEach((b) => {
+        b.onclick = () => swap(+b.dataset.r, +b.dataset.r + 1);
+      });
+      $$("[data-x]").forEach((b) => {
+        b.onclick = () => {
+          images.splice(+b.dataset.x, 1);
+          drawImages();
+        };
+      });
     };
     drawImages();
     const addImage = (src) => {
@@ -373,16 +557,51 @@
       if (e.target.value.trim()) addImage(e.target.value.trim());
       e.target.value = "";
     };
-    const attrs = rows($("#attrs"), (p.attrs || []).map((a) => ({ name: a.name, values: (a.values || []).join(", ") })), [{ k: "name", label: "Name, such as Colour" }, { k: "values", label: "Values, separated by commas" }], { name: "", values: "" });
+    const attrs = rows(
+      $("#attrs"),
+      (p.attrs || []).map((a) => ({ name: a.name, values: (a.values || []).join(", ") })),
+      [
+        { k: "name", label: "Name, such as Colour" },
+        { k: "values", label: "Values, separated by commas" },
+      ],
+      { name: "", values: "" },
+    );
     const desc = rich($("#desc"), p.desc);
-    f.name.addEventListener("input", () => { if (isNew) { f.slug.value = slugify(f.name.value); $("#slugview").textContent = f.slug.value; } });
-    f.slug.addEventListener("input", () => { $("#slugview").textContent = f.slug.value; });
+    f.name.addEventListener("input", () => {
+      if (isNew) {
+        f.slug.value = slugify(f.name.value);
+        $("#slugview").textContent = f.slug.value;
+      }
+    });
+    f.slug.addEventListener("input", () => {
+      $("#slugview").textContent = f.slug.value;
+    });
     $("#back").onclick = products;
     f.onsubmit = run(async (e) => {
       e.preventDefault();
       const d = new FormData(f);
-      const out = { ...p, name: d.get("name").trim(), slug: d.get("slug").trim(), price: +d.get("price"), regular: +d.get("regular"), sku: d.get("sku").trim(), short: d.get("short").trim(), desc: desc(), active: !!d.get("active"),
-        cats: d.getAll("cat"), images, attrs: attrs().filter((a) => a.name.trim()).map((a) => ({ name: a.name.trim(), values: a.values.split(",").map((v) => v.trim()).filter(Boolean) })) };
+      const out = {
+        ...p,
+        name: d.get("name").trim(),
+        slug: d.get("slug").trim(),
+        price: +d.get("price"),
+        regular: +d.get("regular"),
+        sku: d.get("sku").trim(),
+        short: d.get("short").trim(),
+        desc: desc(),
+        active: !!d.get("active"),
+        cats: d.getAll("cat"),
+        images,
+        attrs: attrs()
+          .filter((a) => a.name.trim())
+          .map((a) => ({
+            name: a.name.trim(),
+            values: a.values
+              .split(",")
+              .map((v) => v.trim())
+              .filter(Boolean),
+          })),
+      };
       if (isNew) {
         out.stock = +d.get("stock");
         await api("/products", { body: out });
@@ -405,7 +624,9 @@
       <div class="scroll"><table class="tbl"><tr><th>Name</th><th>Address</th><th></th></tr>
       ${categories.map((c) => `<tr><td>${esc(c.name)}</td><td><small>/product-category/${esc(c.path)}/</small></td><td class="actions"><button class="link" data-e="${esc(c.slug)}">Edit</button> <button class="link" data-x="${esc(c.slug)}">Delete</button></td></tr>`).join("")}</table></div>`;
     $("#newcat").onclick = () => editCat({ name: "", slug: "" }, true);
-    $$("[data-e]").forEach((b) => { b.onclick = () => editCat(categories.find((c) => c.slug === b.dataset.e)); });
+    $$("[data-e]").forEach((b) => {
+      b.onclick = () => editCat(categories.find((c) => c.slug === b.dataset.e));
+    });
     $$("[data-x]").forEach((b) => {
       b.onclick = run(async () => {
         if (!confirm("Delete this category? Its web address will stop working after Publish.")) return;
@@ -424,13 +645,19 @@
       ${isNew ? field("URL slug", "slug", "", "required") + `<label class="field">Parent category<select name="parent"><option value="">None</option>${categories.map((x) => `<option value="${esc(x.path)}">${esc(x.path)}</option>`).join("")}</select></label>` : `<p class="meta">/product-category/${esc(c.path)}/</p>`}
       <div class="stick"><button class="btn">Save</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
     const f = $("#cf");
-    if (isNew) f.name.addEventListener("input", () => { f.slug.value = slugify(f.name.value); });
+    if (isNew)
+      f.name.addEventListener("input", () => {
+        f.slug.value = slugify(f.name.value);
+      });
     $("#back").onclick = cats;
     f.onsubmit = run(async (e) => {
       e.preventDefault();
       const slug = isNew ? f.slug.value.trim() : c.slug;
       const parent = isNew ? f.parent.value : parentPath;
-      await api("/content/cat/" + encodeURIComponent(slug), { method: "PUT", body: { ...c, name: f.name.value.trim(), path: parent ? `${parent}/${slug}` : slug } });
+      await api("/content/cat/" + encodeURIComponent(slug), {
+        method: "PUT",
+        body: { ...c, name: f.name.value.trim(), path: parent ? `${parent}/${slug}` : slug },
+      });
       await cats();
       needsPublish("Category saved.");
     });
@@ -446,21 +673,37 @@
       ${field("Value", "value", "", "required min=1", "number")}${field("Minimum order (৳)", "minOrder", 0, "min=0", "number")}${field("Use limit, 0 for none", "maxUses", 0, "min=0", "number")}${field("Last day", "expires", "", "", "date")}
       ${toggle("Active", "active", true)}<button class="btn">Save coupon</button></form>
       <div class="scroll"><table class="tbl"><tr><th>Code</th><th>Discount</th><th>Minimum</th><th>Used</th><th>Last day</th><th></th></tr>
-      ${l.map((c) => `<tr class="${c.active ? "" : "off"}"><td><b>${esc(c.code)}</b></td><td>${c.kind === "percent" ? c.value + "%" : money(c.value)}</td><td>${money(c.min_order)}</td><td>${c.used}${c.max_uses ? ` of ${c.max_uses}` : ""}</td><td>${c.expires_at ? esc(c.expires_at.slice(0, 10)) : "None"}</td>
-        <td class="actions"><button class="link" data-e="${esc(c.code)}">Edit</button> <button class="link" data-x="${esc(c.code)}">Delete</button></td></tr>`).join("") || `<tr><td colspan="6">No coupons yet.</td></tr>`}</table></div>`;
+      ${
+        l
+          .map(
+            (
+              c,
+            ) => `<tr class="${c.active ? "" : "off"}"><td><b>${esc(c.code)}</b></td><td>${c.kind === "percent" ? c.value + "%" : money(c.value)}</td><td>${money(c.min_order)}</td><td>${c.used}${c.max_uses ? ` of ${c.max_uses}` : ""}</td><td>${c.expires_at ? esc(c.expires_at.slice(0, 10)) : "None"}</td>
+        <td class="actions"><button class="link" data-e="${esc(c.code)}">Edit</button> <button class="link" data-x="${esc(c.code)}">Delete</button></td></tr>`,
+          )
+          .join("") || `<tr><td colspan="6">No coupons yet.</td></tr>`
+      }</table></div>`;
     const f = $("#cpf");
     f.onsubmit = run(async (e) => {
       e.preventDefault();
       const d = Object.fromEntries(new FormData(f));
-      await api("/coupons/" + encodeURIComponent(d.code.trim()), { method: "PUT", body: { kind: d.kind, value: +d.value, minOrder: +d.minOrder, maxUses: +d.maxUses, expires: d.expires, active: !!d.active } });
+      await api("/coupons/" + encodeURIComponent(d.code.trim()), {
+        method: "PUT",
+        body: { kind: d.kind, value: +d.value, minOrder: +d.minOrder, maxUses: +d.maxUses, expires: d.expires, active: !!d.active },
+      });
       await coupons();
       say("Coupon saved. It works straight away.");
     });
     $$("[data-e]").forEach((b) => {
       b.onclick = () => {
         const c = l.find((x) => x.code === b.dataset.e);
-        f.code.value = c.code; f.kind.value = c.kind; f.value.value = c.value; f.minOrder.value = c.min_order; f.maxUses.value = c.max_uses;
-        f.expires.value = c.expires_at ? c.expires_at.slice(0, 10) : ""; f.active.checked = c.active;
+        f.code.value = c.code;
+        f.kind.value = c.kind;
+        f.value.value = c.value;
+        f.minOrder.value = c.min_order;
+        f.maxUses.value = c.max_uses;
+        f.expires.value = c.expires_at ? c.expires_at.slice(0, 10) : "";
+        f.active.checked = c.active;
         scrollTo(0, 0);
       };
     });
@@ -481,12 +724,21 @@
       <p class="note" id="newpass" hidden></p><div id="clist"><p>Loading…</p></div>`;
     const draw = run(async () => {
       const l = await api("/customers?q=" + encodeURIComponent($("#cq").value));
-      $("#clist").innerHTML = `<div class="scroll"><table class="tbl"><tr><th>Customer</th><th>Phone</th><th>Orders</th><th>Cancelled or returned</th><th>Spent</th><th>Last order</th></tr>
+      $("#clist").innerHTML =
+        `<div class="scroll"><table class="tbl"><tr><th>Customer</th><th>Phone</th><th>Orders</th><th>Cancelled or returned</th><th>Spent</th><th>Last order</th></tr>
         ${l.map((c) => `<tr><td>${esc(c.name)}</td><td><a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a></td><td><a class="link" href="#orders" data-phone="${esc(c.phone)}">${c.orders}</a></td><td>${c.cancelled}</td><td>${money(c.spent)}</td><td>${esc(when(c.last))}</td></tr>`).join("") || `<tr><td colspan="6">No customers yet.</td></tr>`}</table></div>`;
-      $$("[data-phone]", $("#clist")).forEach((a) => { a.onclick = () => { orderFilter.q = a.dataset.phone; orderFilter.status = ""; }; });
+      $$("[data-phone]", $("#clist")).forEach((a) => {
+        a.onclick = () => {
+          orderFilter.q = a.dataset.phone;
+          orderFilter.status = "";
+        };
+      });
     });
     let t;
-    $("#cq").oninput = () => { clearTimeout(t); t = setTimeout(draw, 300); };
+    $("#cq").oninput = () => {
+      clearTimeout(t);
+      t = setTimeout(draw, 300);
+    };
     $("#reset").onsubmit = run(async (e) => {
       e.preventDefault();
       if (!confirm("Set a new password? Their current password and logins stop working.")) return;
@@ -502,18 +754,57 @@
 
   const reviews = run(async () => {
     const l = await api("/reviews");
-    view().innerHTML = l.map((r) => `<div class="panel item"><b>${esc(r.name)}</b> ${"★".repeat(r.rating)} on <a class="link" href="/product/${esc(r.slug)}/" target="_blank" rel="noopener">${esc(r.product)}</a> ${r.approved ? "" : `<span class="tag">Waiting</span>`}<p>${esc(r.body)}</p>
-      ${r.approved ? "" : `<button class="btn" data-a="${r.id}">Approve</button> `}<button class="btn ghost" data-x="${r.id}">Delete</button></div>`).join("") || "<p>No reviews yet.</p>";
-    $$("[data-a]").forEach((b) => { b.onclick = run(async () => { await api("/reviews/" + b.dataset.a, { method: "PUT", body: {} }); await reviews(); needsPublish("Review approved."); }); });
-    $$("[data-x]").forEach((b) => { b.onclick = run(async () => { if (confirm("Delete this review?")) { await api("/reviews/" + b.dataset.x, { method: "DELETE" }); await reviews(); } }); });
+    view().innerHTML =
+      l
+        .map(
+          (
+            r,
+          ) => `<div class="panel item"><b>${esc(r.name)}</b> ${"★".repeat(r.rating)} on <a class="link" href="/product/${esc(r.slug)}/" target="_blank" rel="noopener">${esc(r.product)}</a> ${r.approved ? "" : `<span class="tag">Waiting</span>`}<p>${esc(r.body)}</p>
+      ${r.approved ? "" : `<button class="btn" data-a="${r.id}">Approve</button> `}<button class="btn ghost" data-x="${r.id}">Delete</button></div>`,
+        )
+        .join("") || "<p>No reviews yet.</p>";
+    $$("[data-a]").forEach((b) => {
+      b.onclick = run(async () => {
+        await api("/reviews/" + b.dataset.a, { method: "PUT", body: {} });
+        await reviews();
+        needsPublish("Review approved.");
+      });
+    });
+    $$("[data-x]").forEach((b) => {
+      b.onclick = run(async () => {
+        if (confirm("Delete this review?")) {
+          await api("/reviews/" + b.dataset.x, { method: "DELETE" });
+          await reviews();
+        }
+      });
+    });
   });
 
   const messages = run(async () => {
     const l = await api("/messages");
-    view().innerHTML = l.map((m) => `<div class="panel item ${m.read ? "off" : ""}"><b>${esc(m.name)}</b> ${esc(m.contact)} <small>${esc(when(m.created_at))}</small><p>${esc(m.body)}</p>
-      ${m.read ? "" : `<button class="btn" data-r="${m.id}">Mark as read</button> `}<button class="btn ghost" data-x="${m.id}">Delete</button></div>`).join("") || "<p>No messages.</p>";
-    $$("[data-r]").forEach((b) => { b.onclick = run(async () => { await api("/messages/" + b.dataset.r, { method: "PUT", body: {} }); await messages(); }); });
-    $$("[data-x]").forEach((b) => { b.onclick = run(async () => { if (confirm("Delete this message?")) { await api("/messages/" + b.dataset.x, { method: "DELETE" }); await messages(); } }); });
+    view().innerHTML =
+      l
+        .map(
+          (
+            m,
+          ) => `<div class="panel item ${m.read ? "off" : ""}"><b>${esc(m.name)}</b> ${esc(m.contact)} <small>${esc(when(m.created_at))}</small><p>${esc(m.body)}</p>
+      ${m.read ? "" : `<button class="btn" data-r="${m.id}">Mark as read</button> `}<button class="btn ghost" data-x="${m.id}">Delete</button></div>`,
+        )
+        .join("") || "<p>No messages.</p>";
+    $$("[data-r]").forEach((b) => {
+      b.onclick = run(async () => {
+        await api("/messages/" + b.dataset.r, { method: "PUT", body: {} });
+        await messages();
+      });
+    });
+    $$("[data-x]").forEach((b) => {
+      b.onclick = run(async () => {
+        if (confirm("Delete this message?")) {
+          await api("/messages/" + b.dataset.x, { method: "DELETE" });
+          await messages();
+        }
+      });
+    });
   });
 
   // ---- Pages and blog ----
@@ -524,7 +815,9 @@
       view().innerHTML = `<div class="toolbar"><button class="btn" id="newdoc">Add ${word}</button></div><div class="scroll"><table class="tbl"><tr><th>Title</th><th>Address</th><th></th></tr>
         ${l.map((d) => `<tr class="${d.draft ? "off" : ""}"><td>${esc(d.title)}${d.draft ? ` <span class="tag">Draft</span>` : ""}</td><td><small>/${esc(d.slug)}/</small></td><td class="actions"><button class="link" data-e="${esc(d.slug)}">Edit</button> <button class="link" data-x="${esc(d.slug)}">Delete</button></td></tr>`).join("") || `<tr><td colspan="3">Nothing here yet.</td></tr>`}</table></div>`;
       $("#newdoc").onclick = () => edit({ title: "", slug: "", html: "" }, true);
-      $$("[data-e]").forEach((b) => { b.onclick = () => edit(l.find((d) => d.slug === b.dataset.e)); });
+      $$("[data-e]").forEach((b) => {
+        b.onclick = () => edit(l.find((d) => d.slug === b.dataset.e));
+      });
       $$("[data-x]").forEach((b) => {
         b.onclick = run(async () => {
           if (!confirm(`Delete this ${word}? Its web address will stop working after Publish.`)) return;
@@ -545,13 +838,19 @@
         <div class="stick"><button class="btn">Save</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
       const f = $("#df");
       const body = rich($("#body"), d.html);
-      if (isNew) f.title.addEventListener("input", () => { f.slug.value = slugify(f.title.value); });
+      if (isNew)
+        f.title.addEventListener("input", () => {
+          f.slug.value = slugify(f.title.value);
+        });
       $("#back").onclick = list;
       f.onsubmit = run(async (e) => {
         e.preventDefault();
         const slug = isNew ? f.slug.value.trim() : d.slug;
         const out = { ...d, title: f.title.value.trim(), html: body(), draft: f.draft.checked };
-        if (kind === "post") { out.date = f.date.value; out.excerpt = f.excerpt.value.trim(); }
+        if (kind === "post") {
+          out.date = f.date.value;
+          out.excerpt = f.excerpt.value.trim();
+        }
         await api(`/content/${kind}/${encodeURIComponent(slug)}`, { method: "PUT", body: out });
         await list();
         needsPublish("Saved.");
@@ -564,7 +863,8 @@
 
   const settings = run(async () => {
     const [s] = await Promise.all([api("/settings"), loadCategories()]);
-    const L = s.live, W = s.site;
+    const L = s.live,
+      W = s.site;
     site = W;
     const catOptions = () => categories.map((c) => [c.slug, c.name]);
     view().innerHTML = `<form id="sf" class="settings">
@@ -596,22 +896,116 @@
       <section class="panel"><h2>Menu</h2><h3>Drop-down menus</h3><div id="menu"></div><h3>Other links</h3><div id="links"></div></section>
       <div class="stick"><button class="btn">Save settings</button></div></form>`;
     const f = $("#sf");
-    const zones = rows($("#zones"), L.delivery, [{ k: "label", label: "Area" }, { k: "fee", label: "Charge (৳)", type: "number" }], { label: "", fee: 0 });
-    const pays = rows($("#pays"), L.payments, [{ k: "label", label: "Name" }, { k: "number", label: "Number" }, { k: "enabled", label: "On", type: "bool" }], { label: "", number: "", enabled: true });
-    const banners = rows($("#banners"), W.banners || [], [{ k: "title", label: "Description" }, { k: "link", label: "Link" }, { k: "image", label: "Image", type: "image" }], { title: "", link: "/shop/", image: "" });
-    const perks = rows($("#perks"), W.perks || [], [{ k: "title", label: "Title" }, { k: "text", label: "Text" }], { title: "", text: "" });
-    const home = rows($("#home"), W.home || [], [{ k: "title", label: "Heading" }, { k: "cat", label: "Category", type: "select", options: catOptions }], { title: "", cat: categories[0]?.slug || "" });
-    const menu = rows($("#menu"), W.menu || [], [{ k: "title", label: "Title" }, { k: "cats", label: "Categories", type: "cats" }], { title: "", cats: [] });
-    const links = rows($("#links"), W.links || [], [{ k: "label", label: "Words" }, { k: "url", label: "Link" }], { label: "", url: "/" });
-    $("#logoup").onchange = run(async (e) => { f.logo.value = await upload(e.target.files[0]); });
+    const zones = rows(
+      $("#zones"),
+      L.delivery,
+      [
+        { k: "label", label: "Area" },
+        { k: "fee", label: "Charge (৳)", type: "number" },
+      ],
+      { label: "", fee: 0 },
+    );
+    const pays = rows(
+      $("#pays"),
+      L.payments,
+      [
+        { k: "label", label: "Name" },
+        { k: "number", label: "Number" },
+        { k: "enabled", label: "On", type: "bool" },
+      ],
+      { label: "", number: "", enabled: true },
+    );
+    const banners = rows(
+      $("#banners"),
+      W.banners || [],
+      [
+        { k: "title", label: "Description" },
+        { k: "link", label: "Link" },
+        { k: "image", label: "Image", type: "image" },
+      ],
+      { title: "", link: "/shop/", image: "" },
+    );
+    const perks = rows(
+      $("#perks"),
+      W.perks || [],
+      [
+        { k: "title", label: "Title" },
+        { k: "text", label: "Text" },
+      ],
+      { title: "", text: "" },
+    );
+    const home = rows(
+      $("#home"),
+      W.home || [],
+      [
+        { k: "title", label: "Heading" },
+        { k: "cat", label: "Category", type: "select", options: catOptions },
+      ],
+      { title: "", cat: categories[0]?.slug || "" },
+    );
+    const menu = rows(
+      $("#menu"),
+      W.menu || [],
+      [
+        { k: "title", label: "Title" },
+        { k: "cats", label: "Categories", type: "cats" },
+      ],
+      { title: "", cats: [] },
+    );
+    const links = rows(
+      $("#links"),
+      W.links || [],
+      [
+        { k: "label", label: "Words" },
+        { k: "url", label: "Link" },
+      ],
+      { label: "", url: "/" },
+    );
+    $("#logoup").onchange = run(async (e) => {
+      f.logo.value = await upload(e.target.files[0]);
+    });
     f.onsubmit = run(async (e) => {
       e.preventDefault();
       const d = Object.fromEntries(new FormData(f));
-      const live = { ...L, ordersOpen: f.ordersOpen.checked, closedNote: d.closedNote, notice: d.notice.trim(), freeOver: +d.freeOver, minOrder: +d.minOrder, lowStock: +d.lowStock, showLeft: f.showLeft.checked,
-        delivery: zones().map((z) => ({ ...z, id: z.id || asciiId(z.label) })), payments: pays().map((p) => ({ ...p, id: p.id || asciiId(p.label) })) };
-      const shop = { ...W, name: d.name.trim(), tagline: d.tagline, phone: d.phone.trim(), whatsapp: d.whatsapp.trim(), email: d.email.trim(), hours: d.hours, facebook: d.facebook.trim(), youtube: d.youtube.trim(), address: d.address, about: d.about, description: d.description,
-        brandColor: d.brandColor, brandDark: d.brandDark, logo: d.logo.trim(), hero: { title: d.heroTitle, text: d.heroText, button: d.heroButton, link: d.heroLink }, ticker: d.ticker.split("\n").map((t) => t.trim()).filter(Boolean),
-        banners: banners().filter((b) => b.image), perks: perks().filter((p) => p.title), home: home().filter((h) => h.title), menu: menu().filter((m) => m.title), links: links().filter((l) => l.label) };
+      const live = {
+        ...L,
+        ordersOpen: f.ordersOpen.checked,
+        closedNote: d.closedNote,
+        notice: d.notice.trim(),
+        freeOver: +d.freeOver,
+        minOrder: +d.minOrder,
+        lowStock: +d.lowStock,
+        showLeft: f.showLeft.checked,
+        delivery: zones().map((z) => ({ ...z, id: z.id || asciiId(z.label) })),
+        payments: pays().map((p) => ({ ...p, id: p.id || asciiId(p.label) })),
+      };
+      const shop = {
+        ...W,
+        name: d.name.trim(),
+        tagline: d.tagline,
+        phone: d.phone.trim(),
+        whatsapp: d.whatsapp.trim(),
+        email: d.email.trim(),
+        hours: d.hours,
+        facebook: d.facebook.trim(),
+        youtube: d.youtube.trim(),
+        address: d.address,
+        about: d.about,
+        description: d.description,
+        brandColor: d.brandColor,
+        brandDark: d.brandDark,
+        logo: d.logo.trim(),
+        hero: { title: d.heroTitle, text: d.heroText, button: d.heroButton, link: d.heroLink },
+        ticker: d.ticker
+          .split("\n")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        banners: banners().filter((b) => b.image),
+        perks: perks().filter((p) => p.title),
+        home: home().filter((h) => h.title),
+        menu: menu().filter((m) => m.title),
+        links: links().filter((l) => l.label),
+      };
       await api("/settings", { method: "PUT", body: { live, site: shop } });
       needsPublish("Settings saved. Orders settings are live.");
       scrollTo(0, 0);
@@ -620,7 +1014,19 @@
 
   // ---- Start ----
 
-  const routes = { dashboard, orders, products, categories: cats, coupons, customers, reviews, messages, pages: writing("page", "page"), blog: writing("post", "post"), settings };
+  const routes = {
+    dashboard,
+    orders,
+    products,
+    categories: cats,
+    coupons,
+    customers,
+    reviews,
+    messages,
+    pages: writing("page", "page"),
+    blog: writing("post", "post"),
+    settings,
+  };
 
   function go() {
     const tab = routes[location.hash.slice(1)] ? location.hash.slice(1) : "dashboard";
@@ -633,8 +1039,12 @@
   async function enter() {
     $("#login").hidden = true;
     $("#app").hidden = false;
-    $("#tabs").innerHTML = Object.entries(TABS).map(([k, v]) => `<a href="#${k}">${v}</a>`).join("");
-    try { if (localStorage.getItem("dirty")) $("#pub").classList.add("attention"); } catch {}
+    $("#tabs").innerHTML = Object.entries(TABS)
+      .map(([k, v]) => `<a href="#${k}">${v}</a>`)
+      .join("");
+    try {
+      if (localStorage.getItem("dirty")) $("#pub").classList.add("attention");
+    } catch {}
     go();
     const s = await api("/settings").catch(() => ({}));
     site = s.site || null;
@@ -646,7 +1056,9 @@
     say("Publishing…");
     const r = await api("/publish", { method: "POST" });
     say(r.message);
-    try { localStorage.removeItem("dirty"); } catch {}
+    try {
+      localStorage.removeItem("dirty");
+    } catch {}
     $("#pub").classList.remove("attention");
   });
   $("#out").onclick = () => logout();

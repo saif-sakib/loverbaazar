@@ -12,7 +12,7 @@ Bangladesh home-appliance shop. Replaces WordPress at loverbaazar.com.
     cd apps/api && gofmt -l . && go vet .
     TEST_DATABASE_URL=... go test -count=1 .   # throwaway database only, it erases every table
 
-`astro dev` cannot reach `/api`. Always test through `dev.sh`. Local admin token: `local-admin-token-for-this-computer-only`.
+`astro dev` cannot reach `/api`. Always test through `dev.sh`. Local admin token: `local-admin-token-for-this-computer-only`. Every setting is listed in `.env.example`; real secrets live in the hosting dashboards, never in the repo.
 
 ## Rules
 

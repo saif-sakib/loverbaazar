@@ -1,6 +1,20 @@
 ---
-import Base from "../../layouts/Base.astro"; import Grid from "../../components/Grid.astro"; import { cats, inCat } from "../../lib/shop";
+import Base from "../../layouts/Base.astro";
+import Grid from "../../components/Grid.astro";
+import { cats, inCat } from "../../lib/shop";
 export const getStaticPaths = () => cats.map((c) => ({ params: { path: c.path }, props: { c } }));
-const { c } = Astro.props; const items = inCat(c.slug);
+const { c } = Astro.props;
+const items = inCat(c.slug);
 ---
-<Base title={c.name} description={`${c.name} price in Bangladesh. Buy ${c.name} online from LoverBaazar with cash on delivery.`}><div class="wrap"><p class="crumbs"><a href="/">Home</a> / <a href="/shop/">Shop</a> / {c.name}</p><div class="pagehead"><h1>{c.name}</h1></div>{items.length ? <Grid items={items} /> : <p>No products here yet.</p>}</div></Base>
+
+<Base title={c.name} description={`${c.name} price in Bangladesh. Buy ${c.name} online from LoverBaazar with cash on delivery.`}>
+  <div class="wrap">
+    <p class="crumbs">
+      <a href="/">Home</a> / <a href="/shop/">Shop</a> / {c.name}
+    </p>
+    <div class="pagehead">
+      <h1>{c.name}</h1>
+    </div>
+    {items.length ? <Grid items={items} /> : <p>No products here yet.</p>}
+  </div>
+</Base>

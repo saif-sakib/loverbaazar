@@ -1,4 +1,22 @@
 ---
 import Base from "../../layouts/Base.astro";
 ---
-<Base title="Track your order" noindex><div class="wrap" style="max-width:640px"><h1 style="margin-top:20px">Track your order</h1><form class="panel" data-track><label class="field">Order number<input name="order" required placeholder="LB-XXXXXXXX" /></label><label class="field">Mobile number<input name="phone" required /></label><p class="err" data-err></p><button class="btn small">Track</button></form><div data-order></div></div></Base>
+
+<Base title="Track your order" noindex>
+  <div class="wrap" style="max-width:640px">
+    <h1 style="margin-top:20px">Track your order</h1>
+    <form class="panel" data-track>
+      <label class="field">
+        Order number
+        <input name="order" required placeholder="LB-XXXXXXXX" />
+      </label>
+      <label class="field">
+        Mobile number
+        <input name="phone" required />
+      </label>
+      <p class="err" data-err></p>
+      <button class="btn small">Track</button>
+    </form>
+    <div data-order></div>
+  </div>
+</Base>

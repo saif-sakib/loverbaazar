@@ -37,6 +37,8 @@ var schema string
 //go:embed defaults.json
 var defaultsJSON []byte
 
+const localAdminToken = "local-admin-token-for-this-computer-only"
+
 var (
 	db  *pgxpool.Pool
 	dev = os.Getenv("DEV") != ""
@@ -63,8 +65,10 @@ func main() {
 		}
 		return
 	}
-	if !dev && (len(os.Getenv("ADMIN_TOKEN")) < 32 || len(os.Getenv("ORIGIN_SECRET")) < 32) {
-		log.Fatal("ADMIN_TOKEN and ORIGIN_SECRET must each be at least 32 characters")
+	if !dev {
+		if err := checkSecrets(os.Getenv("ADMIN_TOKEN"), os.Getenv("ORIGIN_SECRET")); err != nil {
+			log.Fatal(err)
+		}
 	}
 	go func() { // in the background, so /api/health answers even while the database wakes up
 		c, cancel := context.WithTimeout(ctx, time.Minute)
@@ -77,7 +81,7 @@ func main() {
 	if p := os.Getenv("PORT"); p != "" {
 		addr = ":" + p
 	}
-	srv := &http.Server{Addr: addr, Handler: router(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 2 * time.Minute}
+	srv := &http.Server{Addr: addr, Handler: router(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 90 * time.Second, WriteTimeout: 120 * time.Second, IdleTimeout: 2 * time.Minute}
 	go func() { // Render sends SIGTERM on deploys: let orders in progress finish
 		stop, cancel := signal.NotifyContext(ctx, syscall.SIGTERM, os.Interrupt)
 		defer cancel()
@@ -89,6 +93,18 @@ func main() {
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
+}
+
+// checkSecrets stops a live shop starting with weak secrets. The local admin token is public
+// (it's in the README) and long enough to pass a length check, so it is refused by name.
+func checkSecrets(admin, origin string) error {
+	switch {
+	case admin == localAdminToken:
+		return errors.New("ADMIN_TOKEN is the public local token. Generate one with: openssl rand -hex 32")
+	case len(admin) < 32 || len(origin) < 32:
+		return errors.New("ADMIN_TOKEN and ORIGIN_SECRET must each be at least 32 characters")
+	}
+	return nil
 }
 
 func connect(ctx context.Context) error {

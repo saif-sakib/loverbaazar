@@ -3,37 +3,45 @@ import "@fontsource-variable/plus-jakarta-sans";
 import "../../styles/site.css";
 import "../../styles/admin.css";
 ---
+
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="robots" content="noindex" />
-  <title>LoverBaazar Admin</title>
-  <link rel="icon" href="data:," />
-  <script is:inline src="/admin.js" defer></script>
-</head>
-<body class="admin">
-  <div class="wrap">
-    <form class="panel login" id="login">
-      <h1>LoverBaazar Admin</h1>
-      <label class="field">Admin token<input id="tok" type="password" autocomplete="current-password" required /></label>
-      <p class="err" id="loginErr"></p>
-      <button class="btn small">Enter</button>
-    </form>
-    <div id="app" hidden>
-      <header class="adminbar">
-        <b>LoverBaazar Admin</b>
-        <nav id="tabs"></nav>
-        <div class="adminactions">
-          <button class="btn" id="pub">Publish storefront</button>
-          <button class="link" id="out">Log out</button>
-        </div>
-      </header>
-      <p class="note" id="ok" hidden role="status"></p>
-      <p class="err" id="err" role="alert"></p>
-      <div id="view"></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>LoverBaazar Admin</title>
+    <link rel="icon" href="data:," />
+    <script is:inline src="/admin.js" defer></script>
+  </head>
+  <body class="admin">
+    <div class="wrap">
+      <form class="panel login" id="login">
+        <h1>LoverBaazar Admin</h1>
+        <label class="field">
+          Admin token
+          <input id="tok" type="password" autocomplete="current-password" required />
+        </label>
+        <p class="err" id="loginErr"></p>
+        <button class="btn small">Enter</button>
+      </form>
+      <div id="app" hidden>
+        <header class="adminbar">
+          <b>LoverBaazar Admin</b>
+          <nav id="tabs"></nav>
+          <div class="adminactions">
+            <button class="btn" id="pub">
+              Publish storefront
+            </button>
+            <button class="link" id="out">
+              Log out
+            </button>
+          </div>
+        </header>
+        <p class="note" id="ok" hidden role="status"></p>
+        <p class="err" id="err" role="alert"></p>
+        <div id="view"></div>
+      </div>
     </div>
-  </div>
-</body>
+  </body>
 </html>

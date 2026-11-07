@@ -57,6 +57,19 @@ func TestCSVSafe(t *testing.T) {
 	}
 }
 
+func TestCheckSecrets(t *testing.T) {
+	good := strings.Repeat("a", 64)
+	if err := checkSecrets(good, good); err != nil {
+		t.Error(err)
+	}
+	if checkSecrets(localAdminToken, good) == nil {
+		t.Error("the public local token must be refused")
+	}
+	if checkSecrets("short", good) == nil || checkSecrets(good, "") == nil {
+		t.Error("weak secrets must be refused")
+	}
+}
+
 func TestAllow(t *testing.T) {
 	key := fmt.Sprint("t", time.Now().UnixNano())
 	for i := 0; i < 3; i++ {
@@ -82,6 +95,9 @@ const adminKey = "test-admin-token-test-admin-token-1234"
 func TestMain(m *testing.M) {
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url != "" {
+		if !strings.Contains(url, "127.0.0.1") && !strings.Contains(url, "localhost") {
+			panic("TEST_DATABASE_URL must be a local database: these tests erase every table")
+		}
 		dev = true
 		os.Setenv("DATABASE_URL", url)
 		os.Setenv("ADMIN_TOKEN", adminKey)
