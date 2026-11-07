@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/csv"
 	"encoding/hex"
@@ -13,6 +14,7 @@ import (
 	"maps"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,8 +30,9 @@ import (
 )
 
 var (
-	slugRe  = regexp.MustCompile(`^[\p{L}\p{N}%_-]+$`) // WordPress slugs can be percent-encoded Bangla
-	pathRe  = regexp.MustCompile(`^[\p{L}\p{N}%_-]+(/[\p{L}\p{N}%_-]+)*$`)
+	// Bangla vowel signs are marks, not letters. WordPress slugs can also be percent-encoded.
+	slugRe  = regexp.MustCompile(`^[\p{L}\p{M}\p{N}%_-]+$`)
+	pathRe  = regexp.MustCompile(`^[\p{L}\p{M}\p{N}%_-]+(/[\p{L}\p{M}\p{N}%_-]+)*$`)
 	idRe    = regexp.MustCompile(`^[a-z0-9-]+$`)
 	colorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 	// Top-level addresses the shop already uses. A page with one of these names would break the build.
@@ -284,6 +287,7 @@ func adminSaveProduct(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	var err error
+	var oldImages []any
 	if r.Method == http.MethodPost {
 		if err = db.QueryRow(ctx, `SELECT nextval('product_ids')`).Scan(&id); err == nil {
 			p["id"] = id
@@ -294,6 +298,7 @@ func adminSaveProduct(w http.ResponseWriter, r *http.Request) {
 		p["id"] = id
 		j, _ := json.Marshal(p)
 		var tag pgconn.CommandTag
+		db.QueryRow(ctx, `SELECT data->'images' FROM products WHERE id=$1`, id).Scan(&oldImages)
 		tag, err = db.Exec(ctx, `UPDATE products SET slug=$2,price=$3,regular=$4,stock=GREATEST(stock+$5,0),active=$6,data=$7::jsonb WHERE id=$1`, id, slug, price, regular, int64(delta), active, string(j))
 		if err == nil && tag.RowsAffected() == 0 {
 			fail(w, 404, "product not found")
@@ -308,6 +313,7 @@ func adminSaveProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	refresh()
+	go dropImages(oldImages, p["images"].([]any))
 	ok(w, map[string]any{"ok": true, "id": id})
 }
 
@@ -339,14 +345,32 @@ func adminQuickEdit(w http.ResponseWriter, r *http.Request) {
 	ok(w, map[string]any{"stock": stock})
 }
 
-// adminHideProduct hides a product rather than deleting it: old orders still refer to it.
-func adminHideProduct(w http.ResponseWriter, r *http.Request) {
-	if _, err := db.Exec(r.Context(), `UPDATE products SET active=FALSE WHERE id=$1`, paramID(r, "id")); err != nil {
+// adminDeleteProduct removes a product for good. One that has been ordered is only hidden, because
+// old orders still refer to it.
+func adminDeleteProduct(w http.ResponseWriter, r *http.Request) {
+	id, ctx := paramID(r, "id"), r.Context()
+	var images []any
+	if err := db.QueryRow(ctx, `SELECT data->'images' FROM products WHERE id=$1`, id).Scan(&images); errors.Is(err, pgx.ErrNoRows) {
+		fail(w, 404, "product not found")
+		return
+	} else if err != nil {
+		oops(w, err)
+		return
+	}
+	tag, err := db.Exec(ctx, `DELETE FROM products p WHERE id=$1 AND NOT EXISTS(SELECT 1 FROM order_items i WHERE i.product_id=p.id)`, id)
+	if err == nil && tag.RowsAffected() == 0 {
+		_, err = db.Exec(ctx, `UPDATE products SET active=FALSE WHERE id=$1`, id)
+	}
+	if err != nil {
 		oops(w, err)
 		return
 	}
 	refresh()
-	done(w)
+	deleted := tag.RowsAffected() > 0
+	if deleted {
+		go dropImages(images, nil)
+	}
+	ok(w, map[string]any{"deleted": deleted})
 }
 
 func contentKind(w http.ResponseWriter, r *http.Request) (string, bool) {
@@ -442,7 +466,7 @@ func adminDeleteContent(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if n > 0 {
-			fail(w, 409, fmt.Sprintf("%d products still use this. Move them first", n))
+			fail(w, 409, fmt.Sprintf("Products still use this (%d). Move them first", n))
 			return
 		}
 	}
@@ -717,6 +741,86 @@ func cloudinary(file []byte, folder, name string) (string, error) {
 		return "", fmt.Errorf("cloudinary upload failed: %d", res.StatusCode)
 	}
 	return strings.Replace(out.URL, "/upload/", "/upload/f_auto,q_auto/", 1), nil
+}
+
+// publicID finds an image's name inside its address. Only the shop's own folder counts, so nothing
+// else in the Cloudinary account can ever be deleted from here.
+func publicID(url string) string {
+	i := strings.Index(url, "/"+uploadFolder+"/")
+	if !strings.Contains(url, "res.cloudinary.com/") || i < 0 {
+		return ""
+	}
+	id, _, _ := strings.Cut(url[i+1:], "?")
+	if dot := strings.LastIndex(id, "."); dot > strings.LastIndex(id, "/") {
+		id = id[:dot]
+	}
+	return id
+}
+
+func imageIDs(list []any) []string {
+	var ids []string
+	for _, x := range list {
+		if m, isMap := x.(map[string]any); isMap {
+			if src, _ := m["src"].(string); publicID(src) != "" {
+				ids = append(ids, publicID(src))
+			}
+		}
+	}
+	return ids
+}
+
+// unusedImages lists photos that were removed and that nothing else still shows. A product copy can
+// share a photo, and pages and settings can link to one, so all of them are checked first.
+func unusedImages(ctx context.Context, before, after []any) []string {
+	keep := imageIDs(after)
+	var out []string
+	for _, id := range imageIDs(before) {
+		if slices.Contains(keep, id) {
+			continue
+		}
+		var used bool
+		err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM products WHERE position($1 in data::text)>0)
+			OR EXISTS(SELECT 1 FROM content WHERE position($1 in data::text)>0)
+			OR EXISTS(SELECT 1 FROM settings WHERE position($1 in data::text)>0)`, id).Scan(&used)
+		if err == nil && !used {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// dropImages frees Cloudinary space. Call it with `go`: a failure here must never hold up a save.
+func dropImages(before, after []any) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	for _, id := range unusedImages(ctx, before, after) {
+		if err := cloudinaryDelete(id); err != nil {
+			log.Print("cloudinary delete: ", err)
+		}
+	}
+}
+
+func cloudinaryDelete(id string) error {
+	cloud, key, secret := os.Getenv("CLOUDINARY_CLOUD"), os.Getenv("CLOUDINARY_KEY"), os.Getenv("CLOUDINARY_SECRET")
+	if cloud == "" {
+		return nil
+	}
+	params := map[string]string{"invalidate": "true", "public_id": id, "timestamp": strconv.FormatInt(time.Now().Unix(), 10)}
+	form := url.Values{"api_key": {key}, "signature": {signUpload(params, secret)}}
+	for k, v := range params {
+		form.Set(k, v)
+	}
+	res, err := httpClient.PostForm("https://api.cloudinary.com/v1_1/"+cloud+"/image/destroy", form)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	var out struct{ Result string }
+	json.NewDecoder(res.Body).Decode(&out)
+	if out.Result != "ok" && out.Result != "not found" {
+		return fmt.Errorf("%s: status %d, %q", id, res.StatusCode, out.Result)
+	}
+	return nil
 }
 
 // adminPublish rebuilds the static storefront from the database.

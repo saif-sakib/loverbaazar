@@ -307,8 +307,8 @@ If you can't find it, carry on. If the test below fails with `401`, come back he
 | Render log | What it means | Fix |
 |---|---|---|
 | Nothing about Brevo | `BREVO_KEY` or `SHOP_EMAIL` is missing | Add both, then redeploy |
-| `brevo: status 401` | The key is wrong, or Brevo blocked Render | Paste the `xkeysib-` key again, and repeat part 4 |
-| `brevo: status 400` | `SHOP_EMAIL` isn't your verified sender | Make them match exactly |
+| `brevo: status 401: ...` | The key is wrong, or Brevo blocked Render. The end of the line says which | Paste the `xkeysib-` key again, and repeat part 4 |
+| `brevo: status 400: ...` | `SHOP_EMAIL` isn't your verified sender | Make them match exactly |
 
 ### Part C: Bot protection (Turnstile)
 
@@ -316,31 +316,49 @@ If you can't find it, carry on. If the test below fails with `401`, come back he
 
 **Follow this order exactly.** If the secret reaches Render before the box is on the shop, every order fails with "bot check failed".
 
-1. In Cloudflare, open **Turnstile** from the left menu, and click **Add widget**.
-2. Fill it in:
+1. Open [Turnstile in Cloudflare](https://dash.cloudflare.com/?to=/:account/turnstile), and click **Add widget**.
+2. Fill it in. The next point covers **Hostname Management**.
 
    | Field | Value |
    |---|---|
    | Widget name | `LoverBaazar checkout` |
-   | Hostnames | Your `workers.dev` address without `https://`, and `loverbaazar.com` |
    | Widget mode | **Managed** |
+   | Pre-clearance | **No** |
 
-3. Click **Create**. Save the **Site key** and the **Secret key**.
-4. In GitHub, open **Settings → Secrets and variables → Actions**. On the **Variables** tab, add `TURNSTILE_SITE` with the **site key**.
-5. In admin, click **Publish now**, and wait for **Publish store** to turn green in the **Actions** tab.
-6. Put an item in your cart, open checkout, and confirm the Turnstile box appears.
-7. Only now, on Render, add `TURNSTILE_SECRET` with the **secret key**. Click **Save, rebuild, and deploy**.
+3. Under **Hostname Management**, click **Add Hostnames**, then add your two addresses one at a time:
+
+   1. Type `loverbaazar.loverbaazar.workers.dev`, with no `https://` and no `/` at the end.
+   2. Wait for the spinner to stop. **"No results" is normal.** That list only searches domains already on your Cloudflare account, and neither address is yet.
+   3. Click **Add "loverbaazar.loverbaazar.workers.dev" as a custom hostname** just below it. If you only press Enter, the box clears and nothing is added. On a keyboard, press the Down arrow first, then Enter.
+   4. Do the same for `loverbaazar.com`. It also covers `www.loverbaazar.com`, so don't add that one.
+   5. Click **Add**, and check that both addresses are listed.
+
+4. Scroll to the bottom, and click **Create**. Save the **Site key** and the **Secret key**.
+5. In GitHub, open **Settings → Secrets and variables → Actions**. On the **Variables** tab, add `TURNSTILE_SITE` with the **site key**.
+6. In admin, click **Publish now**, and wait for **Publish store** to turn green in the **Actions** tab.
+7. Put an item in your cart, open checkout, and confirm the Turnstile box appears.
+8. Only now, on Render, add `TURNSTILE_SECRET` with the **secret key**. Click **Save, rebuild, and deploy**.
 
 **Check:** place a test order. It should go through, then set it to **Cancelled** in admin.
+
+If it fails, the box or Render's **Logs** tell you why:
+
+| What you see | What it means | Fix |
+|---|---|---|
+| The box shows error `110200` | That address isn't on the widget | Add it under **Hostname Management**, then wait a few minutes |
+| No box on checkout | `TURNSTILE_SITE` is missing, or Publish hasn't finished | Repeat points 5 and 6 |
+| `turnstile: refused [invalid-input-secret]` | The secret key on Render is wrong | Paste it again from the widget's page |
+| `turnstile: refused [invalid-input-response]` | The site key and secret key come from different widgets | Use both from the same widget |
+| `turnstile: refused [timeout-or-duplicate]` | The customer waited too long, or pressed twice | Nothing to fix. They can press **Place order** again |
 
 ## Step 10: Prepare the shop
 
 Open `/admin/`. Your changes appear for customers after you click **Publish changes** in the yellow bar, unless the page says they're live.
 
-1. **Delivery and payment:** check each charge (0 means free), add delivery times, and check every payment number. Send yourself ৳10 to prove each number is right.
-2. **Shop details and logo:** check your phone, WhatsApp, address and email. Add opening hours and your return policy.
+1. **Settings → Delivery and payment:** check each charge (0 means free), add delivery times, and check every payment number. Send yourself ৳10 to prove each number is right.
+2. **Settings → Shop details:** check your phone, WhatsApp, address and email. Add opening hours and your return policy.
 3. **Products:** enter real stock numbers. Most in-stock products still show the imported figure of 100. These save by themselves.
-4. **Pages:** read Terms & Conditions and Privacy Policy carefully. They're your legal promises to customers.
+4. **Website → Pages:** read Terms & Conditions and Privacy Policy carefully. They're your legal promises to customers.
 5. **Publish changes.**
 
 Then, on a real phone: browse, order, track the order, and cancel it.
@@ -484,7 +502,7 @@ None of these can bill you without a card.
 - Render's Singapore region on Free, its limits, and whether its terms allow the 10-minute keep-awake ping. If not, remove the cron from `wrangler.jsonc`; checkout will sometimes wait about a minute.
 - Real speed from Bangladesh.
 - That Cloudflare's edge cache works on a `workers.dev` address. It's only been tested locally. If not, `/api/stock` is still correct, and the cache starts working on your own domain.
-- Admin photo uploads on a real Cloudinary account. They've only been tested against a simulated one.
+- Admin photo uploads from Render itself. They've been tested against the real Cloudinary account, but from a computer.
 - Brevo's exact menu names. Its help site couldn't be read directly when this was written.
 
 ## Before taking online payments

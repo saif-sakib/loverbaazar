@@ -12,7 +12,7 @@
     String(s)
       .toLowerCase()
       .trim()
-      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-") // Bangla vowel signs are marks, not letters
       .replace(/^-+|-+$/g, "");
   const asciiId = (s) => slugify(s).replace(/[^a-z0-9-]/g, "") || "opt-" + Date.now().toString(36);
   const view = () => $("#view");
@@ -20,11 +20,16 @@
   const STATUSES = ["pending", "confirmed", "shipped", "delivered", "cancelled", "returned"];
   const statusOptions = (current) =>
     STATUSES.map((v) => `<option value="${v}" ${v === current ? "selected" : ""}>${v[0].toUpperCase() + v.slice(1)}</option>`).join("");
+  // Eight places to go. A place with several parts shows them as tabs at the top of the page.
   const NAV = [
-    ["Every day", { dashboard: "Home", orders: "Orders", messages: "Messages", reviews: "Reviews" }],
-    ["Products", { products: "Products", categories: "Categories", coupons: "Coupons", customers: "Customers", tags: "Tags" }],
-    ["Website", { home: "Home page", menu: "Menu and footer", pages: "Pages", blog: "Blog", words: "Words on the site" }],
-    ["Settings", { delivery: "Delivery and payment", shop: "Shop details and logo" }],
+    ["dashboard", "Home"],
+    ["orders", "Orders"],
+    ["products", "Products", { products: "All products", categories: "Categories", tags: "Tags" }],
+    ["coupons", "Coupons"],
+    ["customers", "Customers"],
+    ["messages", "Inbox", { messages: "Messages", reviews: "Reviews" }],
+    ["home", "Website", { home: "Home page", menu: "Menu and footer", pages: "Pages", blog: "Blog", words: "Words" }],
+    ["delivery", "Settings", { delivery: "Delivery and payment", shop: "Shop details" }],
   ];
   const LIVE = "Changes here reach customers within about 2 minutes.";
   const PUB = "After saving, press Publish changes so customers can see it.";
@@ -33,7 +38,7 @@
     orders: ["Orders", "Find an order, change its status, or print an invoice."],
     messages: ["Messages", "What customers sent from the contact page."],
     reviews: ["Reviews", `Approve a review to show it on the product page. ${PUB}`],
-    products: ["Products", `Type in a price or stock box and it saves by itself. ${LIVE}`],
+    products: ["Products", `Type in a price or stock box and it saves by itself. Customers see it within about 2 minutes.`],
     categories: ["Categories", `The groups products are sorted into. ${PUB}`],
     coupons: ["Coupons", `Discount codes for customers. ${LIVE}`],
     customers: ["Customers", "Everyone who has ordered. You can also set a new password for a customer who forgot theirs."],
@@ -44,7 +49,7 @@
     blog: ["Blog", `Articles for your customers and for Google. ${PUB}`],
     words: ["Words on the site", `Headings and small messages used around the shop. ${PUB}`],
     delivery: ["Delivery and payment", `Delivery charges, payment numbers, and opening or closing orders. ${LIVE}`],
-    shop: ["Shop details and logo", `Your phone, address, logo and colours. ${PUB}`],
+    shop: ["Shop details", `Your phone, address, logo and colours. ${PUB}`],
   };
   // The search box and the home screen. The last word list is what people might type.
   const JOBS = [
@@ -123,6 +128,7 @@
       } catch (e) {
         if (e.auth) logout(e.message);
         else {
+          say("");
           $("#err").textContent = e.message;
           unsaved = !!$("#view form");
           scrollTo(0, 0);
@@ -299,8 +305,7 @@
     const top = Math.max(...d.series.map((x) => x.sales), 1);
     const tile = (label, value, link) => `<a class="tile" href="${link || "#orders"}"><b>${esc(value)}</b><span>${esc(label)}</span></a>`;
     view().innerHTML = `<div class="tiles">
-      ${tile("Orders today", d.todayOrders)}${tile("Sales today", money(d.todaySales))}${tile("Sales, last 30 days", money(d.monthSales))}
-      ${tile("Waiting for confirmation", d.pending)}${tile("Ready to ship", d.toShip)}${tile("Unread messages", d.unread, "#messages")}${tile("Reviews to check", d.reviews, "#reviews")}
+      ${tile("Sales today", money(d.todaySales))}${tile("Waiting for confirmation", d.pending)}${tile("Ready to ship", d.toShip)}${tile("New messages and reviews", d.unread + d.reviews, "#messages")}${tile("Sales, last 30 days", money(d.monthSales))}
     </div>
     <h3 class="jobhead">What do you want to do?</h3>
     <div class="jobs">${JOBS.slice(0, 10)
@@ -322,7 +327,7 @@
 
   const orders = run(async () => {
     view().innerHTML = `<div class="toolbar">
-      <input id="oq" type="search" placeholder="Name, phone, order number or address" value="${esc(orderFilter.q)}" aria-label="Search orders">
+      <input id="oq" type="search" placeholder="Search orders" value="${esc(orderFilter.q)}" aria-label="Search orders">
       <select id="ost" aria-label="Status"><option value="">All statuses</option>${statusOptions(orderFilter.status)}</select>
       <label class="check">From <input id="ofrom" type="date" value="${esc(orderFilter.from)}"></label><label class="check">To <input id="oto" type="date" value="${esc(orderFilter.to)}"></label>
       <button class="btn ghost" id="csv">Download as Excel file</button></div><div id="olist"><p>Loading…</p></div>`;
@@ -370,12 +375,12 @@
     ${l
       .map(
         (o) => `<tr>
-      <td><b>${esc(o.number)}</b><br><small>${esc(when(o.created_at))}</small></td>
+      <td class="nowrap"><b>${esc(o.number)}</b><br><small>${esc(when(o.created_at))}</small></td>
       <td>${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}${o.bad_phone > 0 ? ` <span class="tag warn">${o.bad_phone} cancelled or returned</span>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a><br>${esc(o.address)} (${esc(o.area)})${o.note ? `<br><i>${esc(o.note)}</i>` : ""}</td>
       <td>${(o.items || []).map((i) => `${esc(i.name)} × ${i.qty}`).join("<br>")}</td>
       <td>${money(o.total)}${o.discount ? `<br><small>${money(o.discount)} off, ${esc(o.coupon)}</small>` : ""}</td>
       <td>${esc(o.payment)}<br><small>${esc(o.txn_id)}</small></td>
-      <td><select data-o="${esc(o.number)}" aria-label="Status of ${esc(o.number)}">${statusOptions(o.status)}</select></td>
+      <td><select class="status" data-st="${esc(o.status)}" data-o="${esc(o.number)}" aria-label="Status of ${esc(o.number)}">${statusOptions(o.status)}</select></td>
       <td class="actions"><button class="link" data-more="${esc(o.number)}">Details</button> <button class="link" data-print="${esc(o.number)}">Invoice</button></td>
     </tr>
     <tr id="d-${esc(o.number)}" hidden><td colspan="7"><form class="inlineform" data-n="${esc(o.number)}">
@@ -414,6 +419,7 @@
         try {
           await api("/orders/" + encodeURIComponent(s.dataset.o), { method: "PUT", body: { status: s.value } });
           say(`${s.dataset.o} is now ${s.value}.`);
+          counts();
         } finally {
           await drawOrders();
         }
@@ -458,15 +464,16 @@
   // ---- Products ----
 
   let allProducts = [];
+  let allTags = [];
   const productFilter = { q: "", cat: "", show: "", limit: 50 };
 
   const products = run(async () => {
-    [allProducts] = await Promise.all([api("/products"), loadCategories()]);
+    [allProducts, allTags] = await Promise.all([api("/products"), api("/content/tag"), loadCategories()]);
     view().innerHTML = `<div class="toolbar"><button class="btn" id="new">Add product</button>
       <input id="pq" type="search" placeholder="Search name or SKU" value="${esc(productFilter.q)}" aria-label="Search products">
       <select id="pcat" aria-label="Category"><option value="">All categories</option>${categories.map((c) => `<option value="${esc(c.slug)}" ${c.slug === productFilter.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
       <select id="pshow" aria-label="Show"><option value="">All products</option><option value="low">Low stock</option><option value="out">Sold out</option><option value="hidden">Hidden</option></select></div>
-      <div class="scroll"><table class="tbl"><tr><th></th><th>Product</th><th>Price</th><th>Regular price</th><th>Stock</th><th>Visible</th><th></th></tr><tbody id="rows"></tbody></table></div><button class="btn ghost more" id="pmore" hidden>Show more</button>`;
+      <div class="scroll"><table class="tbl"><tr><th></th><th>Product</th><th>Price</th><th>Old price</th><th>Stock</th><th>Visible</th><th></th></tr><tbody id="rows"></tbody></table></div><button class="btn ghost more" id="pmore" hidden>Show more</button>`;
     $("#pshow").value = productFilter.show;
     $("#new").onclick = () =>
       editProduct({ cats: [], images: [], attrs: [], active: true, price: 0, regular: 0, stock: 0, name: "", slug: "" }, true);
@@ -507,10 +514,10 @@
           (p) => `<tr data-id="${p.id}" class="${p.active ? "" : "off"}">
       <td>${p.images?.[0] ? `<img class="mini" src="${esc(p.images[0].thumb || p.images[0].src)}" alt="" loading="lazy" width="44" height="44">` : ""}</td>
       <td>${esc(p.name)}</td>
-      <td><input class="num" type="number" min="0" data-q="price" value="${p.price}" aria-label="Price of ${esc(p.name)}"></td>
-      <td><input class="num" type="number" min="0" data-q="regular" value="${p.regular}" aria-label="Regular price of ${esc(p.name)}"></td>
-      <td><input class="num" type="number" min="0" data-q="stock" value="${p.stock}" aria-label="Stock of ${esc(p.name)}"></td>
-      <td><input type="checkbox" data-q="active" ${p.active ? "checked" : ""} aria-label="${esc(p.name)} visible in shop"></td>
+      <td data-l="Price"><input class="num" type="number" min="0" data-q="price" value="${p.price}" aria-label="Price of ${esc(p.name)}"></td>
+      <td data-l="Old price"><input class="num" type="number" min="0" data-q="regular" value="${p.regular}" aria-label="Old price of ${esc(p.name)}"></td>
+      <td data-l="Stock"><input class="num" type="number" min="0" data-q="stock" value="${p.stock}" aria-label="Stock of ${esc(p.name)}"></td>
+      <td data-l="Visible"><input type="checkbox" data-q="active" ${p.active ? "checked" : ""} aria-label="${esc(p.name)} visible in shop"></td>
       <td class="actions"><button class="link" data-e="${p.id}">Edit</button> <button class="link" data-dup="${p.id}">Copy</button> <a class="link" href="/product/${esc(p.slug)}/" target="_blank" rel="noopener">View</a></td></tr>`,
         )
         .join("") || `<tr><td colspan="7">No products match.</td></tr>`;
@@ -565,10 +572,19 @@
         <label class="btn ghost small upl">Upload photos<input id="up" type="file" accept="image/*" multiple hidden></label>
         <input id="imgurl" placeholder="Or paste an image address and press Enter" aria-label="Image address"></div>
       <div class="field">Specifications<div id="attrs"></div></div>
+      <label class="field">Search words, separated by commas<input name="tagnames" value="${esc((p.tags || []).map((t) => allTags.find((x) => x.slug === t)?.name || t).join(", "))}"></label>
       <div class="field">Description<div id="desc"></div></div>
       ${toggle("Visible in shop", "active", p.active)}
-      <div class="stick"><button class="btn">Save</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
+      <div class="stick"><button class="btn">Save</button> <button type="button" class="btn ghost" id="back">Back</button>${isNew ? "" : ` <button type="button" class="link danger" id="del">Delete product</button>`}</div></form>`;
     const f = $("#pf");
+    if (!isNew)
+      $("#del").onclick = run(async () => {
+        if (!confirm(`Delete ${p.name}? This can't be undone. If it has been ordered before, it will be hidden instead.`)) return;
+        const r = await api("/products/" + p.id, { method: "DELETE" });
+        unsaved = false;
+        await products();
+        needsPublish(r.deleted ? "Product deleted." : "This product has old orders, so it was hidden instead of deleted.");
+      });
     const drawImages = () => {
       $("#imgs").innerHTML = images
         .map(
@@ -612,7 +628,8 @@
       say("Uploading…");
       const cat = (new FormData(f).getAll("cat").find((c) => !["latest-product", "popular-item"].includes(c)) || "other").replace(/[^a-z0-9-]/g, "");
       const stem = asciiName(f.slug.value) || "product";
-      const taken = images.map((i) => +(i.src.match(new RegExp(`${stem}-(\d+)\.`))?.[1] || 0));
+      // Numbers carry on from existing photos: reusing one would overwrite that photo on Cloudinary.
+      const taken = images.map((i) => +(i.src.match(new RegExp(`${stem}-(\\d+)(?:\\.|$)`))?.[1] || 0));
       let n = Math.max(0, ...taken);
       for (const file of e.target.files) addImage(await upload(file, `products/${cat}`, `${stem}-${++n}`));
       say("");
@@ -647,8 +664,20 @@
     f.onsubmit = run(async (e) => {
       e.preventDefault();
       const d = new FormData(f);
+      const tagNames = d
+        .get("tagnames")
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const tagSlugs = [];
+      for (const name of tagNames) {
+        const known = allTags.find((t) => t.name.toLowerCase() === name.toLowerCase());
+        if (!known) await api("/content/tag/" + encodeURIComponent(slugify(name)), { method: "PUT", body: { name } });
+        tagSlugs.push(known?.slug || slugify(name));
+      }
       const out = {
         ...p,
+        tags: tagSlugs,
         name: d.get("name").trim(),
         slug: d.get("slug").trim(),
         price: +d.get("price"),
@@ -834,6 +863,7 @@
       b.onclick = run(async () => {
         await api("/reviews/" + b.dataset.a, { method: "PUT", body: {} });
         await reviews();
+        counts();
         needsPublish("Review approved.");
       });
     });
@@ -862,6 +892,7 @@
       b.onclick = run(async () => {
         await api("/messages/" + b.dataset.r, { method: "PUT", body: {} });
         await messages();
+        counts();
       });
     });
     $$("[data-x]").forEach((b) => {
@@ -934,7 +965,14 @@
 
   const tags = run(async () => {
     const l = await api("/content/tag");
-    view().innerHTML = `<div class="toolbar"><input id="tq" type="search" placeholder="Find a tag" aria-label="Find a tag"></div><p class="meta">The name is what shoppers and Google see. The address never changes. Changes appear after Publish.</p><div class="scroll"><table class="tbl" id="tt"></table></div>`;
+    view().innerHTML = `<div class="toolbar"><input id="tq" type="search" placeholder="Find a tag" aria-label="Find a tag"><button class="btn ghost" id="newtag">Add tag</button></div><div class="scroll"><table class="tbl" id="tt"></table></div>`;
+    $("#newtag").onclick = run(async () => {
+      const name = prompt("Name of the new tag")?.trim();
+      if (!name) return;
+      await api("/content/tag/" + encodeURIComponent(slugify(name)), { method: "PUT", body: { name } });
+      await tags();
+      needsPublish("Tag added.");
+    });
     const draw = () => {
       const q = $("#tq").value.toLowerCase();
       const hits = l.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 100);
@@ -1043,10 +1081,14 @@
         ${field("Heading", "heroTitle", W.hero.title, "required")}${area("Text under the heading", "heroText", W.hero.text, 2)}
         <div class="fields2">${field("Button words", "heroButton", W.hero.button)}${field("Button goes to", "heroLink", W.hero.link, 'list="sitelinks"')}</div>
       </section>
+      <section class="panel" data-s="home"><h2>Pictures beside the heading</h2><p class="meta">Add up to 3. Leave this empty and the shop picks products for you.</p><div id="heroimgs"></div></section>
       <section class="panel" data-s="home"><h2>Text strip at the very top</h2>${area("One line for each message", "ticker", (W.ticker || []).join("\n"), 3)}</section>
       <section class="panel" data-s="home"><h2>Banner pictures</h2><p class="meta">Shown under the main heading. Leave this empty for no banners.</p><div id="banners"></div></section>
       <section class="panel" data-s="home"><h2>Promises</h2><p class="meta">The four short promises under the main heading.</p><div id="perks"></div></section>
-      <section class="panel" data-s="home"><h2>Product sections</h2><p class="meta">Each section shows products from one category.</p><div id="home"></div></section>
+      <section class="panel" data-s="home"><h2>Category pictures</h2>
+        ${toggle("Show the Shop by category section", "showCats", W.showCats !== false)}
+        <div class="field">Which categories to show, leave empty to use the menu ${checkList("tiles", W.catTiles || [])}</div></section>
+      <section class="panel" data-s="home"><h2>Product sections</h2><p class="meta">Each section shows products from one category. Use the arrows to change the order.</p><div id="home"></div></section>
       <section class="panel" data-s="menu"><h2>Drop-down menus</h2><div id="menu"></div></section>
       <section class="panel" data-s="menu"><h2>Other menu links</h2><div id="links"></div></section>
       <section class="panel" data-s="menu"><h2>Footer links</h2><p class="meta">Links with the same column name appear together.</p><div id="footlinks"></div></section>
@@ -1102,8 +1144,19 @@
       [
         { k: "title", label: "Heading" },
         { k: "cat", label: "Category", type: "select", options: catOptions },
+        { k: "count", label: "How many products", type: "number" },
       ],
-      { title: "", cat: categories[0]?.slug || "" },
+      { title: "", cat: categories[0]?.slug || "", count: 8 },
+    );
+    const heroimgs = rows(
+      $("#heroimgs"),
+      W.heroImages || [],
+      [
+        { k: "title", label: "What the picture shows" },
+        { k: "link", label: "Goes to", list: true },
+        { k: "image", label: "Picture", type: "image" },
+      ],
+      { title: "", link: "/shop/", image: "" },
     );
     const menu = rows(
       $("#menu"),
@@ -1177,6 +1230,9 @@
         banners: banners().filter((b) => b.image),
         perks: perks().filter((p) => p.title),
         home: home().filter((h) => h.title),
+        heroImages: heroimgs().filter((h) => h.image),
+        showCats: f.showCats.checked,
+        catTiles: new FormData(f).getAll("tiles"),
         menu: menu().filter((m) => m.title),
         links: links().filter((l) => l.label),
         footer: [...new Set(footlinks().map((l) => l.col.trim()))]
@@ -1260,9 +1316,16 @@
     const nav = NAVTAB[tab] || tab;
     say("");
     $("#err").textContent = "";
-    $$("#tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + nav));
     const [title, help] = HEADS[nav] || ["", ""];
-    $("#head").innerHTML = `<h1>${esc(title)}</h1><p class="meta">${esc(help)}</p>`;
+    const place = NAV.find(([k, , parts]) => k === nav || parts?.[nav]);
+    const parts = place?.[2];
+    $$("#tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + place?.[0]));
+    $("#head").innerHTML =
+      (parts
+        ? `<div class="subtabs">${Object.entries(parts)
+            .map(([k, v]) => `<a href="#${k}" class="${k === nav ? "on" : ""}">${esc(v)}</a>`)
+            .join("")}</div>`
+        : "") + `<h1>${esc(title)}</h1><p class="meta">${esc(help)}</p>`;
     view().innerHTML = "<p>Loading…</p>";
     routes[tab](arg);
     scrollTo(0, 0);
@@ -1297,14 +1360,23 @@
     });
   }
 
+  // Small numbers on the menu, so waiting work is seen from any page.
+  const counts = async () => {
+    const d = await api("/dashboard").catch(() => null);
+    if (!d) return;
+    const show = (k, n) => {
+      const e = $(`[data-count="${k}"]`);
+      e.textContent = n;
+      e.hidden = !n;
+    };
+    show("orders", d.pending);
+    show("messages", d.unread + d.reviews);
+  };
+
   async function enter() {
     $("#login").hidden = true;
     $("#app").hidden = false;
-    $("#tabs").innerHTML = NAV.map(
-      ([group, tabs]) => `<div><h4>${group}</h4>${Object.entries(tabs)
-        .map(([k, v]) => `<a href="#${k}">${v}</a>`)
-        .join("")}</div>`,
-    ).join("");
+    $("#tabs").innerHTML = NAV.map(([k, v]) => `<a href="#${k}">${v}<i data-count="${k}" hidden></i></a>`).join("");
     try {
       $("#dirtybar").hidden = !localStorage.getItem("dirty");
     } catch {}
@@ -1313,6 +1385,7 @@
     const s = await api("/settings").catch(() => ({}));
     site = s.site || null;
     lowStock = s.live?.lowStock ?? lowStock;
+    counts();
   }
 
   addEventListener("hashchange", go);

@@ -7,7 +7,15 @@ const heroPics = withPhoto(SITE.home.flatMap((h: any) => inCat(h.cat)))
   .filter((p: any, i: number, all: any[]) => all.findIndex((x) => x.id === p.id) === i)
   .filter((_: any, i: number) => i % 7 === 0)
   .slice(0, 3);
-const tiles = MENU.flatMap((g: any) => g.items)
+// The admin can choose these. With no choice made, the shop picks them itself.
+const heroShots = SITE.heroImages?.length
+  ? SITE.heroImages.slice(0, 3).map((h: any) => ({ href: h.link || "/shop/", src: h.image, alt: h.title || "" }))
+  : heroPics.map((p: any, i: number) => ({
+      href: `/product/${p.slug}/`,
+      src: img(i === 0 ? p.images[0]?.src : p.images[0]?.thumb),
+      alt: p.name,
+    }));
+const tiles = (SITE.catTiles?.length ? SITE.catTiles.map((s: string) => cats.find((c: any) => c.slug === s)).filter(Boolean) : MENU.flatMap((g: any) => g.items))
   .filter((c: any) => inCat(c.slug).length)
   .slice(0, 12);
 const hero = SITE.hero;
@@ -29,9 +37,9 @@ const heroEnd = heroWords.pop();
         )}
       </div>
       <div class="pics">
-        {heroPics.map((p: any, i: number) => (
-          <a href={`/product/${p.slug}/`}>
-            <img src={img(i === 0 ? p.images[0]?.src : p.images[0]?.thumb)} alt={p.name} width="600" height="600" />
+        {heroShots.map((h: any) => (
+          <a href={h.href}>
+            <img src={h.src} alt={h.alt} width="600" height="600" />
           </a>
         ))}
       </div>
@@ -45,15 +53,17 @@ const heroEnd = heroWords.pop();
         ))}
       </section>
     )}
-    <section class="perks">
-      {SITE.perks.map((k: any) => (
-        <div>
-          <b>{k.title}</b>
-          <span>{fill(k.text)}</span>
-        </div>
-      ))}
-    </section>
-    {tiles.length > 0 && (
+    {SITE.perks.length > 0 && (
+      <section class="perks">
+        {SITE.perks.map((k: any) => (
+          <div>
+            <b>{k.title}</b>
+            <span>{fill(k.text)}</span>
+          </div>
+        ))}
+      </section>
+    )}
+    {SITE.showCats !== false && tiles.length > 0 && (
       <>
         <div class="sec">
           <h2>{say("categoriesHeading")}</h2>
@@ -80,7 +90,7 @@ const heroEnd = heroWords.pop();
             </div>
             <section class="grid">
               {inCat(h.cat)
-                .slice(0, 8)
+                .slice(0, h.count || 8)
                 .map((p: any) => (
                   <Card p={p} />
                 ))}

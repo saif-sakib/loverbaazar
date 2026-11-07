@@ -279,7 +279,7 @@ func router() http.Handler {
 		a.Post("/products", adminSaveProduct)
 		a.Put("/products/{id}", adminSaveProduct)
 		a.Patch("/products/{id}", adminQuickEdit)
-		a.Delete("/products/{id}", adminHideProduct)
+		a.Delete("/products/{id}", adminDeleteProduct)
 		a.Get("/content/{kind}", adminContent)
 		a.Put("/content/{kind}/{slug}", adminSaveContent)
 		a.Delete("/content/{kind}/{slug}", adminDeleteContent)

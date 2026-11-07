@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -490,8 +491,14 @@ func human(r *http.Request, tok string) bool {
 		return false
 	}
 	defer res.Body.Close()
-	var out struct{ Success bool }
+	var out struct {
+		Success bool
+		Codes   []string `json:"error-codes"`
+	}
 	json.NewDecoder(res.Body).Decode(&out)
+	if !out.Success {
+		log.Print("turnstile: refused ", out.Codes)
+	}
 	return out.Success
 }
 
@@ -510,9 +517,10 @@ func notify(subject, text string) {
 		log.Print("brevo: ", err)
 		return
 	}
-	res.Body.Close()
+	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		log.Print("brevo: status ", res.StatusCode)
+		why, _ := io.ReadAll(io.LimitReader(res.Body, 300))
+		log.Printf("brevo: status %d: %s", res.StatusCode, why)
 	}
 }
 

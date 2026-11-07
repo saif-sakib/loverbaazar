@@ -494,6 +494,11 @@
     f.onsubmit = async (e) => {
       e.preventDefault();
       if (!f.reportValidity()) return;
+      // The bot check takes a moment. Pressing the button early shouldn't count as failing it.
+      if ($(".cf-turnstile", f) && !new FormData(f).get("cf-turnstile-response")) {
+        err.textContent = "The security check isn't finished. Wait a moment, tick the box if you see one, then press Place order again.";
+        return;
+      }
       const label = submit.textContent;
       submit.disabled = true;
       submit.textContent = "Placing your order…";
