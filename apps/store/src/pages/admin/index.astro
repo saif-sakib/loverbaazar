@@ -19,28 +19,38 @@ import "../../styles/admin.css";
       <form class="panel login" id="login">
         <h1>LoverBaazar Admin</h1>
         <label class="field">
-          Admin token
+          Admin password
           <input id="tok" type="password" autocomplete="current-password" required />
+        </label>
+        <label class="check field">
+          <input id="keep" type="checkbox" /> Keep me signed in on this device
         </label>
         <p class="err" id="loginErr"></p>
         <button class="btn small">Enter</button>
       </form>
       <div id="app" hidden>
-        <header class="adminbar">
-          <b>LoverBaazar Admin</b>
+        <aside class="adminbar">
+          <a class="adminlogo" href="#dashboard">LoverBaazar</a>
+          <div class="adminfind">
+            <input id="find" type="search" placeholder="Find anything…" aria-label="Search the admin" autocomplete="off" />
+            <div id="findres" hidden></div>
+          </div>
           <nav id="tabs"></nav>
           <div class="adminactions">
-            <button class="btn" id="pub">
-              Publish storefront
-            </button>
-            <button class="link" id="out">
-              Log out
-            </button>
+            <a class="link" href="/" target="_blank" rel="noopener">View the shop</a>
+            <button class="link" id="out">Log out</button>
           </div>
-        </header>
-        <p class="note" id="ok" hidden role="status"></p>
-        <p class="err" id="err" role="alert"></p>
-        <div id="view"></div>
+        </aside>
+        <main class="adminmain">
+          <div class="dirtybar" id="dirtybar" hidden>
+            <span>You have changes that customers can't see yet.</span>
+            <button class="btn" id="pub">Publish changes</button>
+          </div>
+          <div id="head"></div>
+          <p class="note" id="ok" hidden role="status"></p>
+          <p class="err" id="err" role="alert"></p>
+          <div id="view"></div>
+        </main>
       </div>
     </div>
   </body>

@@ -1,14 +1,36 @@
 .admin { background: #f6f4f1; }
 .login { max-width: 380px; margin: 12vh auto; }
 .login h1 { font-size: 22px; }
-.adminbar { display: flex; align-items: center; gap: 14px 18px; flex-wrap: wrap; padding: 14px 0 10px; }
-#tabs { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
-#tabs a { padding: 7px 11px; border-radius: 9px; font-weight: 600; font-size: 14px; }
+#app:not([hidden]) { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 32px; align-items: start; padding: 20px 0 60px; }
+.adminbar { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 16px; max-height: calc(100vh - 32px); overflow-y: auto; padding-right: 4px; }
+.adminmain { background: none; min-width: 0; }
+.adminlogo { font-weight: 800; font-size: 20px; letter-spacing: -0.03em; }
+.adminfind { position: relative; }
+.adminfind input { font-size: 14px; }
+#findres { background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); margin-top: 6px; overflow: hidden; }
+#findres a { display: block; padding: 9px 12px; font-size: 14px; font-weight: 500; }
+#findres a:hover { background: var(--stone); }
+#findres small { color: var(--mute); margin-right: 4px; }
+#findres p { padding: 10px 12px; margin: 0; color: var(--mute); font-size: 14px; }
+#tabs { display: flex; flex-direction: column; gap: 14px; }
+#tabs h4 { margin: 0 0 4px; padding: 0 11px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mute); }
+#tabs a { display: block; padding: 7px 11px; border-radius: 9px; font-weight: 500; font-size: 14px; }
 #tabs a:hover { background: #fff; }
 #tabs a.on { background: var(--ink); color: #fff; }
-.adminactions { display: flex; align-items: center; gap: 12px; }
-.adminactions .btn { padding: 10px 14px; }
-.btn.attention { background: var(--gold); color: #3a2300; }
+.adminactions { display: flex; justify-content: space-between; gap: 12px; padding: 0 11px; font-size: 13px; }
+#head h1 { font-size: 28px; margin: 0 0 4px; }
+#head p { margin: 0 0 18px; font-size: 14px; }
+.dirtybar { position: sticky; top: 12px; z-index: 6; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--butter); border: 1px solid #ecdcae; border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; font-weight: 600; font-size: 14px; }
+.dirtybar .btn { padding: 10px 18px; }
+#ok { position: sticky; top: 76px; z-index: 5; background: var(--sage); margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+.err:empty { display: none; }
+.jobhead { margin: 20px 0 10px; }
+.jobs { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin-bottom: 18px; }
+.jobs a { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-weight: 600; font-size: 14px; transition: border-color var(--ease), color var(--ease); }
+.jobs a:hover { border-color: var(--brand); color: var(--brand); }
+.advanced { margin: 4px 0 12px; }
+.advanced summary { cursor: pointer; color: var(--mute); font-size: 13px; font-weight: 600; margin-bottom: 8px; overflow-wrap: anywhere; }
+input.saved { border-color: var(--ok); background: var(--sage); }
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 .toolbar input[type="search"] { flex: 1; min-width: 200px; max-width: 420px; }
 .toolbar select { width: auto; }
@@ -58,7 +80,7 @@
 .rep label > span:first-child { display: block; margin-bottom: 4px; }
 .repbtn { display: flex; gap: 4px; padding-bottom: 6px; }
 .repbtn button, figcaption button { border: 1px solid var(--line); background: #fff; border-radius: 7px; width: 28px; height: 28px; cursor: pointer; }
-.btn.add { width: auto; margin-top: 10px; padding: 8px 14px; }
+.btn.add { width: auto; margin: 10px 0 16px; padding: 8px 14px; }
 .picker summary { cursor: pointer; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-weight: 500; margin-top: 4px; }
 .picker input[type="search"] { margin: 8px 0; }
 .picker > div { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; max-height: 240px; overflow: auto; font-weight: 400; }
@@ -75,6 +97,16 @@ figcaption { display: flex; justify-content: space-between; margin-top: 4px; }
 .richbox { min-height: 180px; padding: 12px; font-weight: 400; overflow-wrap: anywhere; }
 .richbox img { border-radius: 8px; }
 .richsrc { border: 0; border-radius: 0; font-family: monospace; font-size: 13px; }
+@media (max-width: 900px) {
+  #app:not([hidden]) { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-top: 12px; }
+  .adminbar { position: static; max-height: none; overflow: visible; padding: 0; }
+  #tabs { flex-direction: row; overflow-x: auto; gap: 16px; padding-bottom: 6px; scrollbar-width: none; }
+  #tabs > div { display: flex; align-items: center; gap: 2px; flex: none; }
+  #tabs h4 { display: none; }
+  #tabs a { white-space: nowrap; background: #fff; }
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .tile b { font-size: 20px; }
+}
 @media (max-width: 760px) {
   .split, .fields2, .fields3 { grid-template-columns: 1fr; }
   .fields2 > *, .fields3 > * { min-width: 0; }

@@ -24,12 +24,19 @@ const store: any = remote ? await fetchJson(remote.replace(/catalog\/?$/, "store
 if (!Array.isArray(list) || list.length === 0) throw new Error("The catalogue came back empty. Not publishing.");
 
 export const products: any[] = list.map((p) => ({ cats: [], tags: [], images: [], attrs: [], reviews: [], short: "", desc: "", ...p }));
-const pick = (key: "cats" | "tags" | "pages" | "posts"): any[] => (store[key]?.length ? store[key] : (localContent as any)[key]);
+// An empty list from the database is real: the admin may have deleted the last post.
+const pick = (key: "cats" | "tags" | "pages" | "posts"): any[] => store[key] ?? (localContent as any)[key];
 export const cats = pick("cats"),
   tags = pick("tags"),
   pages = pick("pages");
 export const posts = [...pick("posts")].sort((a, b) => String(b.date).localeCompare(String(a.date)));
 export const SITE: any = { ...defaults.site, ...store.site };
+SITE.copy = { ...defaults.site.copy, ...store.site?.copy };
+// {phone}, {email} and {name} let the admin write text that stays right when those details change.
+export const fill = (text = "") =>
+  text.replaceAll("{phone}", SITE.phone).replaceAll("{email}", SITE.email).replaceAll("{name}", SITE.name);
+export const say = (key: string) => fill(SITE.copy[key] ?? "");
+export const siteUrl = (path: string) => new URL(path, import.meta.env.SITE).href;
 export const LIVE: any = { ...defaults.live, ...store.live }; // only a fallback: the browser reads /api/stock
 
 export const img = (u = "") => (u || "/placeholder.svg");

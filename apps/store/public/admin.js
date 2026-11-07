@@ -18,21 +18,68 @@
   const view = () => $("#view");
 
   const STATUSES = ["pending", "confirmed", "shipped", "delivered", "cancelled", "returned"];
-  const TABS = {
-    dashboard: "Dashboard",
-    orders: "Orders",
-    products: "Products",
-    categories: "Categories",
-    coupons: "Coupons",
-    customers: "Customers",
-    reviews: "Reviews",
-    messages: "Messages",
-    pages: "Pages",
-    blog: "Blog",
-    settings: "Settings",
+  const statusOptions = (current) =>
+    STATUSES.map((v) => `<option value="${v}" ${v === current ? "selected" : ""}>${v[0].toUpperCase() + v.slice(1)}</option>`).join("");
+  const NAV = [
+    ["Every day", { dashboard: "Home", orders: "Orders", messages: "Messages", reviews: "Reviews" }],
+    ["Products", { products: "Products", categories: "Categories", coupons: "Coupons", customers: "Customers", tags: "Tags" }],
+    ["Website", { home: "Home page", menu: "Menu and footer", pages: "Pages", blog: "Blog", words: "Words on the site" }],
+    ["Settings", { delivery: "Delivery and payment", shop: "Shop details and logo" }],
+  ];
+  const LIVE = "Changes here reach customers within about 2 minutes.";
+  const PUB = "After saving, press Publish changes so customers can see it.";
+  const HEADS = {
+    dashboard: ["Welcome", "Your shop today, and shortcuts to what you change most."],
+    orders: ["Orders", "Find an order, change its status, or print an invoice."],
+    messages: ["Messages", "What customers sent from the contact page."],
+    reviews: ["Reviews", `Approve a review to show it on the product page. ${PUB}`],
+    products: ["Products", `Type in a price or stock box and it saves by itself. ${LIVE}`],
+    categories: ["Categories", `The groups products are sorted into. ${PUB}`],
+    coupons: ["Coupons", `Discount codes for customers. ${LIVE}`],
+    customers: ["Customers", "Everyone who has ordered. You can also set a new password for a customer who forgot theirs."],
+    tags: ["Tags", `Extra keywords on products, used by Google. ${PUB}`],
+    home: ["Home page", `The heading, banners and product sections on your home page. ${PUB}`],
+    menu: ["Menu and footer", `The links at the top and bottom of every page. ${PUB}`],
+    pages: ["Pages", `About Us, How To Buy, Terms and other pages. ${PUB}`],
+    blog: ["Blog", `Articles for your customers and for Google. ${PUB}`],
+    words: ["Words on the site", `Headings and small messages used around the shop. ${PUB}`],
+    delivery: ["Delivery and payment", `Delivery charges, payment numbers, and opening or closing orders. ${LIVE}`],
+    shop: ["Shop details and logo", `Your phone, address, logo and colours. ${PUB}`],
   };
+  // The search box and the home screen. The last word list is what people might type.
+  const JOBS = [
+    ["Change a price or stock", "#products", "price stock quantity sold out discount offer"],
+    ["Add a new product", "#new-product", "create product photo image"],
+    ["Change delivery charges", "#delivery", "delivery charge free shipping fee courier area jashore dhaka"],
+    ["Change payment numbers", "#delivery", "bkash nagad rocket payment cash number"],
+    ["Edit the home page", "#home", "hero heading banner picture promises top strip sections"],
+    ["Change phone or address", "#shop", "phone whatsapp address email facebook youtube hours contact"],
+    ["Change the menu or footer", "#menu", "menu footer links navigation"],
+    ["Make a discount coupon", "#coupons", "coupon code discount offer sale"],
+    ["Edit About, Terms or Privacy", "#pages", "about terms privacy how to buy policy page"],
+    ["Write a blog post", "#new-post", "blog article post"],
+    ["Close or reopen online orders", "#delivery", "closed holiday eid stop open"],
+    ["Show an announcement bar", "#delivery", "notice announcement sale eid message"],
+    ["Change the logo or colours", "#shop", "logo colour color brand"],
+    ["Change words on the site", "#words", "text words heading message thank you"],
+    ["Publish the website now", "#publish", "publish rebuild update"],
+  ];
 
-  let token = sessionStorage.getItem("t") || "";
+  const remembered = () => {
+    try {
+      return localStorage.getItem("keep") || "";
+    } catch {
+      return "";
+    }
+  };
+  let token = sessionStorage.getItem("t") || remembered();
+  let unsaved = false;
+  const LEAVE = "You have changes you haven't saved. Leave without saving?";
+  const back = (to) => () => {
+    if (unsaved && !confirm(LEAVE)) return;
+    unsaved = false;
+    to();
+  };
   let site = null; // shop details, for invoices
   let categories = [];
   let lowStock = 5;
@@ -47,7 +94,7 @@
     const r = await fetch("/api/admin" + path, { method: opts.method || (body ? "POST" : "GET"), headers, body });
     if (opts.raw && r.ok) return r;
     const j = await r.json().catch(() => ({}));
-    if (r.status === 401) throw Object.assign(new Error("Wrong admin token. Please try again."), { auth: true });
+    if (r.status === 401) throw Object.assign(new Error("That password is not right. Please try again."), { auth: true });
     if (!r.ok) throw new Error(j.error || "Request failed");
     return j;
   }
@@ -58,6 +105,9 @@
   };
   const logout = (msg) => {
     sessionStorage.removeItem("t");
+    try {
+      localStorage.removeItem("keep");
+    } catch {}
     token = "";
     $("#loginErr").textContent = msg || "";
     $("#login").hidden = false;
@@ -74,17 +124,18 @@
         if (e.auth) logout(e.message);
         else {
           $("#err").textContent = e.message;
+          unsaved = !!$("#view form");
           scrollTo(0, 0);
         }
       }
     };
   // Saved, but customers only see it after Publish.
   const needsPublish = (m) => {
-    say(m + " Click Publish storefront when you have finished.");
+    say(m);
     try {
       localStorage.setItem("dirty", "1");
     } catch {}
-    $("#pub").classList.add("attention");
+    $("#dirtybar").hidden = false;
   };
 
   async function loadCategories() {
@@ -137,7 +188,8 @@
       if (f.type === "cats") return `<label class="wide">${label}<div data-k="${f.k}" data-cats>${checkList("c", v || [])}</div></label>`;
       if (f.type === "image")
         return `<label class="wide">${label}<span class="inline"><input data-k="${f.k}" value="${esc(v)}" placeholder="Image address"><input type="file" accept="image/*" data-up aria-label="Upload image"></span></label>`;
-      return `<label>${label}<input data-k="${f.k}" type="${f.type || "text"}" value="${esc(v)}"></label>`;
+      if (f.type === "area") return `<label class="wide">${label}<textarea data-k="${f.k}" rows="4">${esc(v)}</textarea></label>`;
+      return `<label>${label}<input data-k="${f.k}" type="${f.type || "text"}" value="${esc(v)}" ${f.list ? 'list="sitelinks"' : ""}></label>`;
     };
     const read = () => {
       list = $$(".rep", host).map((row, i) => {
@@ -199,7 +251,7 @@
       <button type="button" data-block="h2">Heading</button><button type="button" data-block="p">Text</button>
       <button type="button" data-cmd="insertUnorderedList">List</button><button type="button" data-link>Link</button>
       <label class="richup">Image<input type="file" accept="image/*" hidden></label>
-      <button type="button" data-html>HTML</button></div>
+      <button type="button" data-html>Code view</button></div>
       <div class="richbox" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Text"></div>
       <textarea class="richsrc" rows="12" hidden aria-label="HTML"></textarea></div>`;
     const box = $(".richbox", host),
@@ -216,7 +268,7 @@
       b.onclick = () => cmd("formatBlock", b.dataset.block);
     });
     $("[data-link]", host).onclick = () => {
-      const u = prompt("Link address");
+      const u = prompt("Paste the link, such as /shop/ or https://...");
       if (u) cmd("createLink", u);
     };
     $("input[type=file]", host).onchange = run(async (e) => {
@@ -250,12 +302,16 @@
       ${tile("Orders today", d.todayOrders)}${tile("Sales today", money(d.todaySales))}${tile("Sales, last 30 days", money(d.monthSales))}
       ${tile("Waiting for confirmation", d.pending)}${tile("Ready to ship", d.toShip)}${tile("Unread messages", d.unread, "#messages")}${tile("Reviews to check", d.reviews, "#reviews")}
     </div>
+    <h3 class="jobhead">What do you want to do?</h3>
+    <div class="jobs">${JOBS.slice(0, 10)
+      .map(([label, href]) => `<a href="${href}">${esc(label)}</a>`)
+      .join("")}</div>
     <div class="panel"><h3>Daily sales, last 14 days</h3><div class="bars" role="img" aria-label="Daily sales for the last 14 days. Best day ${money(top)}.">
       ${d.series.map((x) => `<div class="barcol" title="${esc(x.day)}: ${money(x.sales)}, ${x.orders} orders"><span class="val">${x.sales === top && x.sales ? money(x.sales) : ""}</span><i style="height:${Math.round((x.sales / top) * 100)}%"></i><small>${esc(x.day.slice(8))}</small></div>`).join("")}
     </div></div>
     <div class="split">
       <div class="panel"><h3>Best sellers, last 30 days</h3>${d.top.length ? `<table class="tbl">${d.top.map((t) => `<tr><td>${esc(t.name)}</td><td>${t.qty} sold</td><td>${money(t.sales)}</td></tr>`).join("")}</table>` : "<p>No sales yet.</p>"}</div>
-      <div class="panel"><h3>Low stock</h3>${d.low.length ? `<table class="tbl">${d.low.map((p) => `<tr><td>${esc(p.name)}</td><td><b>${p.stock}</b> left</td></tr>`).join("")}</table>` : "<p>Everything is well stocked.</p>"}</div>
+      <div class="panel"><h3>Low stock</h3>${d.low.length ? `<table class="tbl">${d.low.map((p) => `<tr><td><a class="link" href="#product/${p.id}">${esc(p.name)}</a></td><td><b>${p.stock}</b> left</td></tr>`).join("")}</table>` : "<p>Everything is well stocked.</p>"}</div>
     </div>`;
   });
 
@@ -267,9 +323,9 @@
   const orders = run(async () => {
     view().innerHTML = `<div class="toolbar">
       <input id="oq" type="search" placeholder="Name, phone, order number or address" value="${esc(orderFilter.q)}" aria-label="Search orders">
-      <select id="ost" aria-label="Status"><option value="">All statuses</option>${STATUSES.map((s) => `<option ${s === orderFilter.status ? "selected" : ""}>${s}</option>`).join("")}</select>
+      <select id="ost" aria-label="Status"><option value="">All statuses</option>${statusOptions(orderFilter.status)}</select>
       <label class="check">From <input id="ofrom" type="date" value="${esc(orderFilter.from)}"></label><label class="check">To <input id="oto" type="date" value="${esc(orderFilter.to)}"></label>
-      <button class="btn ghost" id="csv">Export CSV</button></div><div id="olist"><p>Loading…</p></div>`;
+      <button class="btn ghost" id="csv">Download as Excel file</button></div><div id="olist"><p>Loading…</p></div>`;
     const reload = () => {
       orderFilter.page = 0;
       drawOrders();
@@ -319,7 +375,7 @@
       <td>${(o.items || []).map((i) => `${esc(i.name)} × ${i.qty}`).join("<br>")}</td>
       <td>${money(o.total)}${o.discount ? `<br><small>${money(o.discount)} off, ${esc(o.coupon)}</small>` : ""}</td>
       <td>${esc(o.payment)}<br><small>${esc(o.txn_id)}</small></td>
-      <td><select data-o="${esc(o.number)}" aria-label="Status of ${esc(o.number)}">${STATUSES.map((s) => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
+      <td><select data-o="${esc(o.number)}" aria-label="Status of ${esc(o.number)}">${statusOptions(o.status)}</select></td>
       <td class="actions"><button class="link" data-more="${esc(o.number)}">Details</button> <button class="link" data-print="${esc(o.number)}">Invoice</button></td>
     </tr>
     <tr id="d-${esc(o.number)}" hidden><td colspan="7"><form class="inlineform" data-n="${esc(o.number)}">
@@ -410,7 +466,6 @@
       <input id="pq" type="search" placeholder="Search name or SKU" value="${esc(productFilter.q)}" aria-label="Search products">
       <select id="pcat" aria-label="Category"><option value="">All categories</option>${categories.map((c) => `<option value="${esc(c.slug)}" ${c.slug === productFilter.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
       <select id="pshow" aria-label="Show"><option value="">All products</option><option value="low">Low stock</option><option value="out">Sold out</option><option value="hidden">Hidden</option></select></div>
-      <p class="meta">Change a price or stock number here and it is live for customers within about 2 minutes.</p>
       <div class="scroll"><table class="tbl"><tr><th></th><th>Product</th><th>Price</th><th>Regular price</th><th>Stock</th><th>Visible</th><th></th></tr><tbody id="rows"></tbody></table></div><button class="btn ghost more" id="pmore" hidden>Show more</button>`;
     $("#pshow").value = productFilter.show;
     $("#new").onclick = () =>
@@ -456,7 +511,7 @@
       <td><input class="num" type="number" min="0" data-q="regular" value="${p.regular}" aria-label="Regular price of ${esc(p.name)}"></td>
       <td><input class="num" type="number" min="0" data-q="stock" value="${p.stock}" aria-label="Stock of ${esc(p.name)}"></td>
       <td><input type="checkbox" data-q="active" ${p.active ? "checked" : ""} aria-label="${esc(p.name)} visible in shop"></td>
-      <td class="actions"><button class="link" data-e="${p.id}">Edit</button> <button class="link" data-dup="${p.id}">Copy</button></td></tr>`,
+      <td class="actions"><button class="link" data-e="${p.id}">Edit</button> <button class="link" data-dup="${p.id}">Copy</button> <a class="link" href="/product/${esc(p.slug)}/" target="_blank" rel="noopener">View</a></td></tr>`,
         )
         .join("") || `<tr><td colspan="7">No products match.</td></tr>`;
     $("#pmore").hidden = l.length <= limit;
@@ -488,6 +543,8 @@
           p.active = i.checked;
           row.classList.toggle("off", !p.active);
         } else p[key] = body[key];
+        i.classList.add("saved");
+        setTimeout(() => i.classList.remove("saved"), 1500);
         say(key === "active" ? `${p.name} is ${p.active ? "visible" : "hidden"}.` : `${p.name} saved. Live within about 2 minutes.`);
       });
     });
@@ -498,10 +555,11 @@
     let images = (p.images || []).map((i) => ({ ...i }));
     view().innerHTML = `<form class="panel editor" id="pf"><h2>${isNew ? "Add product" : "Edit product"}</h2>
       ${field("Name", "name", p.name, "required maxlength=200")}
-      ${field("URL slug", "slug", p.slug, `required pattern="[^\\s\\/?#.]+"`)}
-      <p class="meta">The web address: /product/<b id="slugview">${esc(p.slug)}</b>/ ${isNew ? "" : "Changing it breaks old links to this product."}</p>
-      <div class="fields3">${field("Price (৳)", "price", p.price, "required min=0 step=1", "number")}${field("Regular price (৳), shown crossed out", "regular", p.regular, "min=0 step=1", "number")}${field("Stock", "stock", p.stock, "required min=0 step=1", "number")}</div>
-      ${field("SKU", "sku", p.sku)}${field("Short description", "short", p.short, "maxlength=300")}
+      <details class="advanced"><summary>Web address: /product/<span id="slugview">${esc(p.slug) || "made-from-the-name"}</span>/</summary>
+        ${field("Web address", "slug", p.slug, `required pattern="[^\\s\\/?#.]+"`)}
+        <p class="meta">This is filled in for you. ${isNew ? "" : "Changing it breaks old links to this product."}</p></details>
+      <div class="fields3">${field("Selling price (৳)", "price", p.price, "required min=0 step=1", "number")}${field("Old price (৳), shown crossed out", "regular", p.regular, "min=0 step=1", "number")}${field("How many in stock", "stock", p.stock, "required min=0 step=1", "number")}</div>
+      ${field("Product code (SKU), optional", "sku", p.sku)}${field("Short description, shown beside the photo", "short", p.short, "maxlength=300")}
       <div class="field">Categories ${checkList("cat", p.cats || [])}</div>
       <div class="field">Photos <span class="meta">The first photo is the main one.</span><div id="imgs" class="imgs"></div>
         <label class="btn ghost small upl">Upload photos<input id="up" type="file" accept="image/*" multiple hidden></label>
@@ -585,7 +643,7 @@
     f.slug.addEventListener("input", () => {
       $("#slugview").textContent = f.slug.value;
     });
-    $("#back").onclick = products;
+    $("#back").onclick = back(products);
     f.onsubmit = run(async (e) => {
       e.preventDefault();
       const d = new FormData(f);
@@ -629,7 +687,7 @@
   const cats = run(async () => {
     await loadCategories();
     view().innerHTML = `<div class="toolbar"><button class="btn" id="newcat">Add category</button></div>
-      <p class="meta">Category addresses keep the links Google already knows. To put one in the menu or on the home page, use Settings.</p>
+      <p class="meta">To put a category in the menu, use <a class="link" href="#menu">Menu and footer</a>. To show one on the home page, use <a class="link" href="#home">Home page</a>.</p>
       <div class="scroll"><table class="tbl"><tr><th>Name</th><th>Address</th><th></th></tr>
       ${categories.map((c) => `<tr><td>${esc(c.name)}</td><td><small>/product-category/${esc(c.path)}/</small></td><td class="actions"><button class="link" data-e="${esc(c.slug)}">Edit</button> <button class="link" data-x="${esc(c.slug)}">Delete</button></td></tr>`).join("")}</table></div>`;
     $("#newcat").onclick = () => editCat({ name: "", slug: "" }, true);
@@ -651,14 +709,14 @@
     const parentPath = isNew ? "" : (c.path || "").split("/").slice(0, -1).join("/");
     view().innerHTML = `<form class="panel editor" id="cf"><h2>${isNew ? "Add category" : "Edit category"}</h2>
       ${field("Name", "name", c.name, "required")}
-      ${isNew ? field("URL slug", "slug", "", "required") + `<label class="field">Parent category<select name="parent"><option value="">None</option>${categories.map((x) => `<option value="${esc(x.path)}">${esc(x.path)}</option>`).join("")}</select></label>` : `<p class="meta">/product-category/${esc(c.path)}/</p>`}
+      ${isNew ? field("Web address, filled in for you", "slug", "", "required") + `<label class="field">Sits under, optional<select name="parent"><option value="">Nothing, it stands alone</option>${categories.map((x) => `<option value="${esc(x.path)}">${esc(x.path)}</option>`).join("")}</select></label>` : `<p class="meta">/product-category/${esc(c.path)}/</p>`}
       <div class="stick"><button class="btn">Save</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
     const f = $("#cf");
     if (isNew)
       f.name.addEventListener("input", () => {
         f.slug.value = slugify(f.name.value);
       });
-    $("#back").onclick = cats;
+    $("#back").onclick = back(cats);
     f.onsubmit = run(async (e) => {
       e.preventDefault();
       const slug = isNew ? f.slug.value.trim() : c.slug;
@@ -822,7 +880,7 @@
     const list = run(async () => {
       const l = await api("/content/" + kind);
       view().innerHTML = `<div class="toolbar"><button class="btn" id="newdoc">Add ${word}</button></div><div class="scroll"><table class="tbl"><tr><th>Title</th><th>Address</th><th></th></tr>
-        ${l.map((d) => `<tr class="${d.draft ? "off" : ""}"><td>${esc(d.title)}${d.draft ? ` <span class="tag">Draft</span>` : ""}</td><td><small>/${esc(d.slug)}/</small></td><td class="actions"><button class="link" data-e="${esc(d.slug)}">Edit</button> <button class="link" data-x="${esc(d.slug)}">Delete</button></td></tr>`).join("") || `<tr><td colspan="3">Nothing here yet.</td></tr>`}</table></div>`;
+        ${l.map((d) => `<tr class="${d.draft ? "off" : ""}"><td>${esc(d.title)}${d.draft ? ` <span class="tag">Draft</span>` : ""}</td><td><small>/${esc(d.slug)}/</small></td><td class="actions"><button class="link" data-e="${esc(d.slug)}">Edit</button> <a class="link" href="/${esc(d.slug)}/" target="_blank" rel="noopener">View</a> <button class="link" data-x="${esc(d.slug)}">Delete</button></td></tr>`).join("") || `<tr><td colspan="3">Nothing here yet.</td></tr>`}</table></div>`;
       $("#newdoc").onclick = () => edit({ title: "", slug: "", html: "" }, true);
       $$("[data-e]").forEach((b) => {
         b.onclick = () => edit(l.find((d) => d.slug === b.dataset.e));
@@ -840,10 +898,10 @@
       say("");
       view().innerHTML = `<form class="panel editor" id="df"><h2>${isNew ? "Add" : "Edit"} ${word}</h2>
         ${field("Title", "title", d.title, "required")}
-        ${isNew ? field("URL slug", "slug", "", "required") : `<p class="meta">/${esc(d.slug)}/</p>`}
-        ${kind === "post" ? field("Date", "date", d.date, "", "date") + field("Short summary", "excerpt", d.excerpt, "maxlength=180") : ""}
+        ${isNew ? field("Web address, filled in for you", "slug", "", "required") : `<p class="meta">Web address: /${esc(d.slug)}/</p>`}
+        ${kind === "post" ? field("Date", "date", d.date, "", "date") + field("Short summary, shown on the blog page", "excerpt", d.excerpt, "maxlength=180") : ""}
         <div class="field">Text<div id="body"></div></div>
-        ${toggle("Draft, keep it off the shop for now", "draft", d.draft)}
+        ${toggle("Draft: keep this hidden for now", "draft", d.draft)}
         <div class="stick"><button class="btn">Save</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
       const f = $("#df");
       const body = rich($("#body"), d.html);
@@ -851,7 +909,7 @@
         f.title.addEventListener("input", () => {
           f.slug.value = slugify(f.title.value);
         });
-      $("#back").onclick = list;
+      $("#back").onclick = back(list);
       f.onsubmit = run(async (e) => {
         e.preventDefault();
         const slug = isNew ? f.slug.value.trim() : d.slug;
@@ -865,54 +923,147 @@
         needsPublish("Saved.");
       });
     };
+    list.add = async () => {
+      await list();
+      $("#newdoc").click();
+    };
     return list;
   };
 
+  // ---- Tags ----
+
+  const tags = run(async () => {
+    const l = await api("/content/tag");
+    view().innerHTML = `<div class="toolbar"><input id="tq" type="search" placeholder="Find a tag" aria-label="Find a tag"></div><p class="meta">The name is what shoppers and Google see. The address never changes. Changes appear after Publish.</p><div class="scroll"><table class="tbl" id="tt"></table></div>`;
+    const draw = () => {
+      const q = $("#tq").value.toLowerCase();
+      const hits = l.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 100);
+      $("#tt").innerHTML =
+        `<tr><th>Name</th><th>Address</th><th></th></tr>` +
+        hits
+          .map(
+            (t) =>
+              `<tr><td><input value="${esc(t.name)}" data-n="${esc(t.slug)}" aria-label="Tag name"></td><td><small>/product-tag/${esc(t.slug)}/</small></td><td class="actions"><button class="link" data-s="${esc(t.slug)}">Save</button> <button class="link" data-x="${esc(t.slug)}">Delete</button></td></tr>`,
+          )
+          .join("");
+      $$("[data-s]").forEach((b) => {
+        b.onclick = run(async () => {
+          const t = l.find((x) => x.slug === b.dataset.s);
+          t.name = $(`[data-n="${CSS.escape(t.slug)}"]`).value.trim();
+          await api("/content/tag/" + encodeURIComponent(t.slug), { method: "PUT", body: t });
+          needsPublish("Saved.");
+        });
+      });
+      $$("[data-x]").forEach((b) => {
+        b.onclick = run(async () => {
+          if (!confirm("Delete this tag? Its web address will stop working after Publish.")) return;
+          await api("/content/tag/" + encodeURIComponent(b.dataset.x), { method: "DELETE" });
+          await tags();
+          needsPublish("Deleted.");
+        });
+      });
+    };
+    $("#tq").oninput = draw;
+    draw();
+  });
+
   // ---- Settings ----
 
-  const settings = run(async () => {
-    const [s] = await Promise.all([api("/settings"), loadCategories()]);
+  const WORDS = [
+    ["searchPlaceholder", "Search box hint"],
+    ["shopAll", "Shop all link"],
+    ["callLine", "Call line in the top strip"],
+    ["categoriesHeading", "Home: categories heading"],
+    ["viewAll", "Home: view all link"],
+    ["seeAll", "Home: see all link"],
+    ["recentlyViewed", "Recently viewed heading"],
+    ["allProducts", "Shop page heading"],
+    ["blogHeading", "Blog page heading"],
+    ["contactHeading", "Contact page heading"],
+    ["contactIntro", "Contact page intro"],
+    ["cartHeading", "Cart page heading"],
+    ["cartNote", "Cart: note under the subtotal"],
+    ["checkoutHeading", "Checkout page heading"],
+    ["checkoutHelp", "Checkout: help line"],
+    ["trackHeading", "Track page heading"],
+    ["wishlistHeading", "Wishlist page heading"],
+    ["accountHeading", "Account page heading"],
+    ["productPromise", "Product: line under delivery charges"],
+    ["orderByPhone", "Product: order by phone words"],
+    ["descriptionHeading", "Product: description heading"],
+    ["reviewsHeading", "Product: reviews heading"],
+    ["noReviews", "Product: no reviews yet"],
+    ["alsoLike", "Product: related products heading"],
+    ["emptyCategory", "Empty category message"],
+    ["notFoundHeading", "Page not found: heading"],
+    ["notFoundText", "Page not found: text"],
+    ["paymentHeading", "Footer: payment heading"],
+    ["orderPlaced", "Thank you after an order"],
+    ["reviewThanks", "Thank you after a review"],
+    ["messageThanks", "Thank you after a message"],
+  ];
+
+  const settings = run(async (only) => {
+    const [s, pageList] = await Promise.all([api("/settings"), api("/content/page"), loadCategories()]);
     const L = s.live,
       W = s.site;
     site = W;
     const catOptions = () => categories.map((c) => [c.slug, c.name]);
-    view().innerHTML = `<form id="sf" class="settings">
-      <section class="panel"><h2>Orders</h2><p class="meta">These take effect within about 2 minutes, without Publish.</p>
-        ${toggle("Accepting online orders", "ordersOpen", L.ordersOpen)}
-        ${field("Message when orders are closed", "closedNote", L.closedNote)}
-        ${field("Announcement bar at the top of every page, empty to hide", "notice", L.notice, "placeholder='Eid sale: 10% off with code EID10'")}
-        <div class="fields3">${field("Free delivery from (৳), 0 for never", "freeOver", L.freeOver, "min=0", "number")}${field("Minimum order (৳), 0 for none", "minOrder", L.minOrder, "min=0", "number")}${field("Low stock warning at", "lowStock", L.lowStock, "min=0", "number")}</div>
-        ${toggle("Show “Only 3 left” on product pages when stock is low", "showLeft", L.showLeft)}
-        ${field("Waiting orders allowed on one phone number, 0 for no limit", "maxPending", L.maxPending, "min=0", "number")}
-        <h3>Delivery areas</h3><div id="zones"></div>
-        <h3>Payment methods</h3><p class="meta">Add a number for mobile payments: customers will be asked for a transaction ID. Leave it empty for cash on delivery.</p><div id="pays"></div>
+    const places = [
+      ["/shop/", "All products"],
+      ["/blog/", "Blog"],
+      ["/contact-us/", "Contact us"],
+      ["/track/", "Track your order"],
+      ...pageList.map((p) => [`/${p.slug}/`, p.title]),
+      ...categories.map((c) => [`/product-category/${c.path}/`, c.name]),
+    ];
+    view().innerHTML = `<datalist id="sitelinks">${places.map(([u, n]) => `<option value="${esc(u)}" label="${esc(n)}"></option>`).join("")}</datalist>
+      <form id="sf" class="settings">
+      <section class="panel" data-s="delivery"><h2>Delivery areas</h2><p class="meta">Set the charge to 0 to make delivery free in that area. Customers must choose their area at checkout.</p><div id="zones"></div>
+        ${field("Free delivery everywhere on orders over (৳), 0 to switch off", "freeOver", L.freeOver, "min=0", "number")}
       </section>
-      <section class="panel"><h2>Shop details</h2><p class="meta">From here down, changes appear after Publish.</p>
-        <div class="fields2">${field("Shop name", "name", W.name, "required")}${field("Tagline", "tagline", W.tagline)}${field("Phone", "phone", W.phone, "required")}${field("WhatsApp, empty to hide", "whatsapp", W.whatsapp)}${field("Email", "email", W.email, "", "email")}${field("Opening hours", "hours", W.hours)}${field("Facebook link", "facebook", W.facebook, "", "url")}${field("YouTube link", "youtube", W.youtube, "", "url")}</div>
-        ${field("Address", "address", W.address)}${area("Return and warranty policy, shown on product pages, empty to hide", "returns", W.returns, 2)}${area("About the shop, shown in the footer", "about", W.about, 2)}${area("Description for Google", "description", W.description, 2)}
+      <section class="panel" data-s="delivery"><h2>Payment methods</h2><p class="meta">Add a number for mobile payments, and customers will be asked for a transaction ID. Leave the number empty for cash on delivery.</p><div id="pays"></div></section>
+      <section class="panel" data-s="delivery"><h2>Taking orders</h2>
+        ${toggle("We are taking online orders", "ordersOpen", L.ordersOpen)}
+        ${field("Message to show when orders are closed", "closedNote", L.closedNote)}
+        ${field("Announcement bar on every page, leave empty to hide it", "notice", L.notice, "placeholder='Eid sale: 10% off with code EID10'")}
+        <details class="advanced"><summary>More options</summary>
+        <div class="fields3">${field("Smallest order allowed (৳), 0 for none", "minOrder", L.minOrder, "min=0", "number")}${field("Warn me when stock falls to", "lowStock", L.lowStock, "min=0", "number")}${field("Unconfirmed orders allowed per phone, 0 for no limit", "maxPending", L.maxPending, "min=0", "number")}</div>
+        ${toggle("Show “Only 3 left” on products when stock is low", "showLeft", L.showLeft)}</details>
       </section>
-      <section class="panel"><h2>Look</h2>
-        <div class="fields3">${field("Main colour", "brandColor", W.brandColor, "", "color")}${field("Dark colour", "brandDark", W.brandDark, "", "color")}
-        <label class="field">Logo, instead of the shop name<span class="inline"><input name="logo" value="${esc(W.logo)}" placeholder="Image address"><input type="file" accept="image/*" id="logoup" aria-label="Upload logo"></span></label></div>
+      <section class="panel" data-s="shop"><h2>Contact details</h2>
+        <div class="fields2">${field("Shop name", "name", W.name, "required")}${field("Tagline", "tagline", W.tagline)}${field("Phone", "phone", W.phone, "required")}${field("WhatsApp number, leave empty to hide", "whatsapp", W.whatsapp)}${field("Email", "email", W.email, "", "email")}${field("Opening hours", "hours", W.hours)}${field("Facebook link", "facebook", W.facebook, "", "url")}${field("YouTube link", "youtube", W.youtube, "", "url")}</div>
+        ${field("Shop address", "address", W.address)}${area("Return and warranty policy, shown on products, leave empty to hide", "returns", W.returns, 2)}${area("A sentence about the shop, shown in the footer", "about", W.about, 2)}${area("Description of the shop for Google", "description", W.description, 2)}
       </section>
-      <section class="panel"><h2>Home page</h2>
-        ${field("Main heading", "heroTitle", W.hero.title, "required")}${area("Text under it", "heroText", W.hero.text, 2)}
-        <div class="fields2">${field("Button words, {count} shows the number of products", "heroButton", W.hero.button)}${field("Button link", "heroLink", W.hero.link)}</div>
-        ${area("Moving text at the top, one line each", "ticker", (W.ticker || []).join("\n"), 3)}
-        <h3>Banners under the heading</h3><div id="banners"></div>
-        <h3>Promises strip</h3><div id="perks"></div>
-        <h3>Product sections</h3><div id="home"></div>
+      <section class="panel" data-s="shop"><h2>Logo and colours</h2>
+        <label class="field">Logo, shown instead of the shop name<span class="inline"><input name="logo" value="${esc(W.logo)}" placeholder="Upload a picture, or paste its address"><input type="file" accept="image/*" id="logoup" aria-label="Upload logo"></span></label>
+        <div class="fields2">${field("Main colour", "brandColor", W.brandColor, "", "color")}${field("Dark colour", "brandDark", W.brandDark, "", "color")}</div>
       </section>
-      <section class="panel"><h2>Menu</h2><h3>Drop-down menus</h3><div id="menu"></div><h3>Other links</h3><div id="links"></div></section>
-      <div class="stick"><button class="btn">Save settings</button></div></form>`;
+      <section class="panel" data-s="home"><h2>Main heading</h2>
+        ${field("Heading", "heroTitle", W.hero.title, "required")}${area("Text under the heading", "heroText", W.hero.text, 2)}
+        <div class="fields2">${field("Button words", "heroButton", W.hero.button)}${field("Button goes to", "heroLink", W.hero.link, 'list="sitelinks"')}</div>
+      </section>
+      <section class="panel" data-s="home"><h2>Text strip at the very top</h2>${area("One line for each message", "ticker", (W.ticker || []).join("\n"), 3)}</section>
+      <section class="panel" data-s="home"><h2>Banner pictures</h2><p class="meta">Shown under the main heading. Leave this empty for no banners.</p><div id="banners"></div></section>
+      <section class="panel" data-s="home"><h2>Promises</h2><p class="meta">The four short promises under the main heading.</p><div id="perks"></div></section>
+      <section class="panel" data-s="home"><h2>Product sections</h2><p class="meta">Each section shows products from one category.</p><div id="home"></div></section>
+      <section class="panel" data-s="menu"><h2>Drop-down menus</h2><div id="menu"></div></section>
+      <section class="panel" data-s="menu"><h2>Other menu links</h2><div id="links"></div></section>
+      <section class="panel" data-s="menu"><h2>Footer links</h2><p class="meta">Links with the same column name appear together.</p><div id="footlinks"></div></section>
+      <section class="panel" data-s="words"><h2>Words</h2><p class="meta">Tip: writing {phone}, {email} or {name} fills in your shop details, here and on Pages, so they stay correct if they change.</p>
+        <div class="fields2">${WORDS.map(([k, label]) => field(label, "copy_" + k, W.copy?.[k])).join("")}</div></section>
+      <div class="stick"><button class="btn">Save changes</button></div></form>`;
+    $$("#sf > section").forEach((p) => {
+      p.hidden = p.dataset.s !== only;
+    });
     const f = $("#sf");
     const zones = rows(
       $("#zones"),
       L.delivery,
       [
         { k: "label", label: "Area" },
-        { k: "fee", label: "Charge (৳)", type: "number" },
-        { k: "days", label: "Delivery time, such as 1 to 2 days" },
+        { k: "fee", label: "Charge (৳), 0 for free", type: "number" },
+        { k: "days", label: "Delivery time, such as 2 to 3 days" },
       ],
       { label: "", fee: 0 },
     );
@@ -930,9 +1081,9 @@
       $("#banners"),
       W.banners || [],
       [
-        { k: "title", label: "Description" },
-        { k: "link", label: "Link" },
-        { k: "image", label: "Image", type: "image" },
+        { k: "title", label: "What the picture shows" },
+        { k: "link", label: "Goes to", list: true },
+        { k: "image", label: "Picture", type: "image" },
       ],
       { title: "", link: "/shop/", image: "" },
     );
@@ -968,9 +1119,19 @@
       W.links || [],
       [
         { k: "label", label: "Words" },
-        { k: "url", label: "Link" },
+        { k: "url", label: "Goes to", list: true },
       ],
       { label: "", url: "/" },
+    );
+    const footlinks = rows(
+      $("#footlinks"),
+      (W.footer || []).flatMap((c) => c.links.map((l) => ({ col: c.title, label: l.label, url: l.url }))),
+      [
+        { k: "col", label: "Column" },
+        { k: "label", label: "Words" },
+        { k: "url", label: "Goes to", list: true },
+      ],
+      { col: W.footer?.[0]?.title || "Company", label: "", url: "/" },
     );
     $("#logoup").onchange = run(async (e) => {
       f.logo.value = await upload(e.target.files[0], "site", "logo");
@@ -1018,15 +1179,39 @@
         home: home().filter((h) => h.title),
         menu: menu().filter((m) => m.title),
         links: links().filter((l) => l.label),
+        footer: [...new Set(footlinks().map((l) => l.col.trim()))]
+          .filter(Boolean)
+          .map((title) => ({
+            title,
+            links: footlinks()
+              .filter((l) => l.col.trim() === title && l.label && l.url)
+              .map(({ label, url }) => ({ label, url })),
+          })),
+        copy: Object.fromEntries(WORDS.map(([k]) => [k, d["copy_" + k] ?? ""])),
       };
       await api("/settings", { method: "PUT", body: { live, site: shop } });
-      needsPublish("Settings saved. Orders settings are live.");
-      scrollTo(0, 0);
+      if (only === "delivery") say("Saved. Customers will see this within about 2 minutes.");
+      else needsPublish("Saved.");
     });
   });
 
   // ---- Start ----
 
+  const blog = writing("post", "post");
+  const publish = run(async () => {
+    $("#pub").disabled = true;
+    say("Publishing…");
+    try {
+      const r = await api("/publish", { method: "POST" });
+      say(r.message);
+      try {
+        localStorage.removeItem("dirty");
+      } catch {}
+      $("#dirtybar").hidden = true;
+    } finally {
+      $("#pub").disabled = false;
+    }
+  });
   const routes = {
     dashboard,
     orders,
@@ -1036,28 +1221,94 @@
     customers,
     reviews,
     messages,
+    tags,
     pages: writing("page", "page"),
-    blog: writing("post", "post"),
-    settings,
+    blog,
+    delivery: () => settings("delivery"),
+    shop: () => settings("shop"),
+    home: () => settings("home"),
+    menu: () => settings("menu"),
+    words: () => settings("words"),
+    settings: () => settings("delivery"), // old bookmarks
+    product: async (id) => {
+      await products();
+      const p = allProducts.find((x) => x.id === +id);
+      if (p) editProduct(p);
+    },
+    "new-product": async () => {
+      await products();
+      $("#new").click();
+    },
+    "new-post": () => blog.add(),
+    publish: async () => {
+      await dashboard();
+      await publish();
+    },
   };
+  const NAVTAB = { product: "products", "new-product": "products", "new-post": "blog", settings: "delivery", publish: "dashboard" };
 
+  let here = "";
   function go() {
-    const tab = routes[location.hash.slice(1)] ? location.hash.slice(1) : "dashboard";
+    if (unsaved && !confirm(LEAVE)) {
+      history.replaceState(null, "", "#" + here);
+      return;
+    }
+    unsaved = false;
+    const [first, arg] = location.hash.slice(1).split("/");
+    const tab = routes[first] ? first : "dashboard";
+    here = location.hash.slice(1);
+    const nav = NAVTAB[tab] || tab;
     say("");
-    $$("#tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + tab));
+    $("#err").textContent = "";
+    $$("#tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + nav));
+    const [title, help] = HEADS[nav] || ["", ""];
+    $("#head").innerHTML = `<h1>${esc(title)}</h1><p class="meta">${esc(help)}</p>`;
     view().innerHTML = "<p>Loading…</p>";
-    routes[tab]();
+    routes[tab](arg);
+    scrollTo(0, 0);
+  }
+
+  // The search box finds tasks by their everyday words, and products by name.
+  let findList = null;
+  function finder() {
+    const box = $("#find"),
+      res = $("#findres");
+    const close = () => {
+      res.hidden = true;
+    };
+    box.oninput = run(async () => {
+      findList ??= await api("/products");
+      const q = box.value.trim().toLowerCase();
+      if (!q) return close();
+      const jobs = JOBS.filter(([label, , words]) => (label + " " + words).toLowerCase().includes(q)).slice(0, 5);
+      const items = (findList || []).filter((p) => (p.name + " " + (p.sku || "")).toLowerCase().includes(q)).slice(0, 6);
+      res.innerHTML =
+        jobs.map(([label, href]) => `<a href="${href}">${esc(label)}</a>`).join("") +
+        items.map((p) => `<a href="#product/${p.id}"><small>Product</small> ${esc(p.name)}</a>`).join("") ||
+        "<p>Nothing found. Try another word.</p>";
+      res.hidden = false;
+    });
+    res.onclick = () => {
+      box.value = "";
+      close();
+    };
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".adminfind")) close();
+    });
   }
 
   async function enter() {
     $("#login").hidden = true;
     $("#app").hidden = false;
-    $("#tabs").innerHTML = Object.entries(TABS)
-      .map(([k, v]) => `<a href="#${k}">${v}</a>`)
-      .join("");
+    $("#tabs").innerHTML = NAV.map(
+      ([group, tabs]) => `<div><h4>${group}</h4>${Object.entries(tabs)
+        .map(([k, v]) => `<a href="#${k}">${v}</a>`)
+        .join("")}</div>`,
+    ).join("");
     try {
-      if (localStorage.getItem("dirty")) $("#pub").classList.add("attention");
+      $("#dirtybar").hidden = !localStorage.getItem("dirty");
     } catch {}
+    finder();
     go();
     const s = await api("/settings").catch(() => ({}));
     site = s.site || null;
@@ -1065,20 +1316,25 @@
   }
 
   addEventListener("hashchange", go);
-  $("#pub").onclick = run(async () => {
-    say("Publishing…");
-    const r = await api("/publish", { method: "POST" });
-    say(r.message);
-    try {
-      localStorage.removeItem("dirty");
-    } catch {}
-    $("#pub").classList.remove("attention");
+  $("#pub").onclick = publish;
+  document.addEventListener("input", (e) => {
+    if (e.target.closest("#view form")) unsaved = true;
+  });
+  document.addEventListener("submit", () => {
+    unsaved = false;
+  });
+  addEventListener("beforeunload", (e) => {
+    if (unsaved) e.preventDefault();
   });
   $("#out").onclick = () => logout();
   $("#login").onsubmit = (e) => {
     e.preventDefault();
     token = $("#tok").value.trim();
     sessionStorage.setItem("t", token);
+    if ($("#keep").checked)
+      try {
+        localStorage.setItem("keep", token);
+      } catch {}
     $("#tok").value = "";
     enter();
   };

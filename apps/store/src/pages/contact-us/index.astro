@@ -1,11 +1,14 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { SITE, telOf, waOf } from "../../lib/shop";
+import { SITE, telOf, waOf, say } from "../../lib/shop";
 ---
 
-<Base title="Contact us">
+<Base title={say("contactHeading")}>
   <div class="wrap">
-    <h1 style="margin-top:20px">Contact us</h1>
+    <div class="pagehead">
+      <h1 class="title">{say("contactHeading")}</h1>
+      <p>{say("contactIntro")}</p>
+    </div>
     <div class="two">
       <form class="panel" data-contact>
         <label class="field">

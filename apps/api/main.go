@@ -37,6 +37,9 @@ var schema string
 //go:embed defaults.json
 var defaultsJSON []byte
 
+//go:embed content-updates.json
+var contentUpdates []byte
+
 const localAdminToken = "local-admin-token-for-this-computer-only"
 
 var (
@@ -75,6 +78,10 @@ func main() {
 		defer cancel()
 		if _, err := db.Exec(c, schema); err != nil {
 			log.Print("schema: ", err)
+			return
+		}
+		if err := applyContentUpdates(c); err != nil {
+			log.Print("content updates: ", err)
 		}
 	}()
 	addr := "127.0.0.1:8080"
@@ -122,7 +129,8 @@ func connect(ctx context.Context) error {
 	return err
 }
 
-// seed loads the imported catalogue. Rows that already exist are left alone, so it is safe to re-run.
+// seed loads the imported catalogue. It is safe to re-run: existing products are left alone, and
+// content of a kind the shop already has is skipped, so anything the admin deleted stays deleted.
 func seed(ctx context.Context, productsFile, contentFile string) error {
 	if _, err := db.Exec(ctx, schema); err != nil {
 		return err
@@ -157,11 +165,76 @@ func seed(ctx context.Context, productsFile, contentFile string) error {
 		return err
 	}
 	for key, kind := range map[string]string{"cats": "cat", "tags": "tag", "pages": "page", "posts": "post"} {
+		var has bool
+		if err = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM content WHERE kind=$1)`, kind).Scan(&has); err != nil {
+			return err
+		}
+		if has {
+			continue
+		}
 		for _, c := range content[key] {
 			j, _ := json.Marshal(c)
 			if _, err = db.Exec(ctx, `INSERT INTO content(kind,slug,data) VALUES($1,$2,$3::jsonb) ON CONFLICT DO NOTHING`, kind, c["slug"], string(j)); err != nil {
 				return err
 			}
+		}
+	}
+	return applyContentUpdates(ctx)
+}
+
+// applyContentUpdates reaches shops that are already seeded, which seed itself leaves alone. Each
+// update runs once. A page only changes if it still holds the old text it "replaces", so the admin's
+// own rewrite is kept. An empty database is skipped, so updates still run after seed on a new shop.
+func applyContentUpdates(ctx context.Context) error {
+	var list []struct {
+		ID   string
+		Docs []struct {
+			Kind, Slug, Replaces string
+			Data                 map[string]any
+		}
+		Names  []struct{ Kind, Slug, Name string }
+		Remove []struct{ Kind, Slug string }
+		SQL    []string
+	}
+	if err := json.Unmarshal(contentUpdates, &list); err != nil {
+		return err
+	}
+	for _, u := range list {
+		err := pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
+			var seeded bool
+			if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM content)`).Scan(&seeded); err != nil || !seeded {
+				return err
+			}
+			tag, err := tx.Exec(ctx, `INSERT INTO applied(name) VALUES($1) ON CONFLICT DO NOTHING`, u.ID)
+			if err != nil || tag.RowsAffected() == 0 {
+				return err
+			}
+			for _, d := range u.Docs {
+				d.Data["slug"] = d.Slug
+				j, _ := json.Marshal(d.Data)
+				if _, err = tx.Exec(ctx, `UPDATE content SET data=$3::jsonb WHERE kind=$1 AND slug=$2 AND position($4 in data->>'html')>0`, d.Kind, d.Slug, string(j), d.Replaces); err != nil {
+					return err
+				}
+			}
+			for _, n := range u.Names {
+				if _, err = tx.Exec(ctx, `UPDATE content SET data=jsonb_set(data,'{name}',to_jsonb($3::text)) WHERE kind=$1 AND slug=$2`, n.Kind, n.Slug, n.Name); err != nil {
+					return err
+				}
+			}
+			for _, r := range u.Remove { // a category a product uses is kept: only empty leftovers go
+				if _, err = tx.Exec(ctx, `DELETE FROM content WHERE kind=$1 AND slug=$2 AND NOT EXISTS(SELECT 1 FROM products WHERE data->'cats' @> to_jsonb($2::text))`, r.Kind, r.Slug); err != nil {
+					return err
+				}
+			}
+			for _, q := range u.SQL {
+				if _, err = tx.Exec(ctx, q); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 	}
 	return nil

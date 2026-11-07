@@ -1,13 +1,13 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { tags, products, fileSlug } from "../../lib/shop";
+import { tags, products, fileSlug, say } from "../../lib/shop";
 export const getStaticPaths = () => tags.map((t) => ({ params: { slug: fileSlug(t.slug) }, props: { t } }));
 const { t } = Astro.props;
 const items = products.filter((p) => p.tags.includes(t.slug));
 ---
 
-<Base title={t.name}>
+<Base title={t.name} noindex={!items.length}>
   <div class="wrap">
     <p class="crumbs">
       <a href="/">Home</a> / <a href="/shop/">Shop</a> / {t.name}
@@ -15,6 +15,6 @@ const items = products.filter((p) => p.tags.includes(t.slug));
     <div class="pagehead">
       <h1>{t.name}</h1>
     </div>
-    <Grid items={items} />
+    {items.length ? <Grid items={items} /> : <div class="empty"><p>{say("emptyCategory")}</p><a class="btn" href="/shop/">{say("shopAll")}</a></div>}
   </div>
 </Base>

@@ -27,7 +27,8 @@
     t._t = setTimeout(() => t.classList.remove("on"), 2200);
   };
 
-  const PHONE = document.documentElement.dataset.phone || "";
+  const WORDS = document.documentElement.dataset; // words the admin can change
+  const PHONE = WORDS.phone || "";
   const MAX_QTY = 20;
   const PAGE = 24;
   const STATUS = {
@@ -143,6 +144,13 @@
       n.textContent = live.notice || "";
       n.hidden = !live.notice;
     }
+    // Payment numbers are live settings: an old number here could send money to the wrong place.
+    const pay = $("[data-payments]");
+    if (pay && live)
+      pay.innerHTML = live.payments
+        .filter((p) => p.enabled)
+        .map((p) => esc(p.label) + (p.number ? `: ${esc(p.number)}` : ""))
+        .join("<br>");
   }
 
   document.addEventListener("click", (e) => {
@@ -156,7 +164,7 @@
       const id = t.dataset.add;
       // The quantity box belongs to the main product, not to the cards under it.
       const box = (t.closest(".buy") || t.closest(".buybar")) && $("[data-qty]");
-      const want = (cart[id] || 0) + (+box?.value || 1);
+      const want = (cart[id] || 0) + Math.max(1, Math.floor(+box?.value) || 1);
       cart[id] = Math.min(want, maxFor(id));
       saveCart();
       toast(cart[id] < want ? `You can order ${cart[id]} of this online` : "Added to cart");
@@ -188,7 +196,10 @@
       saveCart();
       renderCart();
     }
-    if (t.dataset.thumb) $("[data-main]").src = t.dataset.thumb;
+    if (t.dataset.thumb) {
+      $("[data-main]").src = t.dataset.thumb;
+      $$("[data-thumb]").forEach((b) => b.classList.toggle("on", b === t));
+    }
   });
 
   function grids() {
@@ -267,6 +278,11 @@
     const el = $("[data-results]");
     if (!el) return;
     const q = new URLSearchParams(location.search).get("q")?.trim() || "";
+    if (!q) {
+      $("h1").textContent = "Search";
+      el.innerHTML = "<p>Type what you are looking for in the search box above.</p>";
+      return;
+    }
     $("[data-q]").textContent = q;
     if ($(".find input")) $(".find input").value = q;
     const l = matches(await items(), q);
@@ -307,6 +323,11 @@
 
   async function totals() {
     const all = await items();
+    const gone = Object.keys(cart).filter((id) => !all.some((x) => x.id == id));
+    if (gone.length) { // removed from the shop since it was added, so don't keep counting it
+      gone.forEach((id) => delete cart[id]);
+      saveCart();
+    }
     const lines = Object.entries(cart)
       .map(([id, qty]) => ({ p: all.find((x) => x.id == id), qty }))
       .filter((l) => l.p);
@@ -372,11 +393,13 @@
       code = "",
       agreed = 0;
 
-    const options = (select, list) => {
+    const options = (select, list, hint) => {
       const keep = select.value;
-      select.innerHTML = list
-        .map((o) => `<option value="${esc(o.id)}">${esc(o.label)}${o.fee === undefined ? "" : ` (${taka(o.fee)})`}</option>`)
-        .join("");
+      select.innerHTML =
+        (hint ? `<option value="">${esc(hint)}</option>` : "") +
+        list
+          .map((o) => `<option value="${esc(o.id)}">${esc(o.label)}${o.fee === undefined ? "" : ` (${o.fee ? taka(o.fee) : "Free"})`}</option>`)
+          .join("");
       if (list.some((o) => o.id === keep)) select.value = keep;
     };
 
@@ -388,16 +411,17 @@
       $("[data-empty]").hidden = !empty;
       f.hidden = empty;
       if (empty) return;
-      options(f.area, s.delivery);
+      // No area is chosen for the customer: the first one may be free, and a guess would be wrong.
+      options(f.area, s.delivery, s.delivery.length > 1 ? "Choose your area" : "");
       options(
         f.payment,
         s.payments.filter((p) => p.enabled),
       );
-      const zone = s.delivery.find((z) => z.id === f.area.value) || s.delivery[0];
+      const zone = s.delivery.find((z) => z.id === f.area.value);
       const pay = s.payments.find((p) => p.id === f.payment.value);
       discount = Math.min(discount, data.sub);
       const goods = data.sub - discount;
-      const fee = s.freeOver > 0 && goods >= s.freeOver ? 0 : zone.fee;
+      const fee = !zone || (s.freeOver > 0 && goods >= s.freeOver) ? 0 : zone.fee;
       total = goods + fee;
       $("[data-sum]").innerHTML =
         lines
@@ -407,10 +431,14 @@
           )
           .join("") +
         (discount ? `<div class="row"><span>Discount (${esc(code)})</span><b>−${taka(discount)}</b></div>` : "") +
-        `<div class="row"><span>Delivery</span><b>${fee ? taka(fee) : "Free"}</b></div><div class="row total"><span>Total</span><span>${taka(total)}</span></div>`;
-      $("[data-eta]").textContent = zone.days ? `Usually arrives in ${zone.days}.` : "";
+        `<div class="row"><span>Delivery</span><b>${!zone ? "Choose your area" : fee ? taka(fee) : "Free"}</b></div><div class="row total"><span>Total</span><span>${taka(total)}</span></div>`;
+      $("[data-eta]").textContent = zone?.days ? `Usually arrives in ${zone.days}.` : "";
       $("[data-txn]").hidden = !pay?.number;
-      $("[data-pay]").textContent = pay?.number ? `Send ${taka(total)} to ${pay.number}, then enter the transaction ID.` : "";
+      $("[data-pay]").textContent = !pay?.number
+        ? ""
+        : zone
+          ? `Send ${taka(total)} to ${pay.number}, then enter the transaction ID.`
+          : "Choose your area to see the amount to send.";
       const sold = lines.find((l) => !l.p.inStock);
       const short = data.sub < s.minOrder;
       const closed = $("[data-closed]");
@@ -426,11 +454,14 @@
 
     repaintCheckout = paint;
     f.onchange = (e) => {
-      if (e.target.name !== "coupon") paint();
+      if (e.target.name === "coupon") return;
+      agreed = 0; // the customer changed the order, so an earlier agreed total no longer applies
+      paint();
     };
     $("[data-apply]").onclick = async () => {
       code = f.coupon.value.trim().toUpperCase();
       discount = 0;
+      agreed = 0;
       msg.textContent = "";
       if (code) {
         try {
@@ -529,7 +560,7 @@
     if (!el || !live) return;
     const free = live.freeOver > 0 ? `<li>Free delivery on orders of ${taka(live.freeOver)} or more</li>` : "";
     el.innerHTML =
-      live.delivery.map((z) => `<li>${esc(z.label)}: <b>${taka(z.fee)}</b>${z.days ? `, ${esc(z.days)}` : ""}</li>`).join("") + free;
+      live.delivery.map((z) => `<li>${esc(z.label)}: <b>${z.fee ? taka(z.fee) : "Free"}</b>${z.days ? `, ${esc(z.days)}` : ""}</li>`).join("") + free;
   }
 
   function rememberProduct() {
@@ -576,7 +607,7 @@
       try {
         const o = await api(`/track?order=${encodeURIComponent(f.order.value)}&phone=${encodeURIComponent(f.phone.value)}`);
         out.innerHTML =
-          (q.get("new") ? "<p class='note'>Thank you! Your order is placed. We'll call you to confirm.</p>" : "") + orderHtml(o);
+          (q.get("new") ? `<p class="note">${esc(WORDS.orderPlaced)}</p>` : "") + orderHtml(o);
       } catch (x) {
         err.textContent = x.message;
       }
@@ -696,6 +727,17 @@
     }
   }
 
+  // Coming back with the browser's Back button restores the old page: bring the counts up to date.
+  addEventListener("pageshow", (e) => {
+    if (!e.persisted) return;
+    cart = get("cart", {});
+    wish = get("wish", []);
+    badges();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") $$("details.mega[open]").forEach((d) => (d.open = false));
+  });
+
   rememberProduct();
   badges();
   grids();
@@ -704,9 +746,9 @@
   track();
   account();
   checkout();
-  $$("[data-contact]").forEach((f) => simpleForm(f, "/contact", "Message sent. Thank you!"));
+  $$("[data-contact]").forEach((f) => simpleForm(f, "/contact", WORDS.messageThanks));
   $$("[data-review]").forEach((f) =>
-    simpleForm(f, "/reviews", "Thank you! Your review will appear after we check it.", { product: +f.dataset.review }),
+    simpleForm(f, "/reviews", WORDS.reviewThanks, { product: +f.dataset.review }),
   );
   Promise.allSettled([renderCart(), renderWish(), search(), renderRecent()]);
   loadStock();

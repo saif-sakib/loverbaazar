@@ -1,1 +1,11 @@
-{ "permissions": { "deny": ["Read(data/raw/**)", "Read(apps/store/src/data/**)", "Read(apps/api/seed/**)", "Read(apps/store/dist/**)", "Read(apps/store/package-lock.json)", "Read(apps/api/go.sum)"] } }
+{
+  "permissions": {
+    "deny": [
+      "Read(data/raw/**)",
+      "Read(apps/store/src/data/**)",
+      "Read(apps/store/dist/**)",
+      "Read(apps/store/package-lock.json)",
+      "Read(apps/api/go.sum)"
+    ]
+  }
+}

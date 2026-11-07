@@ -1,11 +1,11 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Card from "../../components/Card.astro";
-import { products, cats, img, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug } from "../../lib/shop";
+import { products, cats, img, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, say, siteUrl } from "../../lib/shop";
 export const getStaticPaths = () => products.map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
 const d = off(p);
-const url = `https://loverbaazar.com/product/${p.slug}/`;
+const url = siteUrl(`/product/${p.slug}/`);
 const myCats = p.cats.map((s: string) => cats.find((c: any) => c.slug === s)).filter(Boolean);
 const related = products.filter((x) => x.id !== p.id && x.cats.some((c: string) => p.cats.includes(c))).slice(0, 4);
 const stars = rating(p);
@@ -37,8 +37,8 @@ const crumbs = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   itemListElement: [
-    { "@type": "ListItem", position: 1, name: "Home", item: "https://loverbaazar.com/" },
-    ...(myCats[0] ? [{ "@type": "ListItem", position: 2, name: myCats[0].name, item: `https://loverbaazar.com${catUrl(myCats[0])}` }] : []),
+    { "@type": "ListItem", position: 1, name: "Home", item: siteUrl("/") },
+    ...(myCats[0] ? [{ "@type": "ListItem", position: 2, name: myCats[0].name, item: siteUrl(catUrl(myCats[0])) }] : []),
     { "@type": "ListItem", position: myCats[0] ? 3 : 2, name: p.name },
   ],
 };
@@ -74,7 +74,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
         {p.images.length > 1 && (
           <div class="gal">
             {p.images.map((i: any, n: number) => (
-              <button data-thumb={img(i.src)} aria-label={`View image ${n + 1}`}>
+              <button class={n === 0 ? "on" : undefined} data-thumb={img(i.src)} aria-label={`View image ${n + 1}`}>
                 <img src={img(i.thumb)} alt="" loading="lazy" width="66" height="66" />
               </button>
             ))}
@@ -131,19 +131,19 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
         <ul class="delivery" data-delivery>
           {LIVE.delivery.map((z: any) => (
             <li>
-              {z.label}: <b>{taka(z.fee)}</b>
+              {z.label}: <b>{z.fee ? taka(z.fee) : "Free"}</b>
               {z.days && `, ${z.days}`}
             </li>
           ))}
         </ul>
-        <p class="meta">Cash on delivery. No account needed to order.</p>
+        <p class="meta">{say("productPromise")}</p>
         {SITE.returns && (
           <p class="meta">
             <b>Returns:</b> {SITE.returns}
           </p>
         )}
         <p class="note">
-          Order by phone:{" "}
+          {say("orderByPhone")}{" "}
           <a href={`tel:${telOf(SITE.phone)}`}>
             <b>{SITE.phone}</b>
           </a>
@@ -161,13 +161,13 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
     </section>
     {p.desc && (
       <section class="prose">
-        <h2>Description</h2>
+        <h2>{say("descriptionHeading")}</h2>
         <Fragment set:html={p.desc} />
       </section>
     )}
     <section class="prose" id="reviews">
-      <h2>Customer reviews</h2>
-      {p.reviews.length === 0 && <p>No reviews yet. Be the first to share your experience.</p>}
+      <h2>{say("reviewsHeading")}</h2>
+      {p.reviews.length === 0 && <p>{say("noReviews")}</p>}
       {p.reviews.map((r: any) => (
         <div class="review">
           <b>{r.name}</b>{" "}
@@ -206,7 +206,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
     {related.length > 0 && (
       <>
         <div class="sec">
-          <h2>You may also like</h2>
+          <h2>{say("alsoLike")}</h2>
         </div>
         <section class="grid">
           {related.map((x) => (
@@ -217,7 +217,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
     )}
     <section data-recent-wrap hidden>
       <div class="sec">
-        <h2>Recently viewed</h2>
+        <h2>{say("recentlyViewed")}</h2>
       </div>
       <div class="grid" data-recent></div>
     </section>

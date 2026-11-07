@@ -1,7 +1,7 @@
 ---
 import Base from "../layouts/Base.astro";
 import Card from "../components/Card.astro";
-import { products, inCat, MENU, catUrl, img, SITE, cats } from "../lib/shop";
+import { products, inCat, MENU, catUrl, img, SITE, cats, fill, say } from "../lib/shop";
 const withPhoto = (l: any[]) => l.filter((p) => p.images[0]);
 const heroPics = withPhoto(SITE.home.flatMap((h: any) => inCat(h.cat)))
   .filter((p: any, i: number, all: any[]) => all.findIndex((x) => x.id === p.id) === i)
@@ -49,15 +49,15 @@ const heroEnd = heroWords.pop();
       {SITE.perks.map((k: any) => (
         <div>
           <b>{k.title}</b>
-          <span>{k.text}</span>
+          <span>{fill(k.text)}</span>
         </div>
       ))}
     </section>
     {tiles.length > 0 && (
       <>
         <div class="sec">
-          <h2>Shop by category</h2>
-          <a href="/shop/">View all</a>
+          <h2>{say("categoriesHeading")}</h2>
+          <a href="/shop/">{say("viewAll")}</a>
         </div>
         <section class="cats">
           {tiles.map((c: any) => (
@@ -76,7 +76,7 @@ const heroEnd = heroWords.pop();
           <>
             <div class="sec">
               <h2>{h.title}</h2>
-              <a href={catUrl(cats.find((c: any) => c.slug === h.cat) || { path: h.cat })}>See all</a>
+              <a href={catUrl(cats.find((c: any) => c.slug === h.cat) || { path: h.cat })}>{say("seeAll")}</a>
             </div>
             <section class="grid">
               {inCat(h.cat)
@@ -90,7 +90,7 @@ const heroEnd = heroWords.pop();
     )}
     <section data-recent-wrap hidden>
       <div class="sec">
-        <h2>Recently viewed</h2>
+        <h2>{say("recentlyViewed")}</h2>
       </div>
       <div class="grid" data-recent></div>
     </section>

@@ -30,6 +30,7 @@ Bangladesh home-appliance shop. Replaces WordPress at loverbaazar.com.
 - Admin edits to names, photos, new products, categories, pages or `site` settings need Publish. Price, stock, coupons and `live` settings are live.
 - Images live on Cloudinary as `loverbaazar/products/<category>/<product>-1`, with `pages/`, `blog/` and `site/` beside it. No random names.
 - Never put a real secret in `.env.example`. It is committed, and the repo is public.
+- Fixing seeded pages, posts or categories on a live shop: add an entry with a new `id` to `apps/api/content-updates.json`. Each runs once and keeps the admin's own rewrites.
 - Settings defaults live only in `apps/api/defaults.json`. Don't hard-code shop details, delivery charges or payment numbers.
 - `script-src` has no `unsafe-inline`: keep JavaScript in `public/*.js`.
 

@@ -4,7 +4,7 @@
     "closedNote": "We are not taking online orders right now. Please call us.",
     "notice": "",
     "delivery": [
-      { "id": "jashore", "label": "Inside Jashore", "fee": 60, "days": "" },
+      { "id": "jashore", "label": "Inside Jashore", "fee": 0, "days": "" },
       { "id": "outside", "label": "Outside Jashore", "fee": 100, "days": "" }
     ],
     "payments": [
@@ -26,8 +26,8 @@
     "about": "Your trusted place for home appliances and furniture, at wholesale prices.",
     "phone": "01710-076076",
     "email": "loverbaazar@gmail.com",
-    "whatsapp": "",
-    "address": "",
+    "whatsapp": "01710-076076",
+    "address": "Vekutia, Jashore",
     "returns": "",
     "hours": "",
     "facebook": "https://www.facebook.com/profile.php?id=100091885353080",
@@ -51,7 +51,7 @@
       { "title": "Cash on delivery", "text": "Pay when it arrives" },
       { "title": "Mobile payment", "text": "bKash, Nagad, Rocket" },
       { "title": "Wholesale prices", "text": "Trusted brands" },
-      { "title": "Need help?", "text": "Call 01710-076076" }
+      { "title": "Need help?", "text": "Call {phone}" }
     ],
     "home": [
       { "title": "Latest products", "cat": "latest-product" },
@@ -69,6 +69,52 @@
       { "label": "Blog", "url": "/blog/" },
       { "label": "Track order", "url": "/track/" },
       { "label": "Contact", "url": "/contact-us/" }
-    ]
+    ],
+    "footer": [
+      { "title": "Company", "links": [
+        { "label": "About us", "url": "/about-us/" },
+        { "label": "How to buy", "url": "/how-to-buy/" },
+        { "label": "Contact us", "url": "/contact-us/" },
+        { "label": "Blog", "url": "/blog/" }
+      ] },
+      { "title": "Policies", "links": [
+        { "label": "Privacy policy", "url": "/privacy-policy/" },
+        { "label": "Terms and conditions", "url": "/terms-conditions/" },
+        { "label": "Track your order", "url": "/track/" }
+      ] }
+    ],
+    "copy": {
+      "searchPlaceholder": "Search rice cooker, chair, wardrobe…",
+      "shopAll": "Shop all",
+      "callLine": "Call {phone}",
+      "categoriesHeading": "Shop by category",
+      "viewAll": "View all",
+      "seeAll": "See all",
+      "recentlyViewed": "Recently viewed",
+      "allProducts": "All products",
+      "blogHeading": "Blog",
+      "contactHeading": "Contact us",
+      "contactIntro": "Questions about a product or an order? Send us a message or give us a call.",
+      "cartHeading": "Your cart",
+      "cartNote": "Delivery is added at checkout.",
+      "checkoutHeading": "Checkout",
+      "checkoutHelp": "Trouble ordering? Call {phone}.",
+      "trackHeading": "Track your order",
+      "wishlistHeading": "Your wishlist",
+      "accountHeading": "My account",
+      "productPromise": "Cash on delivery. No account needed to order.",
+      "orderByPhone": "Order by phone:",
+      "descriptionHeading": "Description",
+      "reviewsHeading": "Customer reviews",
+      "noReviews": "No reviews yet. Be the first to share your experience.",
+      "alsoLike": "You may also like",
+      "emptyCategory": "No products here yet. See everything else we sell in the shop.",
+      "notFoundHeading": "We couldn't find that page",
+      "notFoundText": "It may have moved. Everything we sell is in the shop.",
+      "paymentHeading": "Payment",
+      "orderPlaced": "Thank you! Your order is placed. We'll call you to confirm.",
+      "reviewThanks": "Thank you! Your review will appear after we check it.",
+      "messageThanks": "Message sent. Thank you!"
+    }
   }
 }

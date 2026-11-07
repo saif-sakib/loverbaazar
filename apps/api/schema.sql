@@ -35,6 +35,8 @@ ALTER TABLE messages ADD COLUMN IF NOT EXISTS read BOOL NOT NULL DEFAULT FALSE;
 
 -- Shop settings: 'live' takes effect at once, 'site' needs Publish. A missing row means defaults.json.
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, data JSONB NOT NULL);
+-- One-time updates that have already run, so a deploy can never repeat one over the admin's edits.
+CREATE TABLE IF NOT EXISTS applied(name TEXT PRIMARY KEY, at TIMESTAMPTZ NOT NULL DEFAULT now());
 -- Categories, tags, pages and blog posts.
 CREATE TABLE IF NOT EXISTS content(kind TEXT NOT NULL CHECK(kind IN('cat','tag','page','post')), slug TEXT NOT NULL, data JSONB NOT NULL, PRIMARY KEY(kind,slug));
 

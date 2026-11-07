@@ -1,19 +1,20 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { posts } from "../../lib/shop";
+import { posts, say } from "../../lib/shop";
+const when = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 ---
 
-<Base title="Blog">
+<Base title={say("blogHeading")}>
   <div class="wrap">
     <div class="pagehead">
-      <h1 style="margin-top:20px">Blog</h1>
+      <h1 class="title">{say("blogHeading")}</h1>
     </div>
-    <section class="cats" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
+    <section class="posts">
       {posts.map((p) => (
-        <a href={`/${p.slug}/`} style="text-align:left">
-          {p.title}
-          <small>{p.date}</small>
-          <small>{p.excerpt}</small>
+        <a href={`/${p.slug}/`}>
+          <small>{when(p.date)}</small>
+          <b>{p.title}</b>
+          <span>{p.excerpt}</span>
         </a>
       ))}
     </section>

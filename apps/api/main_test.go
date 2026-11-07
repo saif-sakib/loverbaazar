@@ -152,7 +152,11 @@ func reset(t *testing.T) {
 	if api == nil {
 		t.Skip("needs TEST_DATABASE_URL")
 	}
-	if _, err := db.Exec(bg, `TRUNCATE products,users,sessions,orders,order_items,order_events,messages,settings,content,coupons,reviews RESTART IDENTITY CASCADE`); err != nil {
+	if _, err := db.Exec(bg, `TRUNCATE applied,products,users,sessions,orders,order_items,order_events,messages,settings,content,coupons,reviews RESTART IDENTITY CASCADE`); err != nil {
+		t.Fatal(err)
+	}
+	// Fixed charges here, so the tests don't depend on what the shop happens to charge today.
+	if _, err := db.Exec(bg, `INSERT INTO settings VALUES('live','{"delivery":[{"id":"jashore","label":"Inside Jashore","fee":60},{"id":"outside","label":"Outside Jashore","fee":100}]}')`); err != nil {
 		t.Fatal(err)
 	}
 	stockSnap.Store(nil)
@@ -612,5 +616,119 @@ func TestDashboardAndExports(t *testing.T) {
 	}
 	if code, out := call(t, nil, "POST", "/api/admin/customers/password", M{"phone": "01810000000"}, true); code != 200 || len(out["password"].(string)) != 10 {
 		t.Fatalf("%d %v", code, out)
+	}
+}
+
+func TestContentUpdatesRunOnceAndKeepOwnerEdits(t *testing.T) {
+	reset(t)
+	put := func(kind, slug, data string) {
+		t.Helper()
+		if _, err := db.Exec(bg, `INSERT INTO content(kind,slug,data) VALUES($1,$2,$3::jsonb)`, kind, slug, data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	html := func(slug string) string {
+		t.Helper()
+		var s string
+		if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE slug=$1`, slug).Scan(&s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	if err := applyContentUpdates(bg); err != nil { // an empty shop must not use up the update
+		t.Fatal(err)
+	}
+	put("page", "about-us", `{"slug":"about-us","title":"About","html":"Our App store is coming"}`)
+	put("page", "privacy-policy", `{"slug":"privacy-policy","title":"Privacy","html":"The owner wrote this"}`)
+	put("post", "admission-information", `{"slug":"admission-information","title":"x","html":"y"}`)
+	put("cat", "brand-1", `{"slug":"brand-1","name":"Brand 1"}`)
+	put("cat", "shoes", `{"slug":"shoes","name":"Shoes"}`)
+	if _, err := db.Exec(bg, `UPDATE products SET data=data||'{"cats":["shoes"]}' WHERE id=1`); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyContentUpdates(bg); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(html("about-us"), "App store") {
+		t.Error("old page text was not replaced")
+	}
+	if html("privacy-policy") != "The owner wrote this" {
+		t.Error("a page the owner rewrote must be kept")
+	}
+	var left int
+	db.QueryRow(bg, `SELECT count(*) FROM content WHERE slug IN('admission-information','brand-1')`).Scan(&left)
+	if left != 0 {
+		t.Errorf("%d leftovers remain", left)
+	}
+	db.QueryRow(bg, `SELECT count(*) FROM content WHERE slug='shoes'`).Scan(&left)
+	if left != 1 {
+		t.Error("a category with products must not be removed")
+	}
+	db.Exec(bg, `UPDATE content SET data=jsonb_set(data,'{html}','"Our App store again"') WHERE slug='about-us'`)
+	if err := applyContentUpdates(bg); err != nil {
+		t.Fatal(err)
+	}
+	if html("about-us") != "Our App store again" {
+		t.Error("the update must run only once")
+	}
+}
+
+func TestCouponPreviewRejectsBadQuantities(t *testing.T) {
+	reset(t)
+	if code, _ := call(t, nil, "POST", "/api/coupon", M{"code": "X", "items": []M{{"id": 1, "qty": -5}}}, false); code != 400 {
+		t.Errorf("negative quantity: %d", code)
+	}
+}
+
+func TestOwnerAnswersKeepLaterChanges(t *testing.T) {
+	reset(t)
+	exec := func(q string) {
+		t.Helper()
+		if _, err := db.Exec(bg, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`INSERT INTO content(kind,slug,data) VALUES('post','luxury-collection','{"title":"x","html":"y"}'),('post','pureit-water-filter','{"title":"x","html":"kept"}')`)
+	exec(`INSERT INTO settings VALUES('site','{"whatsapp":"","address":"Own address"}')`)
+	if err := applyContentUpdates(bg); err != nil {
+		t.Fatal(err)
+	}
+	live, site, err := loadSettings(bg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if live.Delivery[0].Fee != 0 || live.Delivery[1].Fee != 100 || live.Delivery[0].ID != "jashore" {
+		t.Errorf("delivery: %+v", live.Delivery)
+	}
+	if site["whatsapp"] != "01710-076076" || site["address"] != "Own address" {
+		t.Errorf("site: %v %v", site["whatsapp"], site["address"])
+	}
+	var posts int
+	db.QueryRow(bg, `SELECT count(*) FROM content WHERE kind='post'`).Scan(&posts)
+	if posts != 1 {
+		t.Errorf("%d posts left, want 1", posts)
+	}
+}
+
+func TestSeedKeepsDeletedContentDeleted(t *testing.T) {
+	reset(t)
+	dir := t.TempDir()
+	products := dir + "/products.json"
+	content := dir + "/content.json"
+	os.WriteFile(products, []byte(`[]`), 0o644)
+	os.WriteFile(content, []byte(`{"posts":[{"slug":"a","title":"A","html":""},{"slug":"b","title":"B","html":""}]}`), 0o644)
+	if err := seed(bg, products, content); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(bg, `DELETE FROM content WHERE slug='a'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := seed(bg, products, content); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	db.QueryRow(bg, `SELECT count(*) FROM content WHERE slug='a'`).Scan(&n)
+	if n != 0 {
+		t.Error("seed brought a deleted post back")
 	}
 }

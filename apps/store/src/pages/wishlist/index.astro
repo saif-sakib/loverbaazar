@@ -1,11 +1,12 @@
 ---
 import Base from "../../layouts/Base.astro";
+import { say } from "../../lib/shop";
 ---
 
 <Base title="Wishlist" noindex>
   <div class="wrap">
     <div class="pagehead">
-      <h1 style="margin-top:20px">Your wishlist</h1>
+      <h1 class="title">{say("wishlistHeading")}</h1>
     </div>
     <div class="grid" data-wishlist>
       Loading…

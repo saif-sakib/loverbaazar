@@ -1,0 +1,313 @@
+[
+  {
+    "id": "2026-11-content-review",
+    "docs": [
+      {
+        "kind": "page",
+        "slug": "about-us",
+        "replaces": "App store",
+        "data": {
+          "title": "About Us",
+          "html": "<p>{name} is a home appliance store. We choose good quality products for our customers and sell them at reasonable prices, with delivery all over Bangladesh.</p>\n<h2>What we sell</h2>\n<ul>\n<li>Rice cookers, pressure cookers and nonstick cookware</li>\n<li>Gas stoves, induction cookers and infrared cookers</li>\n<li>Wardrobes, chairs and kitchen racks</li>\n<li>Many other appliances for the home</li>\n</ul>\n<h2>Talk to us</h2>\n<p>Our trained team is happy to help you choose. Call <a href=\"tel:{phone}\">{phone}</a> or email <a href=\"mailto:{email}\">{email}</a>.</p>"
+        }
+      },
+      {
+        "kind": "page",
+        "slug": "how-to-buy",
+        "replaces": "View Cart",
+        "data": {
+          "title": "How To Buy",
+          "html": "<h2>অর্ডার করার নিয়ম</h2>\n<ol>\n<li>আপনার পছন্দের পণ্যটিতে ক্লিক করুন।</li>\n<li><b>Add to cart</b> ক্লিক করুন। তারপর উপরের কার্ট আইকনে গিয়ে <b>Proceed to checkout</b> ক্লিক করুন।</li>\n<li>আপনার নাম, মোবাইল নম্বর ও পূর্ণ ঠিকানা লিখুন। ডেলিভারি এলাকা ও পেমেন্ট পদ্ধতি বেছে নিন।</li>\n<li><b>Place order</b> ক্লিক করুন।</li>\n</ol>\n<p>দ্রুত অর্ডার করতে চাইলে পণ্যের পাতায় <b>Buy now</b> ক্লিক করুন। অর্ডার করতে কোনো অ্যাকাউন্ট লাগে না।</p>\n<h2>পেমেন্ট</h2>\n<ul>\n<li><b>Cash on delivery:</b> পণ্য হাতে পেয়ে টাকা দিন।</li>\n<li><b>বিকাশ, নগদ বা রকেট:</b> Checkout পাতায় দেখানো নম্বরে টাকা পাঠান, তারপর <b>Place order</b> ক্লিক করার আগে Transaction ID লিখুন।</li>\n</ul>\n<p>ডেলিভারি এলাকা: সারা বাংলাদেশ। সাহায্য লাগলে কল করুন <a href=\"tel:{phone}\">{phone}</a>। ধন্যবাদ।</p>\n<h2>In English</h2>\n<ol>\n<li>Open the product you want and click <b>Add to cart</b>, or <b>Buy now</b> to go straight to checkout.</li>\n<li>From the cart, click <b>Proceed to checkout</b>.</li>\n<li>Enter your name, mobile number and full address, then choose your delivery area and payment method.</li>\n<li>Click <b>Place order</b>. You do not need an account.</li>\n</ol>\n<p>If you pay by bKash, Nagad or Rocket, send the money to the number shown at checkout and enter the transaction ID before you place the order. We deliver all over Bangladesh.</p>"
+        }
+      },
+      {
+        "kind": "page",
+        "slug": "terms-conditions",
+        "replaces": "{email address}",
+        "data": {
+          "title": "Terms & Conditions",
+          "html": "<h2>Returns</h2>\n<p>Our return policy lasts 30 days from your purchase. After 30 days we cannot offer a full refund or exchange.</p>\n<p>To be eligible for a return, your item must be unused, in the same condition you received it, and in its original packaging. We need your order number or other proof of purchase.</p>\n<p>Please contact us before sending anything back, and please do not send your purchase to the manufacturer.</p>\n<h2>Items we cannot take back</h2>\n<ul>\n<li>Food and other perishable goods</li>\n<li>Intimate or sanitary goods</li>\n<li>Hazardous materials, and flammable liquids or gases</li>\n<li>Some health and personal care items</li>\n</ul>\n<h2>Partial refunds</h2>\n<p>We may give only a partial refund for an item that is not in its original condition, or that is damaged or missing parts for a reason that is not our fault.</p>\n<h2>Refunds</h2>\n<p>When we receive your return we will inspect it and tell you whether your refund is approved. If it is, we will send the money back by your original payment method or another method we agree with you.</p>\n<h2>Sale items</h2>\n<p>Only regular priced items may be refunded. Sale items cannot be refunded.</p>\n<h2>Exchanges</h2>\n<p>We only replace items that are defective or damaged. Contact us and we will tell you how to send the item back.</p>\n<h2>Return shipping</h2>\n<p>You are responsible for paying your own shipping costs when you return an item, and shipping costs are non-refundable. If you receive a refund, the cost of return shipping will be deducted from it.</p>\n<p>For more expensive items, please use a trackable delivery service. We cannot guarantee that we will receive your returned item.</p>\n<h2>Need help?</h2>\n<p>Call <a href=\"tel:{phone}\">{phone}</a> or email <a href=\"mailto:{email}\">{email}</a>.</p>"
+        }
+      },
+      {
+        "kind": "page",
+        "slug": "privacy-policy",
+        "replaces": "Your Data Always",
+        "data": {
+          "title": "Privacy Policy",
+          "html": "<h2>What we collect</h2>\n<p>When you order, we keep your name, mobile number, delivery address, order details and any note you add. If you pay by mobile payment we also keep the transaction ID. If you create an account we keep your name, mobile number and a protected form of your password, never the password itself. If you contact us we keep your message.</p>\n<p>Your cart, wishlist and recent orders are saved in your own browser, on your own device.</p>\n<h2>How we use it</h2>\n<p>We use your information to confirm, deliver and support your order, and to protect the shop from fake orders. We share it only where we need to, such as with the courier who brings your order and the services that run this website. We do not sell your personal information.</p>\n<h2>Your rights</h2>\n<p>You have the right to ask what personal data we hold about you. To do so, call <a href=\"tel:{phone}\">{phone}</a> or email <a href=\"mailto:{email}\">{email}</a>.</p>\n<h2>Security</h2>\n<p>No method of sending data over the Internet or storing it electronically is completely secure. While we cannot guarantee security, we work to protect your information and keep reviewing our measures.</p>\n<h2>Children</h2>\n<p>We do not sell products to anyone under 18, and we do not knowingly collect personal data about them. By using this site you confirm that you are at least 18 years old and accept this policy.</p>"
+        }
+      },
+      {
+        "kind": "post",
+        "slug": "pureit-water-filter",
+        "replaces": "world best",
+        "data": {
+          "title": "Pureit Water Filter",
+          "date": "2023-12-12",
+          "excerpt": "Looking for a good quality water filter? Pureit is easy to set up and uses a 4-step purification process.",
+          "html": "<p>If you want a good quality water filter, Pureit is well worth a look.</p>\n<ul>\n<li>It uses a 4-step purification process.</li>\n<li>It is very easy to set up: just unpack it and start using it.</li>\n</ul>\n<p><a href=\"/product/pureit-classic-23l/\">See the Pureit Classic 23L in our shop</a>.</p>\n<p><img loading=\"lazy\" decoding=\"async\" src=\"https://loverbaazar.com/wp-content/uploads/2023/11/wfp1_6_11zon-300x300.jpg\" alt=\"Pureit water filter\" width=\"300\" height=\"300\" /></p>"
+        }
+      },
+      {
+        "kind": "post",
+        "slug": "difference-between-infrared-induction-cookware",
+        "replaces": "Working principle",
+        "data": {
+          "title": "Difference Between Infrared and Induction Cookers",
+          "date": "2023-12-11",
+          "excerpt": "Infrared and induction cookers look alike but heat your food in different ways. Here is the difference, and which one we suggest.",
+          "html": "<p>The main difference between infrared and induction cookers is how they make heat.</p>\n<h2>Infrared cooker</h2>\n<p>Electric current heats a wire element under the glass. The element glows and gives off infrared heat, which warms the pot.</p>\n<p><img loading=\"lazy\" decoding=\"async\" src=\"https://loverbaazar.com/wp-content/uploads/2023/12/inductioncooker-287x300.jpg\" alt=\"Induction cooker\" width=\"287\" height=\"300\" /></p>\n<h2>Induction cooker</h2>\n<p>Electric current flows through a copper coil and creates a magnetic field. This field produces countless small eddy currents in the base of a steel pot, and those currents make the pot itself hot.</p>\n<h2>Which should you choose?</h2>\n<p>Because they work differently, the two cookers use electricity differently. We suggest induction as the best choice for cooking.</p>"
+        }
+      },
+      {
+        "kind": "post",
+        "slug": "luxury-collection",
+        "replaces": "Your imagination",
+        "data": {
+          "title": "Luxury Collection",
+          "date": "2019-03-27",
+          "excerpt": "All kinds of home appliances at reasonable prices, with new products added all the time.",
+          "html": "<p>All kinds of home appliances are available here at reasonable prices, and we keep adding new products.</p>\n<p>Whatever you are looking for, we want you to find the right product. <a href=\"/shop/\">Browse the shop</a>.</p>"
+        }
+      },
+      {
+        "kind": "post",
+        "slug": "high-quality-products-of-kiam",
+        "replaces": "alpha greblon",
+        "data": {
+          "title": "High Quality Products of Kiam",
+          "date": "2019-03-27",
+          "excerpt": "Kiam nonstick cookware uses alpha Greblon coating imported from Germany.",
+          "html": "<p>Kiam nonstick cookware is made with alpha Greblon coating imported from Germany.</p>\n<p>You will feel the difference when you use it. <a href=\"/product-category/nonstick/\">See our nonstick range</a>.</p>"
+        }
+      },
+      {
+        "kind": "post",
+        "slug": "latest-wardrobe-of-akij-group",
+        "replaces": "Pigment printer",
+        "data": {
+          "title": "Latest Wardrobe of Akij Group",
+          "date": "2019-03-27",
+          "excerpt": "Akij wardrobes are printed with a pigment printer, so you can choose from a wide range of designs.",
+          "html": "<p>If you want to buy a wardrobe, take a look at Akij. Akij wardrobes are printed with a pigment printer, so you can choose from a wide range of designs.</p>\n<p><a href=\"/product-category/almirah/akij-almirah/\">See Akij almirahs in our shop</a>.</p>"
+        }
+      }
+    ],
+    "names": [
+      {
+        "kind": "cat",
+        "slug": "aci-almirah",
+        "name": "ACI Almirah"
+      },
+      {
+        "kind": "cat",
+        "slug": "nonstick",
+        "name": "Nonstick"
+      },
+      {
+        "kind": "cat",
+        "slug": "latest-product",
+        "name": "Latest Products"
+      },
+      {
+        "kind": "cat",
+        "slug": "popular-item",
+        "name": "Popular Items"
+      },
+      {
+        "kind": "tag",
+        "slug": "alirah-price-in-bangladesh",
+        "name": "almirah price in bangladesh"
+      },
+      {
+        "kind": "tag",
+        "slug": "buy-online-chairarmless-chair-of-rfl",
+        "name": "buy online armless chair of rfl"
+      },
+      {
+        "kind": "tag",
+        "slug": "dinning-table-price-in-bangladesh",
+        "name": "dining table price in bangladesh"
+      },
+      {
+        "kind": "tag",
+        "slug": "folding-commode-tool-comode-tool-price-in-bd",
+        "name": "folding commode tool price in bd"
+      },
+      {
+        "kind": "tag",
+        "slug": "glass-lid-mosaick-coated",
+        "name": "glass lid mosaic coated"
+      },
+      {
+        "kind": "tag",
+        "slug": "glasss-gas-stove-price",
+        "name": "glass gas stove price"
+      },
+      {
+        "kind": "tag",
+        "slug": "hundai-rice-cooker",
+        "name": "Hyundai rice cooker"
+      },
+      {
+        "kind": "tag",
+        "slug": "kiam-glassware-price-tea-cup-set",
+        "name": "kiam glassware price, tea cup set"
+      },
+      {
+        "kind": "tag",
+        "slug": "non-stick-24-karia-ib",
+        "name": "non stick 24 karai ib"
+      },
+      {
+        "kind": "tag",
+        "slug": "pureit-filter-price-in-bangldesh",
+        "name": "pureit filter price in bangladesh"
+      },
+      {
+        "kind": "tag",
+        "slug": "rfl-dinning-table-price",
+        "name": "rfl dining table price"
+      },
+      {
+        "kind": "tag",
+        "slug": "rfl-electric-kette",
+        "name": "rfl electric kettle"
+      },
+      {
+        "kind": "tag",
+        "slug": "rfl-wardobe",
+        "name": "rfl wardrobe"
+      },
+      {
+        "kind": "tag",
+        "slug": "shoe-raclk-price-in-bangladesh",
+        "name": "shoe rack price in bangladesh"
+      },
+      {
+        "kind": "tag",
+        "slug": "vacumm-flask",
+        "name": "vacuum flask"
+      },
+      {
+        "kind": "tag",
+        "slug": "walton-kettle-orice",
+        "name": "walton kettle price"
+      },
+      {
+        "kind": "tag",
+        "slug": "water-bottle-price-in-bangladeshr",
+        "name": "water bottle price in bangladesh"
+      },
+      {
+        "kind": "tag",
+        "slug": "5-5-quen-ib",
+        "name": "5.5 queen ib"
+      },
+      {
+        "kind": "tag",
+        "slug": "moringa-powder-sajne-powder-khara-powder",
+        "name": "moringa powder, sajne powder, khara powder"
+      }
+    ],
+    "remove": [
+      {
+        "kind": "post",
+        "slug": "admission-information"
+      },
+      {
+        "kind": "cat",
+        "slug": "brand-1"
+      },
+      {
+        "kind": "cat",
+        "slug": "brand-2"
+      },
+      {
+        "kind": "cat",
+        "slug": "brand-3"
+      },
+      {
+        "kind": "cat",
+        "slug": "brand-4"
+      },
+      {
+        "kind": "cat",
+        "slug": "brand-5"
+      },
+      {
+        "kind": "cat",
+        "slug": "brand-6"
+      },
+      {
+        "kind": "cat",
+        "slug": "brand-7"
+      },
+      {
+        "kind": "cat",
+        "slug": "brand-8"
+      },
+      {
+        "kind": "cat",
+        "slug": "clothing"
+      },
+      {
+        "kind": "cat",
+        "slug": "hoodies"
+      },
+      {
+        "kind": "cat",
+        "slug": "mixed"
+      },
+      {
+        "kind": "cat",
+        "slug": "shoes"
+      },
+      {
+        "kind": "cat",
+        "slug": "shorts"
+      },
+      {
+        "kind": "cat",
+        "slug": "slider"
+      },
+      {
+        "kind": "cat",
+        "slug": "sports"
+      },
+      {
+        "kind": "cat",
+        "slug": "uncategorized"
+      },
+      {
+        "kind": "cat",
+        "slug": "watches"
+      }
+    ]
+  },
+  {
+    "id": "2026-11-owner-answers",
+    "docs": [],
+    "names": [],
+    "remove": [
+      {
+        "kind": "post",
+        "slug": "luxury-collection"
+      },
+      {
+        "kind": "post",
+        "slug": "high-quality-products-of-kiam"
+      },
+      {
+        "kind": "post",
+        "slug": "latest-wardrobe-of-akij-group"
+      }
+    ],
+    "sql": [
+      "UPDATE settings SET data=jsonb_set(data,'{delivery}',(SELECT jsonb_agg(CASE WHEN z->>'id'='jashore' AND (z->>'fee')::bigint=60 THEN jsonb_set(z,'{fee}','0') ELSE z END ORDER BY n) FROM jsonb_array_elements(data->'delivery') WITH ORDINALITY t(z,n))) WHERE key='live'",
+      "UPDATE settings SET data=data||'{\"whatsapp\":\"01710-076076\"}' WHERE key='site' AND coalesce(data->>'whatsapp','')=''",
+      "UPDATE settings SET data=data||'{\"address\":\"Vekutia, Jashore\"}' WHERE key='site' AND coalesce(data->>'address','')=''"
+    ]
+  }
+]

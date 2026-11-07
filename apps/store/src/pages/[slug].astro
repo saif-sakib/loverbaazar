@@ -1,19 +1,25 @@
 ---
 import Base from "../layouts/Base.astro";
-import { pages, posts, fileSlug } from "../lib/shop";
+import { pages, posts, fileSlug, fill } from "../lib/shop";
 export const getStaticPaths = () => [...pages, ...posts].map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
+const html = fill(p.html).replace(/href="tel:([^"]*)"/g, (_, n) => `href="tel:${n.replace(/[^\d+]/g, "")}"`);
+const summary = p.excerpt || html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 155);
+const date = p.date && new Date(p.date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 ---
 
-<Base title={p.title} description={p.excerpt}>
-  <div class="wrap" style="max-width:860px">
+<Base title={p.title} description={summary} type={p.date ? "article" : "website"}>
+  <div class="wrap narrow">
     <p class="crumbs">
-      <a href="/">Home</a> / {p.title}
+      <a href="/">Home</a> / {p.date && <><a href="/blog/">Blog</a> / </>}
+      {p.title}
     </p>
-    <h1>{p.title}</h1>
-    {p.date && <p class="meta">{p.date}</p>}
-    <article class="prose">
-      <Fragment set:html={p.html} />
+    <div class="pagehead">
+      <h1>{p.title}</h1>
+      {date && <p class="meta">{date}</p>}
+    </div>
+    <article class="prose article">
+      <Fragment set:html={html} />
     </article>
   </div>
 </Base>

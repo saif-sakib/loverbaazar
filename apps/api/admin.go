@@ -33,7 +33,7 @@ var (
 	idRe    = regexp.MustCompile(`^[a-z0-9-]+$`)
 	colorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 	// Top-level addresses the shop already uses. A page with one of these names would break the build.
-	reservedSlugs = []string{"admin", "api", "blog", "cart", "checkout", "contact-us", "feed.xml", "my-account", "product", "product-category", "product-tag", "search", "shop", "track", "wishlist", "wp-content", "uploads"}
+	reservedSlugs = []string{"admin", "api", "blog", "cart", "checkout", "contact-us", "feed.xml", "my-account", "product", "product-category", "product-tag", "search", "shop", "track", "wishlist", "wp-content", "uploads", "404", "_astro", "feed", "page"}
 	statuses      = []string{"pending", "confirmed", "shipped", "delivered", "cancelled", "returned"}
 )
 

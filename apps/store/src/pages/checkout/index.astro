@@ -1,14 +1,14 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { SITE, LIVE } from "../../lib/shop";
+import { SITE, LIVE, say } from "../../lib/shop";
 const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
 ---
 
-<Base title="Checkout" noindex>
+<Base title={say("checkoutHeading")} noindex>
   {site && <script slot="head" is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
   <div class="wrap">
     <div class="pagehead">
-      <h1 style="margin-top:20px">Checkout</h1>
+      <h1 class="title">{say("checkoutHeading")}</h1>
     </div>
     <p data-empty hidden>
       Your cart is empty.{" "}
@@ -42,7 +42,7 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
           Full address<textarea name="address" rows="3" required maxlength="500" autocomplete="street-address"></textarea>
         </label>
         <label class="field">
-          Delivery area<select name="area"></select>
+          Delivery area<select name="area" required></select>
         </label>
         <label class="field">
           Payment<select name="payment"></select>
@@ -72,7 +72,7 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
         <button class="btn small" type="submit">
           Place order
         </button>
-        <p class="meta">Trouble ordering? Call {SITE.phone}.</p>
+        <p class="meta">{say("checkoutHelp")}</p>
       </aside>
     </form>
   </div>

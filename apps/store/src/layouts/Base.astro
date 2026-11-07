@@ -1,7 +1,7 @@
 ---
 import "@fontsource-variable/plus-jakarta-sans";
 import "../styles/site.css";
-import { MENU, SITE, LIVE, catUrl, telOf, waOf } from "../lib/shop";
+import { MENU, SITE, LIVE, catUrl, telOf, waOf, say } from "../lib/shop";
 const { title, description = SITE.description, image, noindex, type = "website" } = Astro.props;
 const full = title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`;
 const canon = new URL(Astro.url.pathname, Astro.site);
@@ -24,7 +24,13 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
 ---
 
 <!doctype html>
-<html lang="en" data-phone={SITE.phone}>
+<html
+  lang="en"
+  data-phone={SITE.phone}
+  data-order-placed={say("orderPlaced")}
+  data-review-thanks={say("reviewThanks")}
+  data-message-thanks={say("messageThanks")}
+>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -60,7 +66,7 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
           {SITE.ticker.map((t: string) => (
             <span>{t}</span>
           ))}
-          <span>Call {SITE.phone}</span>
+          <span>{say("callLine")}</span>
         </div>
       </div>
     )}
@@ -80,7 +86,7 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
           <input
             name="q"
             type="search"
-            placeholder="Search rice cooker, chair, wardrobe…"
+            placeholder={say("searchPlaceholder")}
             aria-label="Search products"
             autocomplete="off"
             data-suggest
@@ -129,7 +135,7 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
         </nav>
       </div>
       <div class="wrap nav">
-        <a href="/shop/">Shop all</a>
+        <a href="/shop/">{say("shopAll")}</a>
         {MENU.map((g: any) => (
           <details class="mega">
             <summary>{g.title}</summary>
@@ -171,22 +177,17 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
             )}
           </p>
         </div>
+        {SITE.footer.map((col: any) => (
+          <div>
+            <h4>{col.title}</h4>
+            {col.links.map((l: any) => (
+              <a href={l.url}>{l.label}</a>
+            ))}
+          </div>
+        ))}
         <div>
-          <h4>Company</h4>
-          <a href="/about-us/">About us</a>
-          <a href="/how-to-buy/">How to buy</a>
-          <a href="/contact-us/">Contact us</a>
-          <a href="/blog/">Blog</a>
-        </div>
-        <div>
-          <h4>Policies</h4>
-          <a href="/privacy-policy/">Privacy policy</a>
-          <a href="/terms-conditions/">Terms and conditions</a>
-          <a href="/track/">Track your order</a>
-        </div>
-        <div>
-          <h4>Payment</h4>
-          <p>
+          <h4>{say("paymentHeading")}</h4>
+          <p data-payments>
             {payments.map((p: any) => (
               <>
                 {p.label}

@@ -85,6 +85,7 @@ func loadSettings(ctx context.Context) (Live, map[string]any, error) {
 	if err := json.Unmarshal(defaultsJSON, &d); err != nil {
 		return d.Live, nil, err
 	}
+	words, _ := d.Site["copy"].(map[string]any)
 	rows, err := db.Query(ctx, `SELECT key,data::text FROM settings`)
 	if err != nil {
 		return d.Live, nil, err
@@ -96,6 +97,14 @@ func loadSettings(ctx context.Context) (Live, map[string]any, error) {
 		}
 		return json.Unmarshal([]byte(data), &d.Site)
 	})
+	// Saved words replace the defaults as a whole, so a phrase added later would otherwise be blank.
+	if saved, isMap := d.Site["copy"].(map[string]any); isMap && err == nil {
+		for k, v := range words {
+			if _, has := saved[k]; !has {
+				saved[k] = v
+			}
+		}
+	}
 	return d.Live, d.Site, err
 }
 
@@ -252,9 +261,18 @@ func couponPreview(w http.ResponseWriter, r *http.Request) {
 	if !read(w, r, &in) {
 		return
 	}
+	items, err := mergeItems(in.Items)
+	if err != nil {
+		oops(w, err)
+		return
+	}
+	if len(items) > 50 {
+		fail(w, 400, "your cart is too large")
+		return
+	}
 	ctx := r.Context()
 	var sub int64
-	for _, it := range in.Items {
+	for _, it := range items {
 		var price int64
 		if err := db.QueryRow(ctx, `SELECT price FROM products WHERE id=$1 AND active`, it.ID).Scan(&price); err == nil {
 			sub += price * int64(it.Qty)
@@ -262,9 +280,8 @@ func couponPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	var kind string
 	var value int64
-	err := db.QueryRow(ctx, `SELECT kind,value FROM coupons WHERE code=$1 AND active AND (expires_at IS NULL OR expires_at>now())
-		AND (max_uses=0 OR used<max_uses) AND min_order<=$2`, strings.ToUpper(clip(in.Code, 40)), sub).Scan(&kind, &value)
-	if err != nil {
+	if err = db.QueryRow(ctx, `SELECT kind,value FROM coupons WHERE code=$1 AND active AND (expires_at IS NULL OR expires_at>now())
+		AND (max_uses=0 OR used<max_uses) AND min_order<=$2`, strings.ToUpper(clip(in.Code, 40)), sub).Scan(&kind, &value); err != nil {
 		fail(w, 400, "that coupon is not valid for this order")
 		return
 	}

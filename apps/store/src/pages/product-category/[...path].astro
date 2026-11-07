@@ -1,13 +1,17 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { cats, inCat, fileSlug } from "../../lib/shop";
+import { cats, inCat, fileSlug, SITE, say } from "../../lib/shop";
 export const getStaticPaths = () => cats.map((c) => ({ params: { path: fileSlug(c.path) }, props: { c } }));
 const { c } = Astro.props;
 const items = inCat(c.slug);
 ---
 
-<Base title={c.name} description={`${c.name} price in Bangladesh. Buy ${c.name} online from LoverBaazar with cash on delivery.`}>
+<Base
+  title={c.name}
+  description={`${c.name} price in Bangladesh. Buy ${c.name} online from ${SITE.name} with cash on delivery.`}
+  noindex={!items.length}
+>
   <div class="wrap">
     <p class="crumbs">
       <a href="/">Home</a> / <a href="/shop/">Shop</a> / {c.name}
@@ -15,6 +19,6 @@ const items = inCat(c.slug);
     <div class="pagehead">
       <h1>{c.name}</h1>
     </div>
-    {items.length ? <Grid items={items} /> : <p>No products here yet.</p>}
+    {items.length ? <Grid items={items} /> : <div class="empty"><p>{say("emptyCategory")}</p><a class="btn" href="/shop/">{say("shopAll")}</a></div>}
   </div>
 </Base>
