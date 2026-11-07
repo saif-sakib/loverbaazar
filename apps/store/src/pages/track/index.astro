@@ -5,6 +5,10 @@ import Base from "../../layouts/Base.astro";
 <Base title="Track your order" noindex>
   <div class="wrap" style="max-width:640px">
     <h1 style="margin-top:20px">Track your order</h1>
+    <div class="mine" data-mine hidden>
+      <p class="meta">Your recent orders on this device:</p>
+      <div></div>
+    </div>
     <form class="panel" data-track>
       <label class="field">
         Order number

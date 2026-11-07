@@ -1,8 +1,8 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { cats, inCat } from "../../lib/shop";
-export const getStaticPaths = () => cats.map((c) => ({ params: { path: c.path }, props: { c } }));
+import { cats, inCat, fileSlug } from "../../lib/shop";
+export const getStaticPaths = () => cats.map((c) => ({ params: { path: fileSlug(c.path) }, props: { c } }));
 const { c } = Astro.props;
 const items = inCat(c.slug);
 ---

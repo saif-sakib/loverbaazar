@@ -150,17 +150,30 @@
     $$("details.mega[open]").forEach((d) => {
       if (d !== open) d.open = false;
     });
-    const t = e.target.closest("[data-add],[data-wish],[data-del],[data-thumb]");
+    const t = e.target.closest("[data-add],[data-wish],[data-del],[data-thumb],[data-again],[data-mine-order]");
     if (!t) return;
     if (t.dataset.add) {
       const id = t.dataset.add;
       // The quantity box belongs to the main product, not to the cards under it.
-      const box = t.closest(".buy") && $("[data-qty]", t.closest(".buy"));
+      const box = (t.closest(".buy") || t.closest(".buybar")) && $("[data-qty]");
       const want = (cart[id] || 0) + (+box?.value || 1);
       cart[id] = Math.min(want, maxFor(id));
       saveCart();
       toast(cart[id] < want ? `You can order ${cart[id]} of this online` : "Added to cart");
       if (t.dataset.buy) location.href = "/checkout/";
+    }
+    if (t.dataset.again) {
+      JSON.parse(t.dataset.again).forEach((l) => {
+        cart[l.id] = Math.min((cart[l.id] || 0) + l.qty, maxFor(l.id));
+      });
+      saveCart();
+      location.href = "/cart/";
+    }
+    if (t.dataset.mineOrder) {
+      const f = $("[data-track]");
+      f.order.value = t.dataset.mineOrder;
+      f.phone.value = t.dataset.minePhone;
+      f.requestSubmit();
     }
     if (t.dataset.wish) {
       const id = +t.dataset.wish;
@@ -395,6 +408,7 @@
           .join("") +
         (discount ? `<div class="row"><span>Discount (${esc(code)})</span><b>−${taka(discount)}</b></div>` : "") +
         `<div class="row"><span>Delivery</span><b>${fee ? taka(fee) : "Free"}</b></div><div class="row total"><span>Total</span><span>${taka(total)}</span></div>`;
+      $("[data-eta]").textContent = zone.days ? `Usually arrives in ${zone.days}.` : "";
       $("[data-txn]").hidden = !pay?.number;
       $("[data-pay]").textContent = pay?.number ? `Send ${taka(total)} to ${pay.number}, then enter the transaction ID.` : "";
       const sold = lines.find((l) => !l.p.inStock);
@@ -475,6 +489,8 @@
           sessionStorage.removeItem("orderKey");
           sessionStorage.setItem("lastOrder", JSON.stringify({ number: r.number, phone: d.phone }));
         } catch {}
+        // Guests have no account, so this device remembers their orders for the track page.
+        put("myOrders", [{ number: r.number, phone: d.phone }, ...get("myOrders", [])].slice(0, 5));
         location.href = `/track/?order=${encodeURIComponent(r.number)}&new=1`;
       } catch (x) {
         err.textContent = x.message;
@@ -503,8 +519,51 @@
       ${(o.items || []).map((i) => `<div class="row"><span>${esc(i.name)} × ${i.qty}</span><b>${taka(i.price * i.qty)}</b></div>`).join("")}
       ${o.discount ? `<div class="row"><span>Discount</span><b>−${taka(o.discount)}</b></div>` : ""}
       <div class="row"><span>Delivery</span><b>${o.shipping ? taka(o.shipping) : "Free"}</b></div>
-      <div class="row total"><span>Total</span><span>${taka(o.total)}</span></div></div>`;
+      <div class="row total"><span>Total</span><span>${taka(o.total)}</span></div>
+      ${(o.items || []).some((i) => i.id) ? `<button class="btn ghost" data-again="${esc(JSON.stringify(o.items.map((i) => ({ id: i.id, qty: i.qty }))))}">Buy again</button>` : ""}</div>`;
   };
+
+  // The delivery lines on a product page, so the charge is no surprise at checkout.
+  function applyDelivery() {
+    const el = $("[data-delivery]");
+    if (!el || !live) return;
+    const free = live.freeOver > 0 ? `<li>Free delivery on orders of ${taka(live.freeOver)} or more</li>` : "";
+    el.innerHTML =
+      live.delivery.map((z) => `<li>${esc(z.label)}: <b>${taka(z.fee)}</b>${z.days ? `, ${esc(z.days)}` : ""}</li>`).join("") + free;
+  }
+
+  function rememberProduct() {
+    const id = +($("[data-product]")?.dataset.product || 0);
+    if (id) put("seen", [id, ...get("seen", []).filter((x) => x !== id)].slice(0, 9));
+  }
+
+  async function renderRecent() {
+    const el = $("[data-recent]");
+    if (!el) return;
+    const here = +($("[data-product]")?.dataset.product || 0);
+    const seen = get("seen", [])
+      .filter((x) => x !== here)
+      .slice(0, 4);
+    const all = await items();
+    const l = seen.map((id) => all.find((p) => p.id === id)).filter(Boolean);
+    el.innerHTML = l.map(card).join("");
+    el.closest("[data-recent-wrap]").hidden = !l.length;
+    badges();
+  }
+
+  // On a phone the Add to cart button scrolls away, so a bar keeps it in reach.
+  function buyBar() {
+    const bar = $("[data-buybar]"),
+      buy = $(".buy");
+    if (!bar || !buy) return;
+    const update = () => {
+      const show = buy.getBoundingClientRect().bottom < 0;
+      bar.classList.toggle("on", show);
+      document.body.classList.toggle("has-buybar", show);
+    };
+    addEventListener("scroll", update, { passive: true });
+    update();
+  }
 
   function track() {
     const f = $("[data-track]");
@@ -526,6 +585,16 @@
       e.preventDefault();
       go();
     };
+    const mine = get("myOrders", []);
+    const list = $("[data-mine]");
+    if (list && mine.length) {
+      list.hidden = false;
+      $("div", list).innerHTML = mine
+        .map(
+          (o) => `<button class="btn ghost" data-mine-order="${esc(o.number)}" data-mine-phone="${esc(o.phone)}">${esc(o.number)}</button>`,
+        )
+        .join("");
+    }
     if (!q.get("order")) return;
     f.order.value = q.get("order");
     f.phone.value = q.get("phone") || "";
@@ -618,7 +687,8 @@
       index = null;
       applyStock();
       applyLive();
-      await Promise.all([renderCart(), renderWish(), search(), repaintCheckout()]);
+      applyDelivery();
+      await Promise.all([renderCart(), renderWish(), search(), renderRecent(), repaintCheckout()]);
     } catch {
       // Keep the prices the page was built with. The server still checks every order.
     } finally {
@@ -626,9 +696,11 @@
     }
   }
 
+  rememberProduct();
   badges();
   grids();
   suggestions();
+  buyBar();
   track();
   account();
   checkout();
@@ -636,6 +708,6 @@
   $$("[data-review]").forEach((f) =>
     simpleForm(f, "/reviews", "Thank you! Your review will appear after we check it.", { product: +f.dataset.review }),
   );
-  Promise.allSettled([renderCart(), renderWish(), search()]);
+  Promise.allSettled([renderCart(), renderWish(), search(), renderRecent()]);
   loadStock();
 })();

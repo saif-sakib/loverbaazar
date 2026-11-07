@@ -1,7 +1,7 @@
 ---
 import Base from "../layouts/Base.astro";
-import { pages, posts } from "../lib/shop";
-export const getStaticPaths = () => [...pages, ...posts].map((p) => ({ params: { slug: p.slug }, props: { p } }));
+import { pages, posts, fileSlug } from "../lib/shop";
+export const getStaticPaths = () => [...pages, ...posts].map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
 ---
 

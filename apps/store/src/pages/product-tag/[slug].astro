@@ -1,8 +1,8 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { tags, products } from "../../lib/shop";
-export const getStaticPaths = () => tags.map((t) => ({ params: { slug: t.slug }, props: { t } }));
+import { tags, products, fileSlug } from "../../lib/shop";
+export const getStaticPaths = () => tags.map((t) => ({ params: { slug: fileSlug(t.slug) }, props: { t } }));
 const { t } = Astro.props;
 const items = products.filter((p) => p.tags.includes(t.slug));
 ---

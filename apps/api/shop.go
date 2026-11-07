@@ -52,6 +52,7 @@ type Zone struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
 	Fee   int64  `json:"fee"`
+	Days  string `json:"days"`
 }
 
 // Pay is a payment option. One with a Number is manual: the customer sends money and gives a transaction ID.
@@ -72,6 +73,7 @@ type Live struct {
 	MinOrder   int64  `json:"minOrder"`
 	LowStock   int    `json:"lowStock"`
 	ShowLeft   bool   `json:"showLeft"`
+	MaxPending int    `json:"maxPending"`
 }
 
 // loadSettings overlays what the admin saved on defaults.json, so a new setting works without a migration.
@@ -340,6 +342,10 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "please enter your transaction ID")
 		return
 	}
+	if err = fraudCheck(ctx, live, in.Phone, pay.Number != "", in.TxnID); err != nil {
+		oops(w, err)
+		return
+	}
 	if !human(r, in.Turnstile) {
 		fail(w, 403, "bot check failed, please try again")
 		return
@@ -416,6 +422,32 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 	ok(w, map[string]any{"number": number, "total": total})
 }
 
+// fraudCheck covers what guest checkout leaves open. Anyone can type any number, so one number can
+// only hold a few unconfirmed orders, which stops fake orders tying up the stock. A mobile payment
+// is only a typed-in ID until the admin checks it, so one ID can't pay for two orders.
+func fraudCheck(ctx context.Context, live Live, phone string, manual bool, txn string) error {
+	if live.MaxPending > 0 {
+		var n int
+		if err := db.QueryRow(ctx, `SELECT count(*) FROM orders WHERE phone=$1 AND status='pending'`, phone).Scan(&n); err != nil {
+			return err
+		}
+		if n >= live.MaxPending {
+			return userErr{429, "this number already has orders waiting for confirmation. Please call us to order more"}
+		}
+	}
+	if manual {
+		var used bool
+		err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM orders WHERE upper(txn_id)=upper($1) AND status NOT IN `+outStatuses+`)`, txn).Scan(&used)
+		if err != nil {
+			return err
+		}
+		if used {
+			return userErr{409, "that transaction ID is already on another order. Please check it"}
+		}
+	}
+	return nil
+}
+
 // soldOut names the product, so the customer knows which one to take out of the cart.
 func soldOut(ctx context.Context, tx pgx.Tx, id int64) error {
 	var name string
@@ -470,7 +502,7 @@ func notify(subject, text string) {
 // orderFields is what a customer may see. adminOrderFields adds the shop's private notes.
 const orderFields = `jsonb_build_object('number',o.number,'name',o.name,'phone',o.phone,'address',o.address,'area',o.area,'payment',o.payment,'txn_id',o.txn_id,'note',o.note,
  'subtotal',o.subtotal,'discount',o.discount,'coupon',o.coupon,'shipping',o.shipping,'total',o.total,'status',o.status,'courier',o.courier,'tracking',o.tracking,'created_at',o.created_at,
- 'items',(SELECT jsonb_agg(jsonb_build_object('name',i.name,'price',i.price,'qty',i.qty)) FROM order_items i WHERE i.order_id=o.id),
+ 'items',(SELECT jsonb_agg(jsonb_build_object('id',i.product_id,'name',i.name,'price',i.price,'qty',i.qty)) FROM order_items i WHERE i.order_id=o.id),
  'events',(SELECT jsonb_agg(jsonb_build_object('status',e.status,'at',e.at) ORDER BY e.at) FROM order_events e WHERE e.order_id=o.id))`
 
 func orderJSON(ctx context.Context, where string, args ...any) ([]json.RawMessage, error) {

@@ -82,3 +82,4 @@ figcaption { display: flex; justify-content: space-between; margin-top: 4px; }
   .rep > label { min-width: 100%; }
   .rep > label.check { min-width: auto; }
 }
+.tag.warn { background: #fde7e7; color: #8d1414; }

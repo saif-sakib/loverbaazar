@@ -310,7 +310,7 @@
       .map(
         (o) => `<tr>
       <td><b>${esc(o.number)}</b><br><small>${esc(when(o.created_at))}</small></td>
-      <td>${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a><br>${esc(o.address)} (${esc(o.area)})${o.note ? `<br><i>${esc(o.note)}</i>` : ""}</td>
+      <td>${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}${o.bad_phone > 0 ? ` <span class="tag warn">${o.bad_phone} cancelled or returned</span>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a><br>${esc(o.address)} (${esc(o.area)})${o.note ? `<br><i>${esc(o.note)}</i>` : ""}</td>
       <td>${(o.items || []).map((i) => `${esc(i.name)} × ${i.qty}`).join("<br>")}</td>
       <td>${money(o.total)}${o.discount ? `<br><small>${money(o.discount)} off, ${esc(o.coupon)}</small>` : ""}</td>
       <td>${esc(o.payment)}<br><small>${esc(o.txn_id)}</small></td>
@@ -874,12 +874,13 @@
         ${field("Announcement bar at the top of every page, empty to hide", "notice", L.notice, "placeholder='Eid sale: 10% off with code EID10'")}
         <div class="fields3">${field("Free delivery from (৳), 0 for never", "freeOver", L.freeOver, "min=0", "number")}${field("Minimum order (৳), 0 for none", "minOrder", L.minOrder, "min=0", "number")}${field("Low stock warning at", "lowStock", L.lowStock, "min=0", "number")}</div>
         ${toggle("Show “Only 3 left” on product pages when stock is low", "showLeft", L.showLeft)}
+        ${field("Waiting orders allowed on one phone number, 0 for no limit", "maxPending", L.maxPending, "min=0", "number")}
         <h3>Delivery areas</h3><div id="zones"></div>
         <h3>Payment methods</h3><p class="meta">Add a number for mobile payments: customers will be asked for a transaction ID. Leave it empty for cash on delivery.</p><div id="pays"></div>
       </section>
       <section class="panel"><h2>Shop details</h2><p class="meta">From here down, changes appear after Publish.</p>
         <div class="fields2">${field("Shop name", "name", W.name, "required")}${field("Tagline", "tagline", W.tagline)}${field("Phone", "phone", W.phone, "required")}${field("WhatsApp, empty to hide", "whatsapp", W.whatsapp)}${field("Email", "email", W.email, "", "email")}${field("Opening hours", "hours", W.hours)}${field("Facebook link", "facebook", W.facebook, "", "url")}${field("YouTube link", "youtube", W.youtube, "", "url")}</div>
-        ${field("Address", "address", W.address)}${area("About the shop, shown in the footer", "about", W.about, 2)}${area("Description for Google", "description", W.description, 2)}
+        ${field("Address", "address", W.address)}${area("Return and warranty policy, shown on product pages, empty to hide", "returns", W.returns, 2)}${area("About the shop, shown in the footer", "about", W.about, 2)}${area("Description for Google", "description", W.description, 2)}
       </section>
       <section class="panel"><h2>Look</h2>
         <div class="fields3">${field("Main colour", "brandColor", W.brandColor, "", "color")}${field("Dark colour", "brandDark", W.brandDark, "", "color")}
@@ -902,6 +903,7 @@
       [
         { k: "label", label: "Area" },
         { k: "fee", label: "Charge (৳)", type: "number" },
+        { k: "days", label: "Delivery time, such as 1 to 2 days" },
       ],
       { label: "", fee: 0 },
     );
@@ -976,6 +978,7 @@
         minOrder: +d.minOrder,
         lowStock: +d.lowStock,
         showLeft: f.showLeft.checked,
+        maxPending: +d.maxPending,
         delivery: zones().map((z) => ({ ...z, id: z.id || asciiId(z.label) })),
         payments: pays().map((p) => ({ ...p, id: p.id || asciiId(p.label) })),
       };
@@ -990,6 +993,7 @@
         facebook: d.facebook.trim(),
         youtube: d.youtube.trim(),
         address: d.address,
+        returns: d.returns,
         about: d.about,
         description: d.description,
         brandColor: d.brandColor,

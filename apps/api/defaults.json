@@ -4,8 +4,8 @@
     "closedNote": "We are not taking online orders right now. Please call us.",
     "notice": "",
     "delivery": [
-      { "id": "dhaka", "label": "Inside Dhaka", "fee": 60 },
-      { "id": "outside", "label": "Outside Dhaka", "fee": 120 }
+      { "id": "jashore", "label": "Inside Jashore", "fee": 60, "days": "" },
+      { "id": "outside", "label": "Outside Jashore", "fee": 100, "days": "" }
     ],
     "payments": [
       { "id": "cod", "label": "Cash on delivery", "number": "", "enabled": true },
@@ -16,7 +16,8 @@
     "freeOver": 0,
     "minOrder": 0,
     "lowStock": 5,
-    "showLeft": false
+    "showLeft": false,
+    "maxPending": 3
   },
   "site": {
     "name": "LoverBaazar",
@@ -27,6 +28,7 @@
     "email": "loverbaazar@gmail.com",
     "whatsapp": "",
     "address": "",
+    "returns": "",
     "hours": "",
     "facebook": "https://www.facebook.com/profile.php?id=100091885353080",
     "youtube": "https://www.youtube.com/channel/UCZu0It_vU51HDCGxWnGjIQA",

@@ -101,13 +101,13 @@ Run **Nightly backup** by hand once and confirm it succeeds.
 
 **Order alerts (Brevo):** sign up, verify your sender, then add `BREVO_KEY` and `SHOP_EMAIL` on Render. Emails go to the shop only, not to customers.
 
-**Bot protection (Turnstile):** in Cloudflare, create a widget. Add `TURNSTILE_SECRET` on Render.
+**Bot protection (Turnstile), required before launch:** in Cloudflare, create a widget. Add `TURNSTILE_SECRET` on Render, and the site key as the GitHub variable `TURNSTILE_SITE`. Checkout needs no login, so this is what keeps bots from filling your orders.
 
 ## Step 8: Prepare the shop
 
 In admin:
 
-1. **Settings:** enter your real delivery charges, payment numbers, address and opening hours. The delivery charges are placeholders until you do.
+1. **Settings:** check the delivery charges, then enter delivery times, payment numbers, address, opening hours and your return policy.
 2. **Products:** enter real stock numbers. Every in-stock product currently shows 100.
 3. Click **Publish storefront**.
 

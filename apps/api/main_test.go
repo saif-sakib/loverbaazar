@@ -172,7 +172,7 @@ func call(t *testing.T, c *http.Client, method, path string, body any, admin boo
 }
 
 func order(extra M, items ...M) M {
-	o := M{"items": items, "name": "Rahim", "phone": "01710076076", "address": "House 1, Dhaka", "area": "dhaka", "payment": "cod"}
+	o := M{"items": items, "name": "Rahim", "phone": "01710076076", "address": "House 1, Jashore", "area": "jashore", "payment": "cod"}
 	for k, v := range extra {
 		o[k] = v
 	}
@@ -220,6 +220,7 @@ func TestLastUnitSellsOnce(t *testing.T) {
 // Logged-in buyers used to look up their session inside the transaction and could hang for ever.
 func TestLoggedInCheckoutsDoNotHang(t *testing.T) {
 	reset(t)
+	saveLive(t, func(l M) { l["maxPending"] = 0 }) // this test places many orders on one number
 	jar, _ := cookiejar.New(nil)
 	user := &http.Client{Jar: jar, Timeout: 20 * time.Second}
 	if code, out := call(t, user, "POST", "/api/register", M{"name": "Rahim", "phone": "01710076076", "password": "password1"}, false); code != 200 {
@@ -263,6 +264,68 @@ func TestSameKeyMakesOneOrder(t *testing.T) {
 	db.QueryRow(bg, `SELECT count(*) FROM orders`).Scan(&n)
 	if n != 1 || stockOf(t, 1) != 49 {
 		t.Fatalf("orders %d stock %d", n, stockOf(t, 1))
+	}
+}
+
+func TestDeliveryCharges(t *testing.T) {
+	reset(t)
+	if _, out := call(t, nil, "POST", "/api/checkout", order(nil, M{"id": 1, "qty": 1}), false); out["total"].(float64) != 1060 {
+		t.Fatalf("inside Jashore: %v", out)
+	}
+	if _, out := call(t, nil, "POST", "/api/checkout", order(M{"area": "outside"}, M{"id": 1, "qty": 1}), false); out["total"].(float64) != 1100 {
+		t.Fatalf("outside Jashore: %v", out)
+	}
+}
+
+func TestGuestNeedsNoAccount(t *testing.T) {
+	reset(t)
+	code, out := call(t, nil, "POST", "/api/checkout", order(nil, M{"id": 1, "qty": 1}), false)
+	if code != 200 {
+		t.Fatalf("%d %v", code, out)
+	}
+	var users int
+	db.QueryRow(bg, `SELECT count(*) FROM users`).Scan(&users)
+	if users != 0 {
+		t.Fatalf("a guest order created %d accounts", users)
+	}
+	if code, _ := call(t, nil, "GET", "/api/track?order="+out["number"].(string)+"&phone=01710076076", nil, false); code != 200 {
+		t.Fatalf("guest tracking: %d", code)
+	}
+}
+
+func TestOneNumberCantHoldTheStock(t *testing.T) {
+	reset(t)
+	var first string
+	for i := 0; i < 3; i++ {
+		code, out := call(t, nil, "POST", "/api/checkout", order(nil, M{"id": 1, "qty": 1}), false)
+		if code != 200 {
+			t.Fatalf("order %d: %d %v", i, code, out)
+		}
+		first, _ = out["number"].(string)
+	}
+	if code, _ := call(t, nil, "POST", "/api/checkout", order(nil, M{"id": 1, "qty": 1}), false); code != 429 || stockOf(t, 1) != 47 {
+		t.Fatalf("fourth waiting order: %d stock %d", code, stockOf(t, 1))
+	}
+	call(t, nil, "PUT", "/api/admin/orders/"+first, M{"status": "confirmed"}, true)
+	if code, _ := call(t, nil, "POST", "/api/checkout", order(nil, M{"id": 1, "qty": 1}), false); code != 200 {
+		t.Fatalf("after one is confirmed: %d", code)
+	}
+}
+
+func TestTransactionIDCantPayTwice(t *testing.T) {
+	reset(t)
+	paid := M{"payment": "bkash", "txnid": "ABC12345"}
+	code, out := call(t, nil, "POST", "/api/checkout", order(paid, M{"id": 1, "qty": 1}), false)
+	if code != 200 {
+		t.Fatalf("%d %v", code, out)
+	}
+	again := M{"payment": "nagad", "txnid": "abc12345", "phone": "01810000000"}
+	if code, _ := call(t, nil, "POST", "/api/checkout", order(again, M{"id": 1, "qty": 1}), false); code != 409 {
+		t.Fatalf("same ID on a second order: %d", code)
+	}
+	call(t, nil, "PUT", "/api/admin/orders/"+out["number"].(string), M{"status": "cancelled"}, true)
+	if code, _ := call(t, nil, "POST", "/api/checkout", order(again, M{"id": 1, "qty": 1}), false); code != 200 {
+		t.Fatalf("a cancelled order frees its ID: %d", code)
 	}
 }
 

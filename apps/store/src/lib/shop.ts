@@ -37,6 +37,15 @@ export const img = (u = "") => (!u ? "/placeholder.svg" : BASE ? u.replace("http
 export const taka = (n: number) => "৳" + Number(n).toLocaleString("en-IN");
 export const off = (p: any) => (p.regular > p.price ? Math.round(((p.regular - p.price) / p.regular) * 100) : 0);
 export const inCat = (slug: string) => products.filter((p) => p.cats.includes(slug));
+// WordPress stores Bangla slugs percent-encoded, but a browser's request is decoded before the file
+// is looked up. So the build must write the real letters, or those pages answer 404.
+export const fileSlug = (s: string) => {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+};
 export const catUrl = (c: any) => `/product-category/${c.path}/`;
 export const telOf = (phone: string) => "+88" + phone.replace(/\D/g, "").replace(/^88/, "");
 export const waOf = (phone: string) => "https://wa.me/88" + phone.replace(/\D/g, "").replace(/^88/, "");

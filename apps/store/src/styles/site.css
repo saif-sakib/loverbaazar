@@ -943,3 +943,68 @@ footer .logo em {
     display: none;
   }
 }
+.delivery {
+  list-style: none;
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 10px;
+  font-size: 14px;
+}
+.mine div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.mine .btn {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.order .btn.ghost {
+  margin-top: 12px;
+}
+.buybar {
+  display: none;
+}
+@media (max-width: 860px) {
+  .buybar.on {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 16;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: #fff;
+    border-top: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+  .buybar .price {
+    margin: 0;
+  }
+  .has-buybar .floats {
+    bottom: 84px;
+  }
+  .has-buybar footer {
+    padding-bottom: 84px;
+  }
+}
+/* A grid column grows to fit its widest child unless told not to. Without this a long
+   thumbnail strip stretches the whole product page past the edge of a phone. */
+.pd > *,
+.two > *,
+.cols > * {
+  min-width: 0;
+}
+.prose table {
+  display: block;
+  overflow-x: auto;
+}
+.prose iframe,
+.prose video {
+  max-width: 100%;
+}

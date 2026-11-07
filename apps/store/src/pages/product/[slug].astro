@@ -1,8 +1,8 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Card from "../../components/Card.astro";
-import { products, cats, img, taka, off, catUrl, SITE, telOf, waOf, rating } from "../../lib/shop";
-export const getStaticPaths = () => products.map((p) => ({ params: { slug: p.slug }, props: { p } }));
+import { products, cats, img, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug } from "../../lib/shop";
+export const getStaticPaths = () => products.map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
 const d = off(p);
 const url = `https://loverbaazar.com/product/${p.slug}/`;
@@ -26,14 +26,12 @@ const ld = {
   aggregateRating: p.reviews.length
     ? { "@type": "AggregateRating", ratingValue: stars.toFixed(1), reviewCount: p.reviews.length }
     : undefined,
-  review: p.reviews
-    .slice(0, 5)
-    .map((r: any) => ({
-      "@type": "Review",
-      author: { "@type": "Person", name: r.name },
-      reviewRating: { "@type": "Rating", ratingValue: r.rating },
-      reviewBody: r.body,
-    })),
+  review: p.reviews.slice(0, 5).map((r: any) => ({
+    "@type": "Review",
+    author: { "@type": "Person", name: r.name },
+    reviewRating: { "@type": "Rating", ratingValue: r.rating },
+    reviewBody: r.body,
+  })),
 };
 const crumbs = {
   "@context": "https://schema.org",
@@ -68,7 +66,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
       )}
       {p.name}
     </p>
-    <section class="pd">
+    <section class="pd" data-product={p.id}>
       <div>
         <img class="main" data-main src={img(p.images[0]?.src)} alt={p.images[0]?.alt || p.name} width="600" height="600" />
         {p.images.length > 1 && (
@@ -128,6 +126,20 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
             </>
           ))}
         </p>
+        <ul class="delivery" data-delivery>
+          {LIVE.delivery.map((z: any) => (
+            <li>
+              {z.label}: <b>{taka(z.fee)}</b>
+              {z.days && `, ${z.days}`}
+            </li>
+          ))}
+        </ul>
+        <p class="meta">Cash on delivery. No account needed to order.</p>
+        {SITE.returns && (
+          <p class="meta">
+            <b>Returns:</b> {SITE.returns}
+          </p>
+        )}
         <p class="note">
           Order by phone:{" "}
           <a href={`tel:${telOf(SITE.phone)}`}>
@@ -201,5 +213,19 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
         </section>
       </>
     )}
+    <section data-recent-wrap hidden>
+      <div class="sec">
+        <h2>Recently viewed</h2>
+      </div>
+      <div class="grid" data-recent></div>
+    </section>
+  </div>
+  <div class="buybar" data-buybar>
+    <div class="price" data-price-for={p.id}>
+      <b>{taka(p.price)}</b>
+    </div>
+    <button class="btn" data-add={p.id} data-label="Add to cart" disabled={!p.inStock}>
+      {p.inStock ? "Add to cart" : "Sold out"}
+    </button>
   </div>
 </Base>

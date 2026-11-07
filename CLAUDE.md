@@ -24,6 +24,8 @@ Bangladesh home-appliance shop. Replaces WordPress at loverbaazar.com.
 - Money is whole taka in BIGINT. No ×100.
 - `/api/health` must never touch the database.
 - Keep all old URLs: `/product/x/`, `/product-category/a/b/`, `/product-tag/x/`, trailing slashes.
+- Static paths use `fileSlug()`. Percent-encoded Bangla slugs answer 404 without it.
+- Checkout needs no login. Keep it that way: guests are protected by `fraudCheck`, rate limits and Turnstile.
 - Escape customer text with `esc()` in `app.js` and the admin page.
 - Admin edits to names, photos, new products, categories, pages or `site` settings need Publish. Price, stock, coupons and `live` settings are live.
 - Settings defaults live only in `apps/api/defaults.json`. Don't hard-code shop details, delivery charges or payment numbers.

@@ -109,7 +109,7 @@ func adminOrders(w http.ResponseWriter, r *http.Request) {
 	}
 	const size = 50
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	list, err := jsonRows(ctx, `SELECT `+orderFields+`||jsonb_build_object('admin_note',o.admin_note,'same_phone',(SELECT count(*) FROM orders x WHERE x.phone=o.phone))
+	list, err := jsonRows(ctx, `SELECT `+orderFields+`||jsonb_build_object('admin_note',o.admin_note,'same_phone',(SELECT count(*) FROM orders x WHERE x.phone=o.phone),'bad_phone',(SELECT count(*) FROM orders x WHERE x.phone=o.phone AND x.status IN `+outStatuses+`))
 		FROM orders o WHERE `+where+fmt.Sprintf(` ORDER BY o.created_at DESC LIMIT %d OFFSET %d`, size, size*max(page, 0)), args...)
 	if err != nil {
 		oops(w, err)
@@ -576,7 +576,7 @@ func validLive(l Live) error {
 	if !open {
 		return userErr{400, "keep at least one payment method turned on"}
 	}
-	if l.FreeOver < 0 || l.MinOrder < 0 || l.LowStock < 0 {
+	if l.FreeOver < 0 || l.MinOrder < 0 || l.LowStock < 0 || l.MaxPending < 0 {
 		return userErr{400, "amounts cannot be negative"}
 	}
 	return nil
