@@ -41,12 +41,13 @@ def tidy(text, fallback):
 
 
 def original(url):
-    return SIZE.sub("", url.replace("http://", "https://").replace("//www.", "//"))
+    return SIZE.sub("", url.split("?")[0].replace("http://", "https://").replace("//www.", "//"))
 
 
 def plan(products, docs):
     """Decide a home for each image. Returns {original url: public id} and the url variants of each."""
-    places, used = {}, set()
+    places = {}
+    used = set(re.findall(rf"({ROOT}/(?:products|pages|blog)/[a-z0-9/-]+)\.", json.dumps([products, docs])))  # from an earlier run
 
     def place(url, folder, name):
         key = original(url)
@@ -62,7 +63,7 @@ def plan(products, docs):
         cat = next((c for c in p.get("cats", []) if c not in LISTS), "other")
         folder, name = f"{ROOT}/products/{tidy(cat, 'other')}", tidy(p["slug"], f"product-{p['id']}")
         for i in p.get("images", []):
-            if OLD.fullmatch(i.get("src", "")):
+            if OLD.match(i.get("src", "")):
                 place(i["src"], folder, name)
         for u in OLD.findall(p.get("desc", "")):
             place(u, folder, name)
@@ -146,7 +147,7 @@ def main():
         images = []
         for i in p.get("images", []):
             key = original(i.get("src", ""))
-            images.append({**i, "src": address(places[key], key), "thumb": address(places[key], key, ",w_300")} if key in done else i)
+            images.append({**i, "src": address(places[key], key), "thumb": address(places[key], key, ",w_300")} if key in places and key in done else i)
         body = {**p, "images": images, "desc": rewrite(p.get("desc"), places, done), "stockDelta": 0}
         if images != p.get("images") or body["desc"] != (p.get("desc") or ""):
             admin(f"/products/{p['id']}", body)
