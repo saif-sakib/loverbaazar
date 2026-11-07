@@ -6,29 +6,32 @@ const withPhoto = (l: any[]) => l.filter((p) => p.images[0]);
 const heroPics = withPhoto(SITE.home.flatMap((h: any) => inCat(h.cat)))
   .filter((p: any, i: number, all: any[]) => all.findIndex((x) => x.id === p.id) === i)
   .filter((_: any, i: number) => i % 7 === 0)
-  .slice(0, 4);
+  .slice(0, 3);
 const tiles = MENU.flatMap((g: any) => g.items)
   .filter((c: any) => inCat(c.slug).length)
   .slice(0, 12);
 const hero = SITE.hero;
+const heroWords = hero.title.trim().split(" ");
+const heroEnd = heroWords.pop();
 ---
 
 <Base type="website">
   <div class="wrap">
     <section class="hero">
       <div>
-        <h1>{hero.title}</h1>
+        <p class="eyebrow">{SITE.tagline}</p>
+        <h1>{heroWords.join(" ")} <em>{heroEnd}</em></h1>
         <p>{hero.text}</p>
         {hero.button && (
-          <a class="btn light" href={hero.link || "/shop/"}>
+          <a class="btn" href={hero.link || "/shop/"}>
             {hero.button.replace("{count}", products.length)}
           </a>
         )}
       </div>
       <div class="pics">
-        {heroPics.map((p: any) => (
+        {heroPics.map((p: any, i: number) => (
           <a href={`/product/${p.slug}/`}>
-            <img src={img(p.images[0]?.thumb)} alt={p.name} width="300" height="300" />
+            <img src={img(i === 0 ? p.images[0]?.src : p.images[0]?.thumb)} alt={p.name} width="600" height="600" />
           </a>
         ))}
       </div>

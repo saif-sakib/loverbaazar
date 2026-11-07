@@ -68,7 +68,9 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
     </p>
     <section class="pd" data-product={p.id}>
       <div>
-        <img class="main" data-main src={img(p.images[0]?.src)} alt={p.images[0]?.alt || p.name} width="600" height="600" />
+        <div class="stage">
+          <img class="main" data-main src={img(p.images[0]?.src)} alt={p.images[0]?.alt || p.name} width="600" height="600" />
+        </div>
         {p.images.length > 1 && (
           <div class="gal">
             {p.images.map((i: any, n: number) => (

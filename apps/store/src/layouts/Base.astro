@@ -204,7 +204,9 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
     <div class="floats">
       {SITE.whatsapp && (
         <a class="float wa" href={waOf(SITE.whatsapp)} rel="noopener" aria-label="Chat on WhatsApp">
-          WA
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 20l1.300-3.900A8 8 0 1 1 8 18.800L4 20Z" />
+          </svg>
         </a>
       )}
       <a class="float call" href={`tel:${telOf(SITE.phone)}`} aria-label="Call us">

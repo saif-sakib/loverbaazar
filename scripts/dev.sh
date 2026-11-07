@@ -8,6 +8,7 @@ docker start lbpg >/dev/null 2>&1 || docker run -d --name lbpg -e POSTGRES_PASSW
 until docker exec lbpg pg_isready -U postgres -d lb -q; do sleep 0.5; done; sleep 1
 export DATABASE_URL='postgres://postgres:dev@127.0.0.1:55432/lb?sslmode=disable' DEV=1 PORT=8080
 export ADMIN_TOKEN=local-admin-token-for-this-computer-only
+unset ORIGIN_SECRET # A real one from .env would make the API refuse this script's own catalogue build.
 export LOCAL_UPLOADS="$ROOT/apps/store/public/uploads" DEV_BUILD_DIR="$ROOT/apps/store"
 cd "$ROOT/apps/store"
 [ -d node_modules ] || npm i --no-audit --no-fund
