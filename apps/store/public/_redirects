@@ -8,3 +8,13 @@
 /shop-2/ /shop/ 301
 /best-price-blog/ /blog/ 301
 /sign-up/ /my-account/ 301
+/shop/page/* /shop/ 301
+/page/* / 301
+/blog/page/* /blog/ 301
+/product-category/:a/page/* /product-category/:a/ 301
+/product-category/:a/:b/page/* /product-category/:a/:b/ 301
+/product-tag/:a/page/* /product-tag/:a/ 301
+/feed/ /feed.xml 301
+/product/feed/ /feed.xml 301
+/wp-admin/* /admin/ 302
+/wp-login.php /my-account/ 302

@@ -31,4 +31,4 @@ Move only when free limits are really reached:
 
 ## Still to build
 
-Password reset, customer reviews, colour filter, popups, moving customers, old orders and Rank Math SEO text from the WordPress database, and a real payment gateway (SSLCommerz or bKash).
+Colour filter, popups, phone orders typed into admin, moving customers, old orders and Rank Math SEO text from the WordPress database, and a real payment gateway (SSLCommerz or bKash). Self-service password reset needs SMS or email, so for now the admin sets a new password from Customers.

@@ -1,23 +1,76 @@
 ---
-import Base from "../../layouts/Base.astro"; import Card from "../../components/Card.astro";
-import { products, cats, img, taka, off, catUrl, SHOP } from "../../lib/shop";
+import Base from "../../layouts/Base.astro";
+import Card from "../../components/Card.astro";
+import { products, cats, img, taka, off, catUrl, SITE, telOf, waOf, rating } from "../../lib/shop";
 export const getStaticPaths = () => products.map((p) => ({ params: { slug: p.slug }, props: { p } }));
-const { p } = Astro.props; const d = off(p);
-const myCats = p.cats.map((s) => cats.find((c) => c.slug === s)).filter(Boolean);
-const related = products.filter((x) => x.id !== p.id && x.cats.some((c) => p.cats.includes(c))).slice(0, 4);
-const ld = { "@context":"https://schema.org","@type":"Product",name:p.name,sku:p.sku||undefined,image:p.images.map((i)=>img(i.src)),description:p.short||p.name,offers:{"@type":"Offer",url:`https://loverbaazar.com/product/${p.slug}/`,priceCurrency:"BDT",price:p.price,availability:p.inStock?"https://schema.org/InStock":"https://schema.org/OutOfStock"}};
+const { p } = Astro.props;
+const d = off(p);
+const url = `https://loverbaazar.com/product/${p.slug}/`;
+const myCats = p.cats.map((s: string) => cats.find((c: any) => c.slug === s)).filter(Boolean);
+const related = products.filter((x) => x.id !== p.id && x.cats.some((c: string) => p.cats.includes(c))).slice(0, 4);
+const stars = rating(p);
+const ld = {
+  "@context": "https://schema.org", "@type": "Product", name: p.name, sku: p.sku || undefined, image: p.images.map((i: any) => img(i.src)), description: p.short || p.name,
+  offers: { "@type": "Offer", url, priceCurrency: "BDT", price: p.price, availability: p.inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock" },
+  aggregateRating: p.reviews.length ? { "@type": "AggregateRating", ratingValue: stars.toFixed(1), reviewCount: p.reviews.length } : undefined,
+  review: p.reviews.slice(0, 5).map((r: any) => ({ "@type": "Review", author: { "@type": "Person", name: r.name }, reviewRating: { "@type": "Rating", ratingValue: r.rating }, reviewBody: r.body })),
+};
+const crumbs = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
+  { "@type": "ListItem", position: 1, name: "Home", item: "https://loverbaazar.com/" },
+  ...(myCats[0] ? [{ "@type": "ListItem", position: 2, name: myCats[0].name, item: `https://loverbaazar.com${catUrl(myCats[0])}` }] : []),
+  { "@type": "ListItem", position: myCats[0] ? 3 : 2, name: p.name },
+] };
+const json = (o: any) => JSON.stringify(o).replace(/</g, "\\u003c");
+const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
 ---
-<Base title={p.name} description={p.short || `Buy ${p.name} online in Bangladesh from LoverBaazar.`} image={img(p.images[0]?.src)}>
-<script slot="head" type="application/ld+json" set:html={JSON.stringify(ld).replace(/</g,"\\u003c")} />
-<div class="wrap"><p class="crumbs"><a href="/">Home</a> / {myCats[0] && <><a href={catUrl(myCats[0])}>{myCats[0].name}</a> / </>}{p.name}</p>
-<section class="pd"><div><img class="main" data-main src={img(p.images[0]?.src)} alt={p.images[0]?.alt || p.name} width="600" height="600" />
-{p.images.length > 1 && <div class="gal">{p.images.map((i) => <button data-thumb={img(i.src)} aria-label="View image"><img src={img(i.thumb)} alt="" loading="lazy" /></button>)}</div>}</div>
-<div><h1>{p.name}</h1><div class="price" data-price-for={p.id}><b>{taka(p.price)}</b>{p.regular > p.price && <s>{taka(p.regular)}</s>}</div>{d > 0 && <p class="meta">You save {d}%</p>}
-<p class={p.inStock ? "stock" : "stock no"}>{p.inStock ? "In stock" : "Sold out"}</p>{p.short && <p>{p.short}</p>}
-<div class="buy"><input class="qty" data-qty type="number" min="1" max="20" value="1" aria-label="Quantity" /><button class="btn" data-add={p.id} disabled={!p.inStock}>Add to cart</button><button class="btn ghost" data-add={p.id} data-go="1" disabled={!p.inStock}>Buy now</button><button class="btn ghost" data-wish={p.id}>♥ Wishlist</button></div>
-{p.attrs.map((a) => <p class="meta"><b>{a.name}:</b> {a.values.join(", ")}</p>)}
-{p.sku && <p class="meta">SKU: {p.sku}</p>}<p class="meta">{myCats.map((c, i) => <>{i > 0 && ", "}<a href={catUrl(c)}>{c.name}</a></>)}</p>
-<p class="note">Order by phone: <a href={`tel:${SHOP.tel}`}><b>{SHOP.phone}</b></a></p></div></section>
-{p.desc && <section class="prose"><h2>Description</h2><Fragment set:html={p.desc} /></section>}
-{related.length > 0 && <><div class="sec"><h2>You may also like</h2></div><section class="grid">{related.map((x) => <Card p={x} />)}</section></>}
-</div></Base>
+<Base title={p.name} description={p.short || `Buy ${p.name} online in Bangladesh from ${SITE.name}.`} image={img(p.images[0]?.src)} type="product">
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={json(ld)} />
+    <script type="application/ld+json" set:html={json(crumbs)} />
+  </Fragment>
+  <div class="wrap">
+    <p class="crumbs"><a href="/">Home</a> / {myCats[0] && <><a href={catUrl(myCats[0])}>{myCats[0].name}</a> / </>}{p.name}</p>
+    <section class="pd">
+      <div>
+        <img class="main" data-main src={img(p.images[0]?.src)} alt={p.images[0]?.alt || p.name} width="600" height="600" />
+        {p.images.length > 1 && <div class="gal">{p.images.map((i: any, n: number) => <button data-thumb={img(i.src)} aria-label={`View image ${n + 1}`}><img src={img(i.thumb)} alt="" loading="lazy" width="66" height="66" /></button>)}</div>}
+      </div>
+      <div>
+        <h1>{p.name}</h1>
+        {p.reviews.length > 0 && <p class="meta"><a href="#reviews"><span class="stars">{"★".repeat(Math.round(stars))}</span> {stars.toFixed(1)} ({p.reviews.length} {p.reviews.length === 1 ? "review" : "reviews"})</a></p>}
+        <div class="price" data-price-for={p.id}><b>{taka(p.price)}</b>{p.regular > p.price && <s>{taka(p.regular)}</s>}</div>
+        <p class="meta" data-save-for={p.id} hidden={d === 0}>You save {d}%</p>
+        <p class={p.inStock ? "stock" : "stock no"} data-stock-for={p.id}>{p.inStock ? "In stock" : "Sold out"}</p>
+        {p.short && <p>{p.short}</p>}
+        <div class="buy">
+          <input class="qty" data-qty type="number" min="1" max="20" value="1" aria-label="Quantity" />
+          <button class="btn" data-add={p.id} data-label="Add to cart" disabled={!p.inStock}>{p.inStock ? "Add to cart" : "Sold out"}</button>
+          <button class="btn ghost" data-add={p.id} data-label="Buy now" data-buy="1" disabled={!p.inStock}>{p.inStock ? "Buy now" : "Sold out"}</button>
+          <button class="btn ghost" data-wish={p.id}>♥ Wishlist</button>
+        </div>
+        {p.attrs.map((a: any) => <p class="meta"><b>{a.name}:</b> {a.values.join(", ")}</p>)}
+        {p.sku && <p class="meta">SKU: {p.sku}</p>}
+        <p class="meta">{myCats.map((c: any, i: number) => <>{i > 0 && ", "}<a href={catUrl(c)}>{c.name}</a></>)}</p>
+        <p class="note">Order by phone: <a href={`tel:${telOf(SITE.phone)}`}><b>{SITE.phone}</b></a>{SITE.whatsapp && <> or <a href={`${waOf(SITE.whatsapp)}?text=${waText}`} rel="noopener"><b>WhatsApp</b></a></>}</p>
+      </div>
+    </section>
+    {p.desc && <section class="prose"><h2>Description</h2><Fragment set:html={p.desc} /></section>}
+    <section class="prose" id="reviews">
+      <h2>Customer reviews</h2>
+      {p.reviews.length === 0 && <p>No reviews yet. Be the first to share your experience.</p>}
+      {p.reviews.map((r: any) => <div class="review"><b>{r.name}</b> <span class="stars" aria-label={`${r.rating} out of 5`}>{"★".repeat(r.rating)}</span><p>{r.body}</p></div>)}
+      <details class="add-review">
+        <summary class="btn ghost">Write a review</summary>
+        <form data-review={p.id}>
+          <label class="field">Your name<input name="name" required maxlength="60" autocomplete="name" /></label>
+          <label class="field">Rating<select name="rating"><option value="5">★★★★★ Excellent</option><option value="4">★★★★ Good</option><option value="3">★★★ Average</option><option value="2">★★ Poor</option><option value="1">★ Very poor</option></select></label>
+          <label class="field">Your review<textarea name="body" rows="3" required minlength="5" maxlength="1000"></textarea></label>
+          <input class="trap" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+          <p class="err"></p>
+          <button class="btn">Send review</button>
+        </form>
+      </details>
+    </section>
+    {related.length > 0 && <><div class="sec"><h2>You may also like</h2></div><section class="grid">{related.map((x) => <Card p={x} />)}</section></>}
+  </div>
+</Base>

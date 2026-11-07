@@ -1,15 +1,34 @@
 ---
-import Base from "../layouts/Base.astro"; import Card from "../components/Card.astro";
-import { products, inCat, MENU, catUrl, img, SHOP } from "../lib/shop";
-const heroPics = [...inCat("rice-cooker"),...inCat("nonstick"),...inCat("rfl-chair"),...inCat("rfl-wardrobe")].filter((p,i)=>i%13===0).slice(0,4);
-const tiles = MENU.flatMap((g) => g.items).filter((c) => inCat(c.slug).length).slice(0, 12);
-const rows = [["Latest products","latest-product"],["Popular items","popular-item"],["Rice cookers","rice-cooker"],["Chairs","rfl-chair"]];
+import Base from "../layouts/Base.astro";
+import Card from "../components/Card.astro";
+import { products, inCat, MENU, catUrl, img, SITE, cats } from "../lib/shop";
+const withPhoto = (l: any[]) => l.filter((p) => p.images[0]);
+const heroPics = withPhoto(SITE.home.flatMap((h: any) => inCat(h.cat)))
+  .filter((p: any, i: number, all: any[]) => all.findIndex((x) => x.id === p.id) === i)
+  .filter((_: any, i: number) => i % 7 === 0)
+  .slice(0, 4);
+const tiles = MENU.flatMap((g: any) => g.items).filter((c: any) => inCat(c.slug).length).slice(0, 12);
+const hero = SITE.hero;
 ---
-<Base><div class="wrap">
-<section class="hero"><div><h1>Everything for your home, at wholesale prices.</h1><p>Rice cookers, cookware, wardrobes, chairs and more from Kiam, RFL and Akij. Delivered across Bangladesh, and you pay on delivery.</p><a class="btn light" href="/shop/">Shop {products.length} products</a></div>
-<div class="pics">{heroPics.map((p) => <a href={`/product/${p.slug}/`}><img src={img(p.images[0]?.thumb)} alt={p.name} width="300" height="300" /></a>)}</div></section>
-<section class="perks"><div><b>Cash on delivery</b><span>Pay when it arrives</span></div><div><b>Mobile payment</b><span>bKash, Nagad, Rocket</span></div><div><b>Wholesale prices</b><span>Trusted brands</span></div><div><b>Need help?</b><span>Call {SHOP.phone}</span></div></section>
-<div class="sec"><h2>Shop by category</h2><a href="/shop/">View all</a></div>
-<section class="cats">{tiles.map((c) => <a href={catUrl(c)}><img src={img(inCat(c.slug)[0].images[0]?.thumb)} alt="" loading="lazy" width="150" height="150" />{c.name}<small>{inCat(c.slug).length} items</small></a>)}</section>
-{rows.map(([t, s]) => <><div class="sec"><h2>{t}</h2><a href={`/product-category/${s}/`}>See all</a></div><section class="grid">{inCat(s).slice(0, 8).map((p) => <Card p={p} />)}</section></>)}
-</div></Base>
+<Base type="website">
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <h1>{hero.title}</h1>
+        <p>{hero.text}</p>
+        {hero.button && <a class="btn light" href={hero.link || "/shop/"}>{hero.button.replace("{count}", products.length)}</a>}
+      </div>
+      <div class="pics">{heroPics.map((p: any) => <a href={`/product/${p.slug}/`}><img src={img(p.images[0]?.thumb)} alt={p.name} width="300" height="300" /></a>)}</div>
+    </section>
+    {SITE.banners.length > 0 && <section class="banners">{SITE.banners.map((b: any) => <a href={b.link || "/shop/"}><img src={b.image} alt={b.title || ""} loading="lazy" /></a>)}</section>}
+    <section class="perks">{SITE.perks.map((k: any) => <div><b>{k.title}</b><span>{k.text}</span></div>)}</section>
+    {tiles.length > 0 && <>
+      <div class="sec"><h2>Shop by category</h2><a href="/shop/">View all</a></div>
+      <section class="cats">{tiles.map((c: any) => <a href={catUrl(c)}><img src={img(inCat(c.slug)[0].images[0]?.thumb)} alt="" loading="lazy" width="150" height="150" />{c.name}<small>{inCat(c.slug).length} items</small></a>)}</section>
+    </>}
+    {SITE.home.map((h: any) => inCat(h.cat).length > 0 && <>
+      <div class="sec"><h2>{h.title}</h2><a href={catUrl(cats.find((c: any) => c.slug === h.cat) || { path: h.cat })}>See all</a></div>
+      <section class="grid">{inCat(h.cat).slice(0, 8).map((p: any) => <Card p={p} />)}</section>
+    </>)}
+  </div>
+</Base>

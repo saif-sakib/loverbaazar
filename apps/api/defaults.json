@@ -1,0 +1,72 @@
+{
+  "live": {
+    "ordersOpen": true,
+    "closedNote": "We are not taking online orders right now. Please call us.",
+    "notice": "",
+    "delivery": [
+      { "id": "dhaka", "label": "Inside Dhaka", "fee": 60 },
+      { "id": "outside", "label": "Outside Dhaka", "fee": 120 }
+    ],
+    "payments": [
+      { "id": "cod", "label": "Cash on delivery", "number": "", "enabled": true },
+      { "id": "bkash", "label": "bKash", "number": "01780-243104", "enabled": true },
+      { "id": "nagad", "label": "Nagad", "number": "01557-123053", "enabled": true },
+      { "id": "rocket", "label": "Rocket", "number": "01780-243104", "enabled": true }
+    ],
+    "freeOver": 0,
+    "minOrder": 0,
+    "lowStock": 5,
+    "showLeft": false
+  },
+  "site": {
+    "name": "LoverBaazar",
+    "tagline": "Home appliances and furniture in Bangladesh",
+    "description": "Rice cookers, pressure cookers, nonstick cookware, chairs, tables and wardrobes at wholesale prices in Bangladesh, with cash on delivery.",
+    "about": "Your trusted place for home appliances and furniture, at wholesale prices.",
+    "phone": "01710-076076",
+    "email": "loverbaazar@gmail.com",
+    "whatsapp": "",
+    "address": "",
+    "hours": "",
+    "facebook": "https://www.facebook.com/profile.php?id=100091885353080",
+    "youtube": "https://www.youtube.com/channel/UCZu0It_vU51HDCGxWnGjIQA",
+    "brandColor": "#b3122e",
+    "brandDark": "#7d0b20",
+    "logo": "",
+    "ticker": [
+      "Wholesale prices on home appliances",
+      "Cash on delivery across Bangladesh",
+      "bKash, Nagad and Rocket accepted"
+    ],
+    "hero": {
+      "title": "Everything for your home, at wholesale prices.",
+      "text": "Rice cookers, cookware, wardrobes, chairs and more from Kiam, RFL and Akij. Delivered across Bangladesh, and you pay on delivery.",
+      "button": "Shop all products",
+      "link": "/shop/"
+    },
+    "banners": [],
+    "perks": [
+      { "title": "Cash on delivery", "text": "Pay when it arrives" },
+      { "title": "Mobile payment", "text": "bKash, Nagad, Rocket" },
+      { "title": "Wholesale prices", "text": "Trusted brands" },
+      { "title": "Need help?", "text": "Call 01710-076076" }
+    ],
+    "home": [
+      { "title": "Latest products", "cat": "latest-product" },
+      { "title": "Popular items", "cat": "popular-item" },
+      { "title": "Rice cookers", "cat": "rice-cooker" },
+      { "title": "Chairs", "cat": "rfl-chair" }
+    ],
+    "menu": [
+      { "title": "Kitchen", "cats": ["rice-cooker", "pressure-cooker", "anodized", "nonstick", "induction-infrared", "electric-kettle", "flask", "mixer-grinder", "dc", "gas-stove"] },
+      { "title": "Furniture", "cats": ["wardrobe", "rfl-wardrobe", "almirah", "akij-almirah", "rfl-almirah", "chair", "rfl-chair", "table", "rfl-table", "kitchen-rack"] }
+    ],
+    "links": [
+      { "label": "New", "url": "/product-category/latest-product/" },
+      { "label": "Popular", "url": "/product-category/popular-item/" },
+      { "label": "Blog", "url": "/blog/" },
+      { "label": "Track order", "url": "/track/" },
+      { "label": "Contact", "url": "/contact-us/" }
+    ]
+  }
+}

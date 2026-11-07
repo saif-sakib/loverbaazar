@@ -2,7 +2,13 @@
 name: test-shop
 description: Check LoverBaazar still works after a change to checkout, stock, admin or the Worker
 ---
-Start with the `run-local` skill, then with `curl`, using `A=127.0.0.1:8787/api`:
+First run the API tests against a throwaway database, never `lbpg` (they erase every table):
+
+    docker run -d --rm --name lbtest -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb -p 55433:5432 postgres:17-alpine
+    cd apps/api && TEST_DATABASE_URL='postgres://postgres:dev@127.0.0.1:55433/lb?sslmode=disable' go test -count=1 .
+    docker rm -f lbtest
+
+Then start with the `run-local` skill and check by hand with `curl`, using `A=127.0.0.1:8787/api`:
 
 1. POST `$A/checkout` with an extra `"price":1`. The total must use the database price.
 2. Set one product to `stock=1` and send 20 parallel checkouts. Expect one 200 and nineteen 409.

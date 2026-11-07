@@ -1,11 +1,38 @@
 ---
-import Base from "../../layouts/Base.astro"; import { SHOP } from "../../lib/shop";
-const site = import.meta.env.PUBLIC_TURNSTILE_SITE; const D = import.meta.env.PUBLIC_SHIP_DHAKA || 60, O = import.meta.env.PUBLIC_SHIP_OUTSIDE || 120;
+import Base from "../../layouts/Base.astro";
+import { SITE, LIVE } from "../../lib/shop";
+const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
 ---
-<Base title="Checkout" noindex>{site && <script slot="head" is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
-<div class="wrap"><div class="pagehead"><h1 style="margin-top:20px">Checkout</h1></div><p data-empty hidden>Your cart is empty. <a class="link" href="/shop/">Start shopping</a></p>
-<form class="two" data-checkout><div class="panel"><label class="field">Full name<input name="name" required autocomplete="name" /></label><label class="field">Mobile number<input name="phone" required inputmode="tel" placeholder="01XXXXXXXXX" autocomplete="tel" /></label><label class="field">Full address<textarea name="address" rows="3" required autocomplete="street-address"></textarea></label>
-<label class="field">Delivery area<select name="area"><option value="dhaka" data-fee={D}>Inside Dhaka (৳{D})</option><option value="outside" data-fee={O}>Outside Dhaka (৳{O})</option></select></label>
-<label class="field">Payment<select name="payment"><option value="cod">Cash on delivery</option><option value="bkash" data-no={SHOP.bkash}>bKash</option><option value="nagad" data-no={SHOP.nagad}>Nagad</option><option value="rocket" data-no={SHOP.rocket}>Rocket</option></select></label><p class="meta" data-pay></p>
-<label class="field" data-txn hidden>Transaction ID<input name="txnid" /></label><label class="field">Order note (optional)<textarea name="note" rows="2"></textarea></label></div>
-<aside class="panel"><h3>Your order</h3><div data-sum></div>{site && <div class="cf-turnstile" data-sitekey={site}></div>}<p class="err" data-err></p><button class="btn small" type="submit">Place order</button><p class="meta">Trouble ordering? Call {SHOP.phone}.</p></aside></form></div></Base>
+<Base title="Checkout" noindex>
+  {site && <script slot="head" is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+  <div class="wrap">
+    <div class="pagehead"><h1 style="margin-top:20px">Checkout</h1></div>
+    <p data-empty hidden>Your cart is empty. <a class="link" href="/shop/">Start shopping</a></p>
+    <p class="note" data-closed hidden></p>
+    <form class="two" data-checkout data-live={JSON.stringify({ delivery: LIVE.delivery, payments: LIVE.payments, freeOver: LIVE.freeOver, minOrder: LIVE.minOrder, ordersOpen: LIVE.ordersOpen, closedNote: LIVE.closedNote })}>
+      <div class="panel">
+        <label class="field">Full name<input name="name" required maxlength="100" autocomplete="name" /></label>
+        <label class="field">Mobile number<input name="phone" required inputmode="tel" placeholder="01XXXXXXXXX" autocomplete="tel" /></label>
+        <label class="field">Full address<textarea name="address" rows="3" required maxlength="500" autocomplete="street-address"></textarea></label>
+        <label class="field">Delivery area<select name="area"></select></label>
+        <label class="field">Payment<select name="payment"></select></label>
+        <p class="meta" data-pay></p>
+        <label class="field" data-txn hidden>Transaction ID<input name="txnid" maxlength="60" autocomplete="off" /></label>
+        <label class="field">Order note (optional)<textarea name="note" rows="2" maxlength="500"></textarea></label>
+      </div>
+      <aside class="panel">
+        <h3>Your order</h3>
+        <div data-sum></div>
+        <div class="coupon">
+          <input name="coupon" placeholder="Coupon code" aria-label="Coupon code" autocomplete="off" />
+          <button class="btn ghost" type="button" data-apply>Apply</button>
+        </div>
+        <p class="meta" data-coupon-msg></p>
+        {site && <div class="cf-turnstile" data-sitekey={site}></div>}
+        <p class="err" data-err></p>
+        <button class="btn small" type="submit">Place order</button>
+        <p class="meta">Trouble ordering? Call {SITE.phone}.</p>
+      </aside>
+    </form>
+  </div>
+</Base>

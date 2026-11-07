@@ -10,7 +10,7 @@ export LOCAL_UPLOADS="$ROOT/apps/store/public/uploads" DEV_BUILD_DIR="$ROOT/apps
 cd "$ROOT/apps/store"
 [ -d node_modules ] || npm i --no-audit --no-fund
 BIN="$(mktemp -d)/api"
-(cd "$ROOT/apps/api" && go build -o "$BIN" . && "$BIN" seed seed/products.json)
+(cd "$ROOT/apps/api" && go build -o "$BIN" . && "$BIN" seed seed/products.json ../store/src/data/content.json)
 "$BIN" & API=$!
 trap 'kill $API 2>/dev/null' EXIT
 until curl -sf http://127.0.0.1:8080/api/health >/dev/null; do sleep 0.2; done

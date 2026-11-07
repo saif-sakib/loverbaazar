@@ -34,10 +34,10 @@ Create a **private** repo called `loverbaazar`, then:
 1. Sign up at neon.com and create a project: **Postgres 17, Singapore**.
 2. Limit compute to **0.25 CU**.
 3. Copy two connection strings: **pooled** and **direct**.
-4. Load the products, using the **direct** string:
+4. Load the products, categories, pages and blog posts, using the **direct** string:
 
        cd apps/api
-       DATABASE_URL='DIRECT-STRING' go run . seed seed/products.json
+       DATABASE_URL='DIRECT-STRING' go run . seed seed/products.json ../store/src/data/content.json
 
 ## Step 4: API (Render)
 
@@ -50,9 +50,8 @@ Create a **private** repo called `loverbaazar`, then:
 | `DATABASE_URL` | Neon **pooled** string |
 | `ADMIN_TOKEN` | Output of `openssl rand -hex 32`. Save it |
 | `ORIGIN_SECRET` | Output of `openssl rand -hex 32`. Save it |
-| `SHIP_DHAKA`, `SHIP_OUTSIDE` | Your real delivery charges |
 
-4. Deploy and copy the service URL.
+4. Deploy and copy the service URL. The API refuses to start if either secret is under 32 characters.
 
 Only ever create **one** Render service. The free 750 hours cover one service for a full month.
 
@@ -96,7 +95,7 @@ When it says `failures: 0`, commit and push. Images keep their same URLs and bec
 | `BACKUP_DATABASE_URL` | Neon **direct** string |
 | `BACKUP_PASSPHRASE` | A long password. Save it safely |
 
-**GitHub Actions variables:** `SHIP_DHAKA`, `SHIP_OUTSIDE`, `TURNSTILE_SITE`, and `CATALOG_URL` = your `workers.dev` link + `/api/catalog`.
+**GitHub Actions variables:** `TURNSTILE_SITE`, and `CATALOG_URL` = your `workers.dev` link + `/api/catalog`. Deploys stop with an error until `CATALOG_URL` is set, so old imported data can't replace the shop.
 
 Run **Nightly backup** by hand once and confirm it succeeds.
 
@@ -106,7 +105,13 @@ Run **Nightly backup** by hand once and confirm it succeeds.
 
 ## Step 8: Prepare the shop
 
-In admin, enter real stock numbers. Every in-stock product currently shows 100. Then test on a real phone: browse, order, track, cancel.
+In admin:
+
+1. **Settings:** enter your real delivery charges, payment numbers, address and opening hours. The delivery charges are placeholders until you do.
+2. **Products:** enter real stock numbers. Every in-stock product currently shows 100.
+3. Click **Publish storefront**.
+
+Then test on a real phone: browse, order, track, cancel.
 
 ## Step 9: Switch the domain
 
@@ -157,6 +162,8 @@ None of these can bill you without a card.
 - That the Go API works on Neon's pooled connection. It's only been tested on local Postgres. If orders fail, try the direct string.
 - That the Actions workflows run. They haven't been run yet.
 - Real speed from Bangladesh.
+- That Cloudflare's edge cache works on a `workers.dev` address. It's only been tested locally. If not, `/api/stock` is still correct, and the cache starts working on your own domain.
+- The checkout page with Turnstile switched on, under the stricter security headers. Place a test order after adding it.
 
 ## Before taking online payments
 

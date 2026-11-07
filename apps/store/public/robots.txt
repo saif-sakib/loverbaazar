@@ -3,4 +3,8 @@ Disallow: /admin/
 Disallow: /api/
 Disallow: /cart/
 Disallow: /checkout/
+Disallow: /my-account/
+Disallow: /search/
+Disallow: /track/
+Disallow: /wishlist/
 Sitemap: https://loverbaazar.com/sitemap-index.xml
