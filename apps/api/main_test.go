@@ -619,6 +619,27 @@ func TestDashboardAndExports(t *testing.T) {
 	}
 }
 
+// The server is already answering while these run, so a snapshot built meanwhile must not outlive them.
+func TestContentUpdateClearsSnapshots(t *testing.T) {
+	reset(t)
+	defer func(saved []byte) { contentUpdates = saved }(contentUpdates)
+	contentUpdates = []byte(`[{"id":"snapshot-test"}]`)
+	if _, err := db.Exec(bg, `INSERT INTO content(kind,slug,data) VALUES('page','x','{}'::jsonb)`); err != nil {
+		t.Fatal(err)
+	}
+	old := []byte("old")
+	for _, want := range []bool{true, false} { // the first run applies it, the second has nothing to do
+		catalogSnap.Store(&old)
+		if err := applyContentUpdates(bg); err != nil {
+			t.Fatal(err)
+		}
+		if cleared := catalogSnap.Load() == nil; cleared != want {
+			t.Errorf("snapshot cleared=%v, want %v", cleared, want)
+		}
+	}
+	catalogSnap.Store(nil)
+}
+
 func TestContentUpdatesRunOnceAndKeepOwnerEdits(t *testing.T) {
 	reset(t)
 	put := func(kind, slug, data string) {

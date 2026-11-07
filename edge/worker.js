@@ -21,20 +21,25 @@ async function stock(request, env, url, ctx) {
   const cache = caches.default;
   const hit = await cache.match(request); // one API call a minute at most, however busy the shop is
   if (hit) return hit;
+  let res;
   try {
-    const res = await forward(request, env, url, { signal: AbortSignal.timeout(5000) });
+    res = await forward(request, env, url, { signal: AbortSignal.timeout(5000) });
     if (res.ok) {
       const stale = new Response(res.clone().body, res);
       stale.headers.set("Cache-Control", "public, max-age=86400");
       ctx.waitUntil(Promise.all([cache.put(request, res.clone()), cache.put(staleKey(url), stale)]));
+      return res;
     }
-    return res;
   } catch {
-    return (
-      (await cache.match(staleKey(url))) ||
-      new Response('{"error":"unavailable"}', { status: 503, headers: { "Content-Type": "application/json" } })
-    );
+    // Timed out or unreachable: treated the same as an error answer below.
   }
+  const saved = await cache.match(staleKey(url));
+  if (saved) {
+    const copy = new Response(saved.body, saved);
+    copy.headers.set("Cache-Control", "no-store"); // the day-long life is for this cache, not for browsers
+    return copy;
+  }
+  return res || new Response('{"error":"unavailable"}', { status: 503, headers: { "Content-Type": "application/json" } });
 }
 
 export default {

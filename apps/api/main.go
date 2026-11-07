@@ -201,6 +201,12 @@ func applyContentUpdates(ctx context.Context) error {
 	if err := json.Unmarshal(contentUpdates, &list); err != nil {
 		return err
 	}
+	changed := false
+	defer func() { // the server is already answering by now, so a snapshot may hold the old wording
+		if changed {
+			refresh()
+		}
+	}()
 	for _, u := range list {
 		err := pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
 			var seeded bool
@@ -241,6 +247,7 @@ func applyContentUpdates(ctx context.Context) error {
 					return err
 				}
 			}
+			changed = true
 			return nil
 		})
 		if err != nil {
