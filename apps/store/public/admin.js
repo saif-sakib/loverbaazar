@@ -21,16 +21,49 @@
   const statusOptions = (current) =>
     STATUSES.map((v) => `<option value="${v}" ${v === current ? "selected" : ""}>${v[0].toUpperCase() + v.slice(1)}</option>`).join("");
 
-  // Eight places to go. A place with several parts shows them as tabs at the top of the page.
-  const NAV = [
-    ["dashboard", "Home"],
-    ["orders", "Orders"],
-    ["products", "Products", { products: "All products", categories: "Categories", tags: "Tags" }],
-    ["coupons", "Coupons"],
-    ["customers", "Customers"],
-    ["messages", "Inbox", { messages: "Messages", reviews: "Reviews" }],
-    ["home", "Website", { home: "Home page", menu: "Navigation menu", pages: "Pages", blog: "Blog" }],
-    ["delivery", "Settings", { delivery: "Delivery and payment", shop: "Shop details" }],
+  // Direct 1-click grouped navigation; related sections also share top subtabs.
+  const NAV_GROUPS = [
+    [
+      "Daily Work",
+      [
+        ["dashboard", "Overview"],
+        ["orders", "Orders"],
+        ["messages", "Inbox"],
+        ["reviews", "Reviews"],
+      ],
+    ],
+    [
+      "Catalog",
+      [
+        ["products", "Products"],
+        ["categories", "Categories"],
+        ["coupons", "Coupons"],
+        ["customers", "Customers"],
+        ["tags", "Search tags"],
+      ],
+    ],
+    [
+      "Website",
+      [
+        ["home", "Home page"],
+        ["menu", "Navigation menu"],
+        ["pages", "Pages"],
+        ["blog", "Blog"],
+      ],
+    ],
+    [
+      "Settings",
+      [
+        ["delivery", "Delivery and payment"],
+        ["shop", "Shop details"],
+      ],
+    ],
+  ];
+  const SUBGROUPS = [
+    { messages: "Messages", reviews: "Reviews" },
+    { products: "All products", categories: "Categories", tags: "Search tags" },
+    { home: "Home page", menu: "Navigation menu", pages: "Pages", blog: "Blog" },
+    { delivery: "Delivery and payment", shop: "Shop details" },
   ];
 
   const LIVE_BADGE = `<span class="effect live">● Live — updates in ~2 min</span>`;
@@ -154,6 +187,44 @@
     $("#dirtybar").hidden = false;
   };
 
+  const publish = run(async () => {
+    $("#pub").disabled = true;
+    $("#pub2").disabled = true;
+    say("Publishing…");
+    try {
+      const r = await api("/publish", { method: "POST" });
+      say(r.message);
+      try {
+        localStorage.removeItem("dirty");
+      } catch {}
+      $("#dirtybar").hidden = true;
+    } finally {
+      $("#pub").disabled = false;
+      $("#pub2").disabled = false;
+    }
+  });
+
+  // Binds Save and an optional Save & Publish now button so a failed save never publishes.
+  const bindSavePublish = (f, saveFn) => {
+    let publishAfter = false;
+    f.onsubmit = run(async (e) => {
+      e.preventDefault();
+      unsaved = false;
+      const andPub = publishAfter;
+      publishAfter = false;
+      await saveFn(e);
+      if (andPub) await publish();
+    });
+    const btn = $("#savepub", f);
+    if (btn)
+      btn.onclick = () => {
+        if (f.reportValidity && !f.reportValidity()) return;
+        publishAfter = true;
+        if (f.requestSubmit) f.requestSubmit();
+        else f.onsubmit({ preventDefault: () => {} });
+      };
+  };
+
   async function loadCategories() {
     categories = await api("/content/cat");
     return categories;
@@ -161,10 +232,15 @@
 
   // ---- Reusable form parts ----
 
-  const checkList = (
-    name,
-    chosen,
-  ) => `<details class="picker"><summary>${chosen.length} chosen</summary><input type="search" placeholder="Filter categories…" data-pick-filter aria-label="Filter categories"><div>
+  const pickSummary = (chosen) => {
+    if (!chosen.length) return "0 chosen — click to select";
+    const names = chosen.map((s) => categories.find((c) => c.slug === s)?.name || s);
+    const shown = names.slice(0, 3).join(", ");
+    return `${shown}${names.length > 3 ? ` +${names.length - 3} more` : ""} (${chosen.length} chosen)`;
+  };
+
+  const checkList = (name, chosen, openDefault = false) =>
+    `<details class="picker"${openDefault ? " open" : ""}><summary>${esc(pickSummary(chosen))}</summary><input type="search" placeholder="Filter categories…" data-pick-filter aria-label="Filter categories"><div>
     ${categories.map((c) => `<label class="check" data-pick="${esc(c.name.toLowerCase())}"><input type="checkbox" name="${esc(name)}" value="${esc(c.slug)}" ${chosen.includes(c.slug) ? "checked" : ""}> ${esc(c.name)}</label>`).join("")}
   </div></details>`;
 
@@ -178,7 +254,9 @@
   });
   document.addEventListener("change", (e) => {
     const box = e.target.closest(".picker");
-    if (box && e.target.type === "checkbox") $("summary", box).textContent = `${$$("input:checked", box).length} chosen`;
+    if (box && e.target.type === "checkbox") {
+      $("summary", box).textContent = pickSummary($$("input:checked", box).map((x) => x.value));
+    }
   });
 
   // Images get readable names. Without a name, the file's own name is used.
@@ -345,7 +423,7 @@
     const top = Math.max(...d.series.map((x) => x.sales), 1);
     const tile = (label, value, link) => `<a class="tile" href="${link || "#orders"}"><b>${esc(value)}</b><span>${esc(label)}</span></a>`;
     view().innerHTML = `<div class="tiles">
-      ${tile("Sales today", money(d.todaySales))}${tile("Waiting for confirmation", d.pending)}${tile("Ready to ship", d.toShip)}${tile("New messages and reviews", d.unread + d.reviews, "#messages")}${tile("Sales, last 30 days", money(d.monthSales))}
+      ${tile("Sales today", money(d.todaySales), "#orders/all")}${tile("Waiting for confirmation", d.pending, "#orders/pending")}${tile("Ready to ship", d.toShip, "#orders/confirmed")}${tile("New messages", d.unread, "#messages")}${tile("Pending reviews", d.reviews, "#reviews")}${tile("Sales, last 30 days", money(d.monthSales), "#orders/all")}
     </div>
     <h3 class="jobhead">Quick actions</h3>
     <div class="jobs">${JOBS.slice(0, 10)
@@ -365,8 +443,19 @@
   const orderFilter = { q: "", status: "", from: "", to: "", page: 0 };
   const query = () => new URLSearchParams(Object.entries(orderFilter).filter(([, v]) => v !== "" && v !== 0)).toString();
 
-  const orders = run(async () => {
-    view().innerHTML = `<div class="toolbar">
+  const orders = run(async (statusArg) => {
+    if (statusArg === "all") {
+      orderFilter.status = "";
+      orderFilter.q = "";
+      orderFilter.page = 0;
+    } else if (statusArg && STATUSES.includes(statusArg)) {
+      orderFilter.status = statusArg;
+      orderFilter.q = "";
+      orderFilter.page = 0;
+    }
+    const pills = [["", "All"], ...STATUSES.map((s) => [s, s[0].toUpperCase() + s.slice(1)])];
+    view().innerHTML = `<div class="qfilters">${pills.map(([v, lbl]) => `<button type="button" class="qpill ${orderFilter.status === v ? "on" : ""}" data-fst="${v}">${lbl}</button>`).join("")}</div>
+      <div class="toolbar">
       <input id="oq" type="search" placeholder="Search order #, phone, name or address" value="${esc(orderFilter.q)}" aria-label="Search orders">
       <select id="ost" aria-label="Status"><option value="">All statuses</option>${statusOptions(orderFilter.status)}</select>
       <label class="check">From <input id="ofrom" type="date" value="${esc(orderFilter.from)}"></label><label class="check">To <input id="oto" type="date" value="${esc(orderFilter.to)}"></label>
@@ -375,6 +464,17 @@
       orderFilter.page = 0;
       drawOrders();
     };
+    const syncPills = () => {
+      $$("[data-fst]").forEach((b) => b.classList.toggle("on", b.dataset.fst === orderFilter.status));
+    };
+    $$("[data-fst]").forEach((b) => {
+      b.onclick = () => {
+        orderFilter.status = b.dataset.fst;
+        $("#ost").value = orderFilter.status;
+        syncPills();
+        reload();
+      };
+    });
     let t;
     $("#oq").oninput = (e) => {
       clearTimeout(t);
@@ -385,6 +485,7 @@
     };
     $("#ost").onchange = (e) => {
       orderFilter.status = e.target.value;
+      syncPills();
       reload();
     };
     $("#ofrom").onchange = (e) => {
@@ -410,26 +511,33 @@
     const res = await api("/orders?" + query());
     const l = res.orders;
     const pages = Math.ceil(res.total / res.size);
+    const quickBtn = (o) => {
+      if (o.status === "pending") return `<button type="button" class="link primary-act" data-step="confirmed" data-num="${esc(o.number)}">✓ Confirm</button> `;
+      if (o.status === "shipped") return `<button type="button" class="link primary-act" data-step="delivered" data-num="${esc(o.number)}">✓ Delivered</button> `;
+      return "";
+    };
     $("#olist").innerHTML = `<p><b>${res.total}</b> orders · <b>${money(res.sales)}</b> sales, excluding cancelled and returned</p>
     <div class="scroll"><table class="tbl"><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr>
-    ${l
-      .map(
-        (o) => `<tr>
+    ${
+      l
+        .map(
+          (o) => `<tr>
       <td class="nowrap"><b>${esc(o.number)}</b><br><small>${esc(when(o.created_at))}</small></td>
       <td>${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}${o.bad_phone > 0 ? ` <span class="tag warn">${o.bad_phone} cancelled or returned</span>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a>${o.email ? `<br><a class="link" href="mailto:${esc(o.email)}">${esc(o.email)}</a>` : ""}<br>${esc(o.address)} (${esc(o.area)})${o.note ? `<br><i>${esc(o.note)}</i>` : ""}</td>
       <td>${(o.items || []).map((i) => `${esc(i.name)} × ${i.qty}`).join("<br>")}</td>
       <td>${money(o.total)}${o.discount ? `<br><small>${money(o.discount)} off, ${esc(o.coupon)}</small>` : ""}</td>
       <td>${esc(o.payment)}<br><small>${esc(o.txn_id)}</small></td>
       <td><select class="status" data-st="${esc(o.status)}" data-o="${esc(o.number)}" aria-label="Status of ${esc(o.number)}">${statusOptions(o.status)}</select></td>
-      <td class="actions"><button class="link" data-more="${esc(o.number)}">Details</button> <button class="link" data-print="${esc(o.number)}">Invoice</button></td>
+      <td class="actions">${quickBtn(o)}${o.status === "confirmed" ? `<button type="button" class="link primary-act" data-more="${esc(o.number)}" data-ship-focus>📦 Ship / Track</button>` : `<button type="button" class="link" data-more="${esc(o.number)}">Details</button>`} <button type="button" class="link" data-print="${esc(o.number)}">Invoice</button></td>
     </tr>
     <tr id="d-${esc(o.number)}" hidden><td colspan="7"><form class="inlineform" data-n="${esc(o.number)}">
-      ${field("Courier", "courier", o.courier, "", "text", "Shown to customer on /track/.")}
-      ${field("Tracking number", "tracking", o.tracking, "", "text", "Shown to customer on /track/.")}
-      ${field("Private note", "adminNote", o.admin_note, "", "text", "Staff only — customers never see this.")}
-      <button class="btn">Save</button></form></td></tr>`,
-      )
-      .join("")}</table></div>
+      ${field("Courier", "courier", o.courier, "", "text", "Shown on /track/.")}
+      ${field("Tracking number", "tracking", o.tracking, "", "text", "Shown on /track/.")}
+      ${field("Private note", "adminNote", o.admin_note, "", "text", "Staff only.")}
+      <button class="btn">Save details</button>${o.status === "cancelled" || o.status === "returned" ? "" : ` <button type="button" class="btn pub-now" data-ship="${esc(o.number)}">Save & Mark Shipped</button>`} <button type="button" class="btn ghost small" data-copy="${esc(o.number)}">Copy address</button></form></td></tr>`,
+        )
+        .join("") || `<tr><td colspan="7">No orders match.</td></tr>`
+    }</table></div>
     ${pages > 1 ? `<div class="pager"><button class="btn ghost" id="prev" ${orderFilter.page ? "" : "disabled"}>Previous</button> Page ${orderFilter.page + 1} of ${pages} <button class="btn ghost" id="next" ${orderFilter.page + 1 < pages ? "" : "disabled"}>Next</button></div>` : ""}`;
     if ($("#prev")) {
       $("#prev").onclick = () => {
@@ -444,9 +552,18 @@
     $$("[data-phone]").forEach((a) => {
       a.onclick = () => {
         orderFilter.q = a.dataset.phone;
+        orderFilter.status = "";
         orderFilter.page = 0;
         orders();
       };
+    });
+    $$("[data-step]").forEach((b) => {
+      b.onclick = run(async () => {
+        await api("/orders/" + encodeURIComponent(b.dataset.num), { method: "PUT", body: { status: b.dataset.step } });
+        say(`${b.dataset.num} is now ${b.dataset.step}.`);
+        counts();
+        await drawOrders();
+      });
     });
     $$("[data-o]").forEach((s) => {
       s.onchange = run(async () => {
@@ -471,6 +588,7 @@
       b.onclick = () => {
         const r = $(`[id="d-${b.dataset.more}"]`);
         r.hidden = !r.hidden;
+        if (!r.hidden && b.hasAttribute("data-ship-focus")) $('[name="courier"]', r)?.focus();
       };
     });
     $$("form[data-n]").forEach((f) => {
@@ -480,6 +598,31 @@
         say("Order updated.");
         await drawOrders();
       });
+    });
+    $$("[data-ship]").forEach((b) => {
+      b.onclick = run(async () => {
+        const f = b.closest("form");
+        await api("/orders/" + encodeURIComponent(f.dataset.n), {
+          method: "PUT",
+          body: { ...Object.fromEntries(new FormData(f)), status: "shipped" },
+        });
+        say(`${f.dataset.n} marked shipped.`);
+        counts();
+        await drawOrders();
+      });
+    });
+    $$("[data-copy]").forEach((b) => {
+      b.onclick = async () => {
+        const o = l.find((x) => x.number === b.dataset.copy);
+        if (!o) return;
+        const text = `${o.name}\n${o.phone}\n${o.address} (${o.area})`;
+        try {
+          if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+          say(`Address copied for ${o.number}.`);
+        } catch {
+          prompt("Copy customer address:", text);
+        }
+      };
     });
     $$("[data-print]").forEach((b) => {
       b.onclick = () => invoice(l.find((x) => x.number === b.dataset.print));
@@ -556,7 +699,7 @@
         .map(
           (p) => `<tr data-id="${p.id}" class="${p.active ? "" : "off"}">
       <td>${p.images?.[0] ? `<img class="mini" src="${esc(p.images[0].thumb || p.images[0].src)}" alt="" loading="lazy" width="44" height="44">` : ""}</td>
-      <td>${esc(p.name)}</td>
+      <td><button type="button" class="link prod-title" data-e="${p.id}">${esc(p.name)}</button></td>
       <td data-l="Price"><input class="num" type="number" min="0" data-q="price" value="${p.price}" aria-label="Price of ${esc(p.name)}"></td>
       <td data-l="Old price"><input class="num" type="number" min="0" data-q="regular" value="${p.regular}" aria-label="Old price of ${esc(p.name)}"></td>
       <td data-l="Stock"><input class="num" type="number" min="0" data-q="stock" value="${p.stock}" aria-label="Stock of ${esc(p.name)}"></td>
@@ -616,7 +759,7 @@
       </div>
       ${field("Product code (SKU)", "sku", p.sku, "", "text", "Optional product code shown on the product page and searchable.")}
       ${field("Short description", "short", p.short, "maxlength=300", "text", "Shown right beside the main photo and used as the Google search snippet.")}
-      <div class="field"><span class="flabel">Categories</span><small class="fhelp">Choose which category pages and home page rows include this product. (Needs Publish)</small>${checkList("cat", p.cats || [])}</div>
+      <div class="field"><span class="flabel">Categories</span><small class="fhelp">Choose which category pages and home page rows include this product. (Needs Publish)</small><div id="pcatpick">${checkList("cat", p.cats || [], true)}</div><div class="inline-cats"><input id="quickcat" placeholder="Need a new category? Type name…" aria-label="New category name"><button type="button" class="btn ghost small" id="addquickcat">+ Add category</button></div></div>
       <div class="field"><span class="flabel">Product photos</span><small class="fhelp">The first photo is the main thumbnail on product cards. Use ◀ / ▶ to reorder. (Needs Publish)</small><div id="imgs" class="imgs"></div>
         <label class="btn ghost small upl">Upload photos<input id="up" type="file" accept="image/*" multiple hidden></label>
         <input id="imgurl" placeholder="Or paste an image address and press Enter" aria-label="Image address"></div>
@@ -624,8 +767,31 @@
       <label class="field"><span class="flabel">Search tags (comma-separated)</span><small class="fhelp">Extra keywords for search engines and /product-tag/ pages.</small><input name="tagnames" value="${esc((p.tags || []).map((t) => allTags.find((x) => x.slug === t)?.name || t).join(", "))}"></label>
       <div class="field"><span class="flabel">Full description</span><small class="fhelp">Detailed features and product info shown below the main section. (Needs Publish)</small><div id="desc"></div></div>
       ${toggle("Visible in shop", "active", p.active, "Turn off to hide this product from customers without deleting it. (Live in ~2 min)")}
-      <div class="stick"><button class="btn">Save product</button> <button type="button" class="btn ghost" id="back">Back</button>${isNew ? "" : ` <button type="button" class="link danger" id="del">Delete product</button>`}<span class="stick-hint">Price, stock & visibility go live in ~2 min. Other edits need Publish.</span></div></form>`;
+      <div class="stick"><button class="btn">Save product</button> <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button> <button type="button" class="btn ghost" id="back">Back</button>${isNew ? "" : ` <button type="button" class="link danger" id="del">Delete product</button>`}<span class="stick-hint">Price, stock & visibility go live in ~2 min. Other edits need Publish.</span></div></form>`;
     const f = $("#pf");
+    const addQuickCat = run(async () => {
+      const inp = $("#quickcat");
+      const name = inp.value.trim();
+      if (!name) return inp.focus();
+      const slug = slugify(name);
+      if (!slug) throw new Error("Please enter a valid category name.");
+      const cur = $$('input[name="cat"]:checked', $("#pcatpick")).map((x) => x.value);
+      if (!categories.some((c) => c.slug === slug)) {
+        await api("/content/cat/" + encodeURIComponent(slug), { method: "PUT", body: { name, path: slug } });
+        categories.push({ name, slug, path: slug });
+      }
+      if (!cur.includes(slug)) cur.push(slug);
+      $("#pcatpick").innerHTML = checkList("cat", cur, true);
+      inp.value = "";
+      unsaved = true;
+      needsPublish(`Category "${name}" added and selected.`);
+    });
+    $("#addquickcat").onclick = addQuickCat;
+    $("#quickcat").onkeydown = (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      addQuickCat();
+    };
     if (!isNew)
       $("#del").onclick = run(async () => {
         if (!confirm(`Delete ${p.name}? This can't be undone. If it has been ordered before, it will be hidden instead.`)) return;
@@ -704,9 +870,10 @@
       { addLabel: "+ Add specification", empty: "No specifications added yet (optional)." },
     );
     const desc = rich($("#desc"), p.desc);
-    f.name.addEventListener("input", () => {
+    const nameEl = $('[name="name"]', f);
+    nameEl.addEventListener("input", () => {
       if (isNew) {
-        f.slug.value = slugify(f.name.value);
+        f.slug.value = slugify(nameEl.value);
         $("#slugview").textContent = f.slug.value;
       }
     });
@@ -714,8 +881,7 @@
       $("#slugview").textContent = f.slug.value;
     });
     $("#back").onclick = back(products);
-    f.onsubmit = run(async (e) => {
-      e.preventDefault();
+    bindSavePublish(f, async () => {
       const d = new FormData(f);
       const tagNames = d
         .get("tagnames")
@@ -768,10 +934,34 @@
 
   const cats = run(async () => {
     await loadCategories();
-    view().innerHTML = `<div class="toolbar"><button class="btn" id="newcat">Add category</button></div>
+    view().innerHTML = `<form class="panel inline-form" id="quickcatform">
+        ${secHead("Quick add category", "Add a category in one step. Need a custom URL? Use Full category form.", "Category pages & Navigation menu", "pub")}
+        <div class="fields2">
+          ${field("Category name", "name", "", `required placeholder="e.g. Air Fryers"`, "text", "Creates /product-category/<slug>/ automatically.")}
+          <label class="field"><span class="flabel">Parent category (optional)</span><small class="fhelp">Nest under an existing category, or leave top-level.</small><select name="parent"><option value="">Top-level (no parent)</option>${categories.map((x) => `<option value="${esc(x.path)}">${esc(x.path)}</option>`).join("")}</select></label>
+        </div>
+        <div class="inline-actions">
+          <button class="btn">Add category</button>
+          <button type="button" class="btn pub-now" id="savepub">Add &amp; Publish now</button>
+          <button type="button" class="btn ghost" id="newcat">Full category form…</button>
+        </div>
+      </form>
       <p class="meta">Categories appear at /product-category/&lt;address&gt;/. To show categories in the top menu and home page grid, open <a class="link" href="#menu">Website → Navigation menu</a>. To add a product row on the home page, open <a class="link" href="#home">Website → Home page</a>.</p>
       <div class="scroll"><table class="tbl"><tr><th>Name</th><th>Address</th><th></th></tr>
       ${categories.map((c) => `<tr><td>${esc(c.name)}</td><td><small>/product-category/${esc(c.path)}/</small></td><td class="actions"><button class="link" data-e="${esc(c.slug)}">Edit</button> <button class="link" data-x="${esc(c.slug)}">Delete</button></td></tr>`).join("")}</table></div>`;
+    const qf = $("#quickcatform");
+    bindSavePublish(qf, async () => {
+      const name = $('[name="name"]', qf).value.trim();
+      const slug = slugify(name);
+      if (!slug) throw Error("Enter a valid category name.");
+      const parent = qf.parent.value;
+      await api("/content/cat/" + encodeURIComponent(slug), {
+        method: "PUT",
+        body: { name, slug, path: parent ? `${parent}/${slug}` : slug },
+      });
+      await cats();
+      needsPublish(`Category "${name}" saved.`);
+    });
     $("#newcat").onclick = () => editCat({ name: "", slug: "" }, true);
     $$("[data-e]").forEach((b) => {
       b.onclick = () => editCat(categories.find((c) => c.slug === b.dataset.e));
@@ -798,20 +988,20 @@
             `<label class="field"><span class="flabel">Parent category (optional)</span><small class="fhelp">Nests this category's URL under an existing category.</small><select name="parent"><option value="">None (top-level category)</option>${categories.map((x) => `<option value="${esc(x.path)}">${esc(x.path)}</option>`).join("")}</select></label>`
           : `<p class="meta"><b>Web address:</b> /product-category/${esc(c.path)}/</p>`
       }
-      <div class="stick"><button class="btn">Save category</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
+      <div class="stick"><button class="btn">Save category</button> <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
     const f = $("#cf");
+    const nameEl = $('[name="name"]', f);
     if (isNew)
-      f.name.addEventListener("input", () => {
-        f.slug.value = slugify(f.name.value);
+      nameEl.addEventListener("input", () => {
+        f.slug.value = slugify(nameEl.value);
       });
     $("#back").onclick = back(cats);
-    f.onsubmit = run(async (e) => {
-      e.preventDefault();
+    bindSavePublish(f, async () => {
       const slug = isNew ? f.slug.value.trim() : c.slug;
       const parent = isNew ? f.parent.value : parentPath;
       await api("/content/cat/" + encodeURIComponent(slug), {
         method: "PUT",
-        body: { ...c, name: f.name.value.trim(), path: parent ? `${parent}/${slug}` : slug },
+        body: { ...c, name: nameEl.value.trim(), path: parent ? `${parent}/${slug}` : slug },
       });
       await cats();
       needsPublish("Category saved.");
@@ -836,16 +1026,17 @@
       </div>
       ${toggle("Active", "active", true, "Uncheck to pause this coupon without deleting it.")}
       <div class="inline-actions"><button class="btn">Save coupon</button> <button type="button" class="btn ghost" id="cpclear" hidden>Cancel edit</button></div></form>
-      <div class="scroll"><table class="tbl"><tr><th>Code</th><th>Discount</th><th>Minimum order</th><th>Used</th><th>Expires</th><th></th></tr>
+      <div class="scroll"><table class="tbl"><tr><th>Code</th><th>Discount</th><th>Minimum order</th><th>Used</th><th>Expires</th><th>Active</th><th></th></tr>
       ${
         l
           .map(
             (
               c,
             ) => `<tr class="${c.active ? "" : "off"}"><td><b>${esc(c.code)}</b>${c.active ? "" : ` <span class="tag">Paused</span>`}</td><td>${c.kind === "percent" ? c.value + "%" : money(c.value)}</td><td>${money(c.min_order)}</td><td>${c.used}${c.max_uses ? ` of ${c.max_uses}` : ""}</td><td>${c.expires_at ? esc(c.expires_at.slice(0, 10)) : "No expiry"}</td>
+        <td><input type="checkbox" data-toggle-cp="${esc(c.code)}" ${c.active ? "checked" : ""} aria-label="Active ${esc(c.code)}"></td>
         <td class="actions"><button class="link" data-e="${esc(c.code)}">Edit</button> <button class="link" data-x="${esc(c.code)}">Delete</button></td></tr>`,
           )
-          .join("") || `<tr><td colspan="6">No coupons yet.</td></tr>`
+          .join("") || `<tr><td colspan="7">No coupons yet.</td></tr>`
       }</table></div>`;
     const f = $("#cpf");
     $("#cpclear").onclick = () => {
@@ -863,6 +1054,25 @@
       });
       await coupons();
       say("Coupon saved. It works straight away at checkout.");
+    });
+    $$("[data-toggle-cp]").forEach((box) => {
+      box.onchange = run(async () => {
+        const c = l.find((x) => x.code === box.dataset.toggleCp);
+        if (!c) return;
+        await api("/coupons/" + encodeURIComponent(c.code), {
+          method: "PUT",
+          body: {
+            kind: c.kind,
+            value: c.value,
+            minOrder: c.min_order,
+            maxUses: c.max_uses,
+            expires: c.expires_at ? c.expires_at.slice(0, 10) : "",
+            active: box.checked,
+          },
+        });
+        await coupons();
+        say(`Coupon ${c.code} ${box.checked ? "activated" : "paused"}.`);
+      });
     });
     $$("[data-e]").forEach((b) => {
       b.onclick = () => {
@@ -931,7 +1141,7 @@
           (
             r,
           ) => `<div class="panel item"><b>${esc(r.name)}</b> ${"★".repeat(r.rating)} on <a class="link" href="/product/${esc(r.slug)}/" target="_blank" rel="noopener">${esc(r.product)}</a> ${r.approved ? "" : `<span class="tag">Waiting</span>`}<p>${esc(r.body)}</p>
-      ${r.approved ? "" : `<button class="btn" data-a="${r.id}">Approve</button> `}<button class="btn ghost" data-x="${r.id}">Delete</button></div>`,
+      ${r.approved ? "" : `<button class="btn" data-a="${r.id}">Approve</button> <button type="button" class="btn pub-now" data-ap="${r.id}">Approve &amp; Publish</button> `}<button class="btn ghost" data-x="${r.id}">Delete</button></div>`,
         )
         .join("") || "<p>No reviews yet.</p>";
     $$("[data-a]").forEach((b) => {
@@ -940,6 +1150,14 @@
         await reviews();
         counts();
         needsPublish("Review approved. Click Publish changes to show it on the product page.");
+      });
+    });
+    $$("[data-ap]").forEach((b) => {
+      b.onclick = run(async () => {
+        await api("/reviews/" + b.dataset.ap, { method: "PUT", body: {} });
+        await reviews();
+        counts();
+        await publish();
       });
     });
     $$("[data-x]").forEach((b) => {
@@ -1020,7 +1238,7 @@
         ${kind === "post" ? field("Publish date", "date", d.date, "", "date", "Posts are ordered newest first.") + field("Short summary", "excerpt", d.excerpt, "maxlength=180", "text", "Shown below the title on /blog/ and in Google search results.") : ""}
         <div class="field"><span class="flabel">Content</span><div id="body"></div></div>
         ${toggle("Draft (keep hidden)", "draft", d.draft, "Hidden from customers even after Publish until unchecked.")}
-        <div class="stick"><button class="btn">Save ${word}</button> <button type="button" class="btn ghost" id="back">Back</button><span class="stick-hint">◆ Remember to click <b>Publish changes</b> afterwards.</span></div></form>`;
+        <div class="stick"><button class="btn">Save ${word}</button> <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button> <button type="button" class="btn ghost" id="back">Back</button><span class="stick-hint">◆ Save stores a draft here; <b>Save &amp; Publish now</b> updates the live site too.</span></div></form>`;
       const f = $("#df");
       const body = rich($("#body"), d.html);
       if (isNew)
@@ -1028,8 +1246,7 @@
           f.slug.value = slugify(f.title.value);
         });
       $("#back").onclick = back(list);
-      f.onsubmit = run(async (e) => {
-        e.preventDefault();
+      bindSavePublish(f, async () => {
         const slug = isNew ? f.slug.value.trim() : d.slug;
         const out = { ...d, title: f.title.value.trim(), html: body(), draft: f.draft.checked };
         if (kind === "post") {
@@ -1115,7 +1332,7 @@
 
     let html = "";
     let stickBtn = "Save changes";
-    let stickHint = "◆ Remember to click <b>Publish changes</b> afterwards so customers see updates.";
+    let stickHint = "◆ Save stores a draft; <b>Save &amp; Publish now</b> updates the live storefront immediately.";
 
     if (only === "delivery") {
       stickBtn = "Save delivery & payment";
@@ -1212,7 +1429,7 @@
     }
 
     view().innerHTML = `${only === "home" ? datalist : ""}<form id="sf" class="settings">${html}
-      <div class="stick"><button class="btn">${esc(stickBtn)}</button><span class="stick-hint">${stickHint}</span></div></form>`;
+      <div class="stick"><button class="btn">${esc(stickBtn)}</button>${only === "delivery" ? "" : ` <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button>`}<span class="stick-hint">${stickHint}</span></div></form>`;
 
     const f = $("#sf");
     let zones, pays, banners, home, menu;
@@ -1296,8 +1513,7 @@
       );
     }
 
-    f.onsubmit = run(async (e) => {
-      e.preventDefault();
+    bindSavePublish(f, async () => {
       const d = Object.fromEntries(new FormData(f));
       let live = { ...L };
       let shop = { ...W };
@@ -1357,22 +1573,6 @@
   // ---- Start ----
 
   const blog = writing("post", "post");
-  const publish = run(async () => {
-    $("#pub").disabled = true;
-    $("#pub2").disabled = true;
-    say("Publishing…");
-    try {
-      const r = await api("/publish", { method: "POST" });
-      say(r.message);
-      try {
-        localStorage.removeItem("dirty");
-      } catch {}
-      $("#dirtybar").hidden = true;
-    } finally {
-      $("#pub").disabled = false;
-      $("#pub2").disabled = false;
-    }
-  });
   const routes = {
     dashboard,
     orders,
@@ -1421,9 +1621,8 @@
     say("");
     $("#err").textContent = "";
     const [title, help, mode] = HEADS[nav] || ["", "", ""];
-    const place = NAV.find(([k, , parts]) => k === nav || parts?.[nav]);
-    const parts = place?.[2];
-    $$("#tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + place?.[0]));
+    const parts = SUBGROUPS.find((g) => g[nav]);
+    $$("#tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + nav));
     const badges = effectBadges(mode);
     $("#head").innerHTML =
       (parts
@@ -1471,17 +1670,23 @@
     if (!d) return;
     const show = (k, n) => {
       const e = $(`[data-count="${k}"]`);
+      if (!e) return;
       e.textContent = n;
       e.hidden = !n;
     };
     show("orders", d.pending);
-    show("messages", d.unread + d.reviews);
+    show("messages", d.unread);
+    show("reviews", d.reviews);
   };
 
   async function enter() {
     $("#login").hidden = true;
     $("#app").hidden = false;
-    $("#tabs").innerHTML = NAV.map(([k, v]) => `<a href="#${k}">${v}<i data-count="${k}" hidden></i></a>`).join("");
+    $("#tabs").innerHTML = NAV_GROUPS.map(
+      ([group, items]) =>
+        `<div class="nav-group">${esc(group)}</div>` +
+        items.map(([k, v]) => `<a href="#${k}">${esc(v)}<i data-count="${k}" hidden></i></a>`).join(""),
+    ).join("");
     try {
       $("#dirtybar").hidden = !localStorage.getItem("dirty");
     } catch {}

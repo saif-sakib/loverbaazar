@@ -30,14 +30,16 @@ import "../../styles/admin.css";
       </form>
       <div id="app" hidden>
         <aside class="adminbar">
-          <a class="adminlogo" href="#dashboard">LoverBaazar</a>
+          <div class="adminbar-top">
+            <a class="adminlogo" href="#dashboard">LoverBaazar <span>Admin</span></a>
+            <a class="shop-ext" href="/" target="_blank" rel="noopener">View shop ↗</a>
+          </div>
           <div class="adminfind">
             <input id="find" type="search" placeholder="Find anything…" aria-label="Search the admin" autocomplete="off" />
             <div id="findres" hidden></div>
           </div>
           <nav id="tabs"></nav>
           <div class="adminactions">
-            <a class="link" href="/" target="_blank" rel="noopener">View the shop</a>
             <button class="link" id="pub2">Publish now</button>
             <button class="link" id="out">Log out</button>
           </div>
