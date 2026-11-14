@@ -33,6 +33,7 @@ Bangladesh home-appliance shop. Replaces WordPress at loverbaazar.com.
 - Fixing seeded pages, posts or categories on a live shop: add an entry with a new `id` to `apps/api/content-updates.json`. Each runs once and keeps the admin's own rewrites.
 - Settings defaults live only in `apps/api/defaults.json`. Don't hard-code shop details, delivery charges or payment numbers.
 - `script-src` has no `unsafe-inline`: keep JavaScript in `public/*.js`.
+- End every final report with an **Actions required** section listing clear, step-by-step instructions for anything the user must do (such as setting environment variables in `.env` or Render/Cloudflare, restarting `./scripts/dev.sh`, clicking Publish in admin, or pushing to deploy).
 
 ## Saving tokens
 

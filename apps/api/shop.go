@@ -564,21 +564,38 @@ func orBlank(prefix, s string) string {
 }
 
 // notify emails the admin through Brevo: ADMIN_EMAIL (one address or several, comma separated), or
-// SHOP_EMAIL when that is empty. Call it with `go`: a slow or failed email must never hold up an order.
+// SHOP_EMAIL (plus the email saved in Admin > Shop details, if different) when ADMIN_EMAIL is empty.
+// Call it with `go`: a slow or failed email must never hold up an order.
 func notify(subject, text string) {
-	to := os.Getenv("ADMIN_EMAIL")
-	if to == "" {
-		to = os.Getenv("SHOP_EMAIL")
+	if to := os.Getenv("ADMIN_EMAIL"); to != "" {
+		sendMail(strings.Split(to, ","), subject, text)
+		return
 	}
-	sendMail(strings.Split(to, ","), subject, text)
+	var list []string
+	if shop := strings.TrimSpace(os.Getenv("SHOP_EMAIL")); shop != "" {
+		list = append(list, shop)
+	}
+	if db != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var siteEmail string
+		if db.QueryRow(ctx, `SELECT coalesce(data->>'email','') FROM settings WHERE key='site'`).Scan(&siteEmail) == nil {
+			if siteEmail = strings.TrimSpace(siteEmail); siteEmail != "" {
+				list = append(list, siteEmail)
+			}
+		}
+	}
+	sendMail(list, subject, text)
 }
 
 // sendMail sends a plain text email from SHOP_EMAIL, the sender confirmed in Brevo.
 func sendMail(to []string, subject, text string) {
-	key, from := os.Getenv("BREVO_KEY"), os.Getenv("SHOP_EMAIL")
+	key, from := os.Getenv("BREVO_KEY"), strings.TrimSpace(os.Getenv("SHOP_EMAIL"))
+	seen := map[string]bool{}
 	var list []map[string]string
 	for _, t := range to {
-		if t = strings.TrimSpace(t); t != "" {
+		if t = strings.TrimSpace(t); t != "" && !seen[strings.ToLower(t)] {
+			seen[strings.ToLower(t)] = true
 			list = append(list, map[string]string{"email": t})
 		}
 	}
