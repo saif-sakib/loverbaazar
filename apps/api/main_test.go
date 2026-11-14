@@ -796,3 +796,94 @@ func TestProductTextNeverTouchesNameOrPrice(t *testing.T) {
 		t.Errorf("desc: %q", desc)
 	}
 }
+
+func TestImageCleanupAndSafeUploadPlace(t *testing.T) {
+	reset(t)
+	dir := t.TempDir()
+	t.Setenv("LOCAL_UPLOADS", dir)
+
+	uploadPNG := func() string {
+		t.Helper()
+		png := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00")
+		req, _ := http.NewRequest("POST", api.URL+"/api/admin/image", bytes.NewReader(png))
+		req.Header.Set("X-Admin-Token", adminKey)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		if res.StatusCode != 200 {
+			t.Fatalf("upload status %d", res.StatusCode)
+		}
+		var out struct {
+			URL string `json:"url"`
+		}
+		if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+			t.Fatal(err)
+		}
+		return out.URL
+	}
+
+	// 1. Unsaved upload is deleted when /api/admin/image/cleanup is called.
+	unsavedURL := uploadPNG()
+	unsavedFile := dir + "/" + localUploadFile(unsavedURL)
+	if _, err := os.Stat(unsavedFile); err != nil {
+		t.Fatalf("uploaded file missing: %v", err)
+	}
+	if code, body := call(t, nil, "POST", "/api/admin/image/cleanup", M{"urls": []string{unsavedURL}}, true); code != 200 {
+		t.Fatalf("cleanup status %d: %s", code, body)
+	}
+	if _, err := os.Stat(unsavedFile); !os.IsNotExist(err) {
+		t.Errorf("unsaved upload was not removed: %v", err)
+	}
+
+	// 2. Saved image in settings is kept by /api/admin/image/cleanup, then deleted when settings removes it.
+	savedURL := uploadPNG()
+	savedFile := dir + "/" + localUploadFile(savedURL)
+	live := M{
+		"delivery": []M{{"id": "jashore", "label": "Inside Jashore", "fee": 60}},
+		"payments": []M{{"id": "cod", "label": "Cash on delivery", "enabled": true}},
+	}
+	if code, body := call(t, nil, "PUT", "/api/admin/settings", M{
+		"live": live,
+		"site": M{"name": "LoverBaazar", "phone": "01710076076", "logo": savedURL},
+	}, true); code != 200 {
+		t.Fatalf("save settings failed %d: %s", code, body)
+	}
+	if code, body := call(t, nil, "POST", "/api/admin/image/cleanup", M{"urls": []string{savedURL}}, true); code != 200 {
+		t.Fatalf("cleanup saved status %d: %s", code, body)
+	}
+	if _, err := os.Stat(savedFile); err != nil {
+		t.Errorf("saved upload must be kept while in settings: %v", err)
+	}
+
+	if code, body := call(t, nil, "PUT", "/api/admin/settings", M{
+		"live": live,
+		"site": M{"name": "LoverBaazar", "phone": "01710076076", "logo": ""},
+	}, true); code != 200 {
+		t.Fatalf("update settings failed %d: %s", code, body)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(savedFile); os.IsNotExist(err) {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	if _, err := os.Stat(savedFile); !os.IsNotExist(err) {
+		t.Errorf("old settings logo was not removed after saving settings: %v", err)
+	}
+
+	// 3. safeUploadPlace avoids overwriting a Cloudinary public_id already referenced in DB.
+	const existingLogo = "https://res.cloudinary.com/demo/image/upload/loverbaazar/site/logo.png"
+	if code, body := call(t, nil, "PUT", "/api/admin/settings", M{
+		"live": live,
+		"site": M{"name": "LoverBaazar", "phone": "01710076076", "logo": existingLogo},
+	}, true); code != 200 {
+		t.Fatalf("save settings failed %d: %s", code, body)
+	}
+	_, nextID := safeUploadPlace(bg, "site", "logo")
+	if nextID == "loverbaazar/site/logo" {
+		t.Errorf("safeUploadPlace reused existing public_id %q", nextID)
+	}
+}

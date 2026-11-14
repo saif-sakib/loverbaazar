@@ -31,10 +31,11 @@ import (
 
 var (
 	// Bangla vowel signs are marks, not letters. WordPress slugs can also be percent-encoded.
-	slugRe  = regexp.MustCompile(`^[\p{L}\p{M}\p{N}%_-]+$`)
-	pathRe  = regexp.MustCompile(`^[\p{L}\p{M}\p{N}%_-]+(/[\p{L}\p{M}\p{N}%_-]+)*$`)
-	idRe    = regexp.MustCompile(`^[a-z0-9-]+$`)
-	colorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+	slugRe     = regexp.MustCompile(`^[\p{L}\p{M}\p{N}%_-]+$`)
+	pathRe     = regexp.MustCompile(`^[\p{L}\p{M}\p{N}%_-]+(/[\p{L}\p{M}\p{N}%_-]+)*$`)
+	idRe       = regexp.MustCompile(`^[a-z0-9-]+$`)
+	colorRe    = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+	imageRefRe = regexp.MustCompile(`https?://[^\s"'<>\\]+|/uploads/[a-zA-Z0-9._-]+`)
 	// Top-level addresses the shop already uses. A page with one of these names would break the build.
 	reservedSlugs = []string{"admin", "api", "blog", "cart", "checkout", "contact-us", "feed.xml", "my-account", "offers", "product", "product-category", "product-tag", "search", "shop", "track", "wishlist", "wp-content", "uploads", "404", "_astro", "feed", "page"}
 	statuses      = []string{"pending", "confirmed", "shipped", "delivered", "cancelled", "returned"}
@@ -448,12 +449,17 @@ func adminSaveContent(w http.ResponseWriter, r *http.Request) {
 			d["date"] = time.Now().Format("2006-01-02")
 		}
 	}
+	var oldData string
+	_ = db.QueryRow(ctx, `SELECT data::text FROM content WHERE kind=$1 AND slug=$2`, kind, slug).Scan(&oldData)
 	j, _ := json.Marshal(d)
 	if _, err := db.Exec(ctx, `INSERT INTO content(kind,slug,data) VALUES($1,$2,$3::jsonb) ON CONFLICT(kind,slug) DO UPDATE SET data=$3::jsonb`, kind, slug, string(j)); err != nil {
 		oops(w, err)
 		return
 	}
 	refresh()
+	if oldURLs := extractImageRefs(oldData); len(oldURLs) > 0 {
+		go dropOldURLs(oldURLs)
+	}
 	done(w)
 }
 
@@ -476,11 +482,16 @@ func adminDeleteContent(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	var oldData string
+	_ = db.QueryRow(ctx, `SELECT data::text FROM content WHERE kind=$1 AND slug=$2`, kind, slug).Scan(&oldData)
 	if _, err := db.Exec(ctx, `DELETE FROM content WHERE kind=$1 AND slug=$2`, kind, slug); err != nil {
 		oops(w, err)
 		return
 	}
 	refresh()
+	if oldURLs := extractImageRefs(oldData); len(oldURLs) > 0 {
+		go dropOldURLs(oldURLs)
+	}
 	done(w)
 }
 
@@ -642,6 +653,19 @@ func adminSaveSettings(w http.ResponseWriter, r *http.Request) {
 	live, _ := json.Marshal(in.Live)
 	site, _ := json.Marshal(in.Site)
 	ctx := r.Context()
+	var oldURLs []string
+	if rows, err := db.Query(ctx, `SELECT data::text FROM settings WHERE key IN ('site','live')`); err == nil {
+		var buf strings.Builder
+		for rows.Next() {
+			var raw string
+			if rows.Scan(&raw) == nil {
+				buf.WriteString(raw)
+				buf.WriteByte('\n')
+			}
+		}
+		rows.Close()
+		oldURLs = extractImageRefs(buf.String())
+	}
 	err := pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
 		for key, data := range map[string][]byte{"live": live, "site": site} {
 			if _, err := tx.Exec(ctx, `INSERT INTO settings(key,data) VALUES($1,$2::jsonb) ON CONFLICT(key) DO UPDATE SET data=$2::jsonb`, key, string(data)); err != nil {
@@ -655,6 +679,9 @@ func adminSaveSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	refresh()
+	if len(oldURLs) > 0 {
+		go dropOldURLs(oldURLs)
+	}
 	done(w)
 }
 
@@ -678,13 +705,29 @@ func adminImage(w http.ResponseWriter, r *http.Request) {
 		url = "/uploads/" + name
 	} else {
 		q := r.URL.Query()
-		url, err = cloudinary(b, q.Get("folder"), q.Get("name"))
+		url, err = cloudinary(r.Context(), b, q.Get("folder"), q.Get("name"))
 	}
 	if err != nil {
 		oops(w, err)
 		return
 	}
 	ok(w, map[string]string{"url": url})
+}
+
+func adminCleanupImages(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		URLs []string `json:"urls"`
+	}
+	if !read(w, r, &in) {
+		return
+	}
+	if len(in.URLs) > 100 {
+		in.URLs = in.URLs[:100]
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	dropURLs(ctx, in.URLs)
+	done(w)
 }
 
 // uploadFolder holds every shop image, in readable places such as
@@ -708,6 +751,21 @@ func uploadPlace(folder, name string) (dir, publicID string) {
 	return dir, dir + "/" + name
 }
 
+// safeUploadPlace avoids overwriting an image already saved in the database when a fixed name
+// (such as "logo" or "banner") is uploaded before the admin clicks Save.
+func safeUploadPlace(ctx context.Context, folder, name string) (dir, id string) {
+	dir, id = uploadPlace(folder, name)
+	if !isImageRefUsed(ctx, id) {
+		return dir, id
+	}
+	base := id + "-" + time.Now().Format("150405")
+	id = base
+	for i := 2; isImageRefUsed(ctx, id); i++ {
+		id = base + "-" + strconv.Itoa(i)
+	}
+	return dir, id
+}
+
 // signUpload is Cloudinary's rule: sorted name=value pairs, then the secret, hashed with SHA-1.
 func signUpload(params map[string]string, secret string) string {
 	keys := slices.Sorted(maps.Keys(params))
@@ -720,12 +778,12 @@ func signUpload(params map[string]string, secret string) string {
 }
 
 // cloudinary stores an upload on the free plan, which needs no card.
-func cloudinary(file []byte, folder, name string) (string, error) {
+func cloudinary(ctx context.Context, file []byte, folder, name string) (string, error) {
 	cloud, key, secret := os.Getenv("CLOUDINARY_CLOUD"), os.Getenv("CLOUDINARY_KEY"), os.Getenv("CLOUDINARY_SECRET")
 	if cloud == "" {
 		return "", userErr{501, "image storage is not configured. Add the Cloudinary keys on Render"}
 	}
-	dir, id := uploadPlace(folder, name)
+	dir, id := safeUploadPlace(ctx, folder, name)
 	params := map[string]string{
 		"asset_folder": dir,
 		"invalidate":   "true",
@@ -771,13 +829,57 @@ func publicID(url string) string {
 	return id
 }
 
-func imageIDs(list []any) []string {
-	var ids []string
+func localUploadFile(u string) string {
+	if !strings.HasPrefix(u, "/uploads/") {
+		return ""
+	}
+	name := strings.TrimPrefix(u, "/uploads/")
+	if name == "" || strings.ContainsAny(name, `/\`) || name == "." || name == ".." {
+		return ""
+	}
+	return name
+}
+
+func extractImageRefs(raw string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range imageRefRe.FindAllString(raw, -1) {
+		if (publicID(m) != "" || localUploadFile(m) != "") && !seen[m] {
+			seen[m] = true
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func isImageRefUsed(ctx context.Context, needle string) bool {
+	if needle == "" {
+		return false
+	}
+	var used bool
+	err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM products WHERE position($1 in data::text)>0)
+		OR EXISTS(SELECT 1 FROM content WHERE position($1 in data::text)>0)
+		OR EXISTS(SELECT 1 FROM settings WHERE position($1 in data::text)>0)`, needle).Scan(&used)
+	return err == nil && used
+}
+
+func imageURLs(list []any) []string {
+	var urls []string
 	for _, x := range list {
 		if m, isMap := x.(map[string]any); isMap {
-			if src, _ := m["src"].(string); publicID(src) != "" {
-				ids = append(ids, publicID(src))
+			if src, _ := m["src"].(string); src != "" {
+				urls = append(urls, src)
 			}
+		}
+	}
+	return urls
+}
+
+func imageIDs(list []any) []string {
+	var ids []string
+	for _, u := range imageURLs(list) {
+		if id := publicID(u); id != "" {
+			ids = append(ids, id)
 		}
 	}
 	return ids
@@ -792,25 +894,68 @@ func unusedImages(ctx context.Context, before, after []any) []string {
 		if slices.Contains(keep, id) {
 			continue
 		}
-		var used bool
-		err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM products WHERE position($1 in data::text)>0)
-			OR EXISTS(SELECT 1 FROM content WHERE position($1 in data::text)>0)
-			OR EXISTS(SELECT 1 FROM settings WHERE position($1 in data::text)>0)`, id).Scan(&used)
-		if err == nil && !used {
+		if !isImageRefUsed(ctx, id) {
 			out = append(out, id)
 		}
 	}
 	return out
 }
 
-// dropImages frees Cloudinary space. Call it with `go`: a failure here must never hold up a save.
-func dropImages(before, after []any) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	for _, id := range unusedImages(ctx, before, after) {
+func unusedURLs(ctx context.Context, urls []string) (cloudIDs []string, localFiles []string) {
+	seenCloud := map[string]bool{}
+	seenLocal := map[string]bool{}
+	for _, u := range urls {
+		if id := publicID(u); id != "" && !seenCloud[id] {
+			seenCloud[id] = true
+			if !isImageRefUsed(ctx, id) {
+				cloudIDs = append(cloudIDs, id)
+			}
+		} else if f := localUploadFile(u); f != "" && !seenLocal[f] {
+			seenLocal[f] = true
+			if !isImageRefUsed(ctx, "/uploads/"+f) {
+				localFiles = append(localFiles, f)
+			}
+		}
+	}
+	return cloudIDs, localFiles
+}
+
+func dropURLs(ctx context.Context, urls []string) {
+	cloudIDs, localFiles := unusedURLs(ctx, urls)
+	for _, id := range cloudIDs {
 		if err := cloudinaryDelete(id); err != nil {
 			log.Print("cloudinary delete: ", err)
 		}
+	}
+	if dir := os.Getenv("LOCAL_UPLOADS"); dir != "" {
+		for _, f := range localFiles {
+			if err := os.Remove(filepath.Join(dir, f)); err != nil && !errors.Is(err, os.ErrNotExist) {
+				log.Print("local upload delete: ", err)
+			}
+		}
+	}
+}
+
+func dropOldURLs(urls []string) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	dropURLs(ctx, urls)
+}
+
+// dropImages frees Cloudinary (and local dev) space. Call it with `go`: a failure here must never hold up a save.
+func dropImages(before, after []any) {
+	keep := map[string]bool{}
+	for _, u := range imageURLs(after) {
+		keep[u] = true
+	}
+	var removed []string
+	for _, u := range imageURLs(before) {
+		if !keep[u] {
+			removed = append(removed, u)
+		}
+	}
+	if len(removed) > 0 {
+		dropOldURLs(removed)
 	}
 }
 

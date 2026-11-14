@@ -123,9 +123,23 @@
   let token = sessionStorage.getItem("t") || remembered();
   let unsaved = false;
   const LEAVE = "You have changes you haven't saved. Leave without saving?";
+  const pendingUploads = new Set();
+  async function cleanupUploads(urls = [...pendingUploads]) {
+    const list = [...new Set(urls)].filter((u) => typeof u === "string" && u.trim());
+    if (!list.length) return;
+    list.forEach((u) => pendingUploads.delete(u));
+    if (!token) return;
+    await fetch("/api/admin/image/cleanup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+      body: JSON.stringify({ urls: list }),
+      keepalive: true,
+    }).catch(() => {});
+  }
   const back = (to) => () => {
     if (unsaved && !confirm(LEAVE)) return;
     unsaved = false;
+    cleanupUploads();
     to();
   };
   let site = null; // shop details, for invoices
@@ -157,6 +171,7 @@
     $("#ok").hidden = !m;
   };
   const logout = (msg) => {
+    cleanupUploads();
     sessionStorage.removeItem("t");
     try {
       localStorage.removeItem("keep");
@@ -224,16 +239,21 @@
       const andPub = publishAfter;
       publishAfter = false;
       await saveFn(e);
+      await cleanupUploads();
       if (andPub) await publish();
     });
-    const btn = $("#savepub", f);
-    if (btn)
-      btn.onclick = () => {
-        if (f.reportValidity && !f.reportValidity()) return;
-        publishAfter = true;
-        if (f.requestSubmit) f.requestSubmit();
-        else f.onsubmit({ preventDefault: () => {} });
-      };
+    const submitAs = (andPub) => {
+      if (!f.noValidate && f.reportValidity && !f.reportValidity()) return;
+      publishAfter = andPub;
+      if (f.requestSubmit) f.requestSubmit();
+      else f.onsubmit({ preventDefault: () => {} });
+    };
+    $$("[data-save]", f).forEach((b) => {
+      b.onclick = () => submitAs(false);
+    });
+    $$("#savepub, [data-savepub]", f).forEach((b) => {
+      b.onclick = () => submitAs(true);
+    });
   };
 
   async function loadCategories(force = false) {
@@ -298,7 +318,9 @@
   const asciiName = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const upload = async (file, folder = "pages", name = "") => {
     const base = name || asciiName(file.name.replace(/\.\w+$/, ""));
-    return (await api(`/image?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(base)}`, { body: file })).url;
+    const url = (await api(`/image?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(base)}`, { body: file })).url;
+    if (url) pendingUploads.add(url);
+    return url;
   };
 
   const field = (label, name, value, extra = "", type = "text", help = "") =>
@@ -311,12 +333,29 @@
     const badge = effectBadges(mode);
     return `<div class="sec-head"><div><h2>${esc(title)}</h2>${desc ? `<p class="sec-desc">${esc(desc)}</p>` : ""}</div>${where || badge ? `<div class="sec-tags">${where ? `<span class="where-badge">Where: ${esc(where)}</span>` : ""}${badge}</div>` : ""}</div>`;
   };
+  const secFoot = (withPub = true) =>
+    `<div class="panel-foot"><button type="button" class="btn ghost small" data-save>Save</button>${withPub ? ` <button type="button" class="btn pub-now small" data-savepub>Save &amp; Publish now</button>` : ""}</div>`;
 
   // Editable rows: delivery areas, payment methods, homepage sections and so on.
   function rows(host, items, fields, blank, opts = {}) {
-    let list = items.map((x) => ({ ...x }));
+    const normVal = (f, raw) => {
+      if (f.type === "number") {
+        const n = Number(raw);
+        const fallback = blank?.[f.k] ?? f.min ?? 0;
+        if (raw === "" || raw === null || raw === undefined || !Number.isFinite(n)) return fallback;
+        return f.min !== undefined && n < f.min ? fallback : n;
+      }
+      return raw ?? blank?.[f.k] ?? "";
+    };
+    let list = items.map((x) => {
+      const copy = { ...x };
+      fields.forEach((f) => {
+        if (f.type === "number") copy[f.k] = normVal(f, copy[f.k]);
+      });
+      return copy;
+    });
     const cell = (f, it) => {
-      const v = it[f.k] ?? "";
+      const v = f.type === "number" ? normVal(f, it[f.k]) : (it[f.k] ?? "");
       const label = `<span class="flabel">${esc(f.label)}</span>${f.help ? `<small class="fhelp">${esc(f.help)}</small>` : ""}`;
       if (f.type === "bool")
         return `<label class="check"><input type="checkbox" data-k="${f.k}" ${v ? "checked" : ""}> <span>${esc(f.label)}</span></label>`;
@@ -339,7 +378,7 @@
           const e = $(`[data-k="${f.k}"]`, row);
           if (f.type === "bool") it[f.k] = e.checked;
           else if (f.type === "cats") it[f.k] = $$("input[name=c]:checked", e).map((x) => x.value);
-          else if (f.type === "number") it[f.k] = +e.value || 0;
+          else if (f.type === "number") it[f.k] = normVal(f, e.value.trim());
           else it[f.k] = e.value;
         });
         return it;
@@ -362,13 +401,19 @@
         inp.onchange = run(async () => {
           if (!inp.files[0]) return;
           const row = inp.closest(".img-row");
+          const txt = $("input[data-k]", row);
+          const prevUrl = txt?.value?.trim();
+          say("Uploading…");
           const url = await upload(inp.files[0], "site");
-          $("input[data-k]", row).value = url;
+          say("");
+          if (prevUrl && prevUrl !== url && pendingUploads.has(prevUrl)) cleanupUploads([prevUrl]);
+          txt.value = url;
           const prev = $(".img-prev", row);
           if (prev) {
             prev.src = url;
             prev.hidden = false;
           }
+          inp.value = "";
           unsaved = true;
         });
       });
@@ -394,7 +439,9 @@
         $("[data-down]", row).onclick = () => swap(i + 1);
         $("[data-remove]", row).onclick = () => {
           read();
-          list.splice(i, 1);
+          const [removed] = list.splice(i, 1);
+          const stale = Object.values(removed || {}).filter((val) => typeof val === "string" && pendingUploads.has(val));
+          if (stale.length) cleanupUploads(stale);
           draw();
           unsaved = true;
         };
@@ -438,9 +485,14 @@
       if (u) cmd("createLink", u);
     };
     $("input[type=file]", host).onchange = run(async (e) => {
+      if (!e.target.files[0]) return;
+      say("Uploading…");
       const url = await upload(e.target.files[0]);
+      say("");
       if (src.hidden) cmd("insertImage", url);
       else src.value += `<img src="${esc(url)}" alt="">`;
+      unsaved = true;
+      e.target.value = "";
     });
     $("[data-html]", host).onclick = () => {
       if (src.hidden) src.value = box.innerHTML;
@@ -802,7 +854,7 @@
       ${secHead(isNew ? "Add product" : "Edit product", "Fill in product details below. Price, stock and visibility update live; name, photos, categories and text require Publish.", isNew ? "Shop & new /product/<slug>/ page" : `/product/${p.slug}/`, "both")}
       ${field("Product name", "name", p.name, "required maxlength=200", "text", "Shown on product cards, search results, cart, and customer invoices. (Needs Publish)")}
       <details class="advanced"><summary>Web address: /product/<span id="slugview">${esc(p.slug) || "made-from-the-name"}</span>/</summary>
-        ${field("Web address (URL slug)", "slug", p.slug, `required pattern="[^\\s\\/?#.]+"`, "text", isNew ? "Automatically filled from the product name." : "Changing an existing web address breaks old links to this product.")}
+        ${field("Web address (URL slug)", "slug", p.slug, "", "text", isNew ? "Automatically filled from the product name." : "Changing an existing web address breaks old links to this product.")}
       </details>
       <div class="fields3">
         ${field("Selling price (৳)", "price", p.price, "required min=0 step=1", "number", "Actual checkout price. Live in ~2 min.")}
@@ -849,6 +901,7 @@
         if (!confirm(`Delete ${p.name}? This can't be undone. If it has been ordered before, it will be hidden instead.`)) return;
         const r = await api("/products/" + p.id, { method: "DELETE" });
         unsaved = false;
+        await cleanupUploads();
         await ensureCatalog(true);
         await products();
         needsPublish(r.deleted ? "Product deleted." : "This product has old orders, so it was hidden instead of deleted.");
@@ -883,7 +936,8 @@
       });
       $$("[data-x]").forEach((b) => {
         b.onclick = () => {
-          images.splice(+b.dataset.x, 1);
+          const [removed] = images.splice(+b.dataset.x, 1);
+          if (removed?.src && pendingUploads.has(removed.src)) cleanupUploads([removed.src]);
           drawImages();
           unsaved = true;
         };
@@ -936,22 +990,30 @@
     $("#back").onclick = back(products);
     bindSavePublish(f, async () => {
       const d = new FormData(f);
+      const name = d.get("name").trim();
+      const rawSlug = d.get("slug").trim() || slugify(name);
+      if (!rawSlug || /[\s/?#.]/.test(rawSlug)) {
+        const adv = $("details.advanced", f);
+        if (adv) adv.open = true;
+        f.slug.focus();
+        throw new Error("Please enter a valid web address (URL slug) without spaces or / ? # .");
+      }
       const tagNames = d
         .get("tagnames")
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean);
       const tagSlugs = [];
-      for (const name of tagNames) {
-        const known = allTags.find((t) => t.name.toLowerCase() === name.toLowerCase());
-        if (!known) await api("/content/tag/" + encodeURIComponent(slugify(name)), { method: "PUT", body: { name } });
-        tagSlugs.push(known?.slug || slugify(name));
+      for (const tn of tagNames) {
+        const known = allTags.find((t) => t.name.toLowerCase() === tn.toLowerCase());
+        if (!known) await api("/content/tag/" + encodeURIComponent(slugify(tn)), { method: "PUT", body: { name: tn } });
+        tagSlugs.push(known?.slug || slugify(tn));
       }
       const out = {
         ...p,
         tags: tagSlugs,
-        name: d.get("name").trim(),
-        slug: d.get("slug").trim(),
+        name,
+        slug: rawSlug,
         price: +d.get("price"),
         regular: +d.get("regular"),
         sku: d.get("sku").trim(),
@@ -1433,6 +1495,7 @@
           ${toggle("Accepting online orders", "ordersOpen", L.ordersOpen, "When turned off, customers can still browse products, but placing orders at checkout is paused.")}
           ${field("Closed message", "closedNote", L.closedNote, "", "text", "Shown in a notice box at the top of the Checkout page when online orders are paused.")}
           ${field("Top announcement bar", "notice", L.notice, "placeholder='Eid Sale: 10% off with code EID10'", "text", "Shown as a bar at the very top of every page. Leave empty to hide.")}
+          ${secFoot(false)}
         </section>
         <section class="panel">
           ${secHead("Delivery areas & order rules", "Configure delivery areas and fees shown on product pages and checkout. Fees are charged per piece because appliances are heavy.", "Product pages, Cart & Checkout", "live")}
@@ -1441,11 +1504,13 @@
             ${field("Free delivery threshold (৳)", "freeOver", L.freeOver, "min=0 step=1", "number", "Orders at or above this subtotal (after coupon discount) get free delivery everywhere. Set 0 to disable.")}
             ${field("Minimum order amount (৳)", "minOrder", L.minOrder, "min=0 step=1", "number", "Smallest cart subtotal allowed to place an online order. Set 0 for no minimum.")}
           </div>
+          ${secFoot(false)}
         </section>
         <section class="panel">
           ${secHead("Payment methods", "Enable or disable payment options at checkout. Active methods are also listed in the website footer.", "Checkout & Website footer", "live")}
           <p class="hint-box"><strong>How mobile payments work:</strong> Add a mobile/account number (such as bKash, Nagad, or Rocket) and checkout instructs the customer to send money there and asks for their Transaction ID. Leave the number empty for Cash on delivery.</p>
           <div id="pays"></div>
+          ${secFoot(false)}
         </section>`;
     } else if (only === "shop") {
       stickBtn = "Save shop details";
@@ -1469,6 +1534,7 @@
           </div>
           ${area("Footer summary", "about", W.about, 2, "Short sentence shown under your shop name in the website footer.")}
           ${area("Google search description (SEO)", "description", W.description, 2, "Summary shown under your website link in Google search results and social link previews.")}
+          ${secFoot(true)}
         </section>
         <section class="panel">
           ${secHead("Phone, WhatsApp & location", "Support numbers and address shown in the header, Contact Us page, product pages, floating buttons, and invoices.", "Header strip, Product pages, Contact page, Floating buttons & Invoices", "pub")}
@@ -1479,6 +1545,7 @@
             ${field("Opening hours", "hours", W.hours, "placeholder='Sat–Thu, 9:00 AM – 9:00 PM'", "text", "Shown on the Contact Us page. Leave empty to hide.")}
           </div>
           ${field("Shop address", "address", W.address, "", "text", "Shown in the footer, Contact Us page, and printed on customer invoices.")}
+          ${secFoot(true)}
         </section>
         <section class="panel">
           ${secHead("Return policy & social links", "Warranty/return details shown on product pages and social media links in the footer.", "Product pages & Website footer", "pub")}
@@ -1487,26 +1554,30 @@
             ${field("Facebook page URL", "facebook", W.facebook, "", "url", "Shows the Facebook icon in the website footer. Leave empty to hide.")}
             ${field("YouTube channel URL", "youtube", W.youtube, "", "url", "Shows the YouTube icon in the website footer. Leave empty to hide.")}
           </div>
+          ${secFoot(true)}
         </section>`;
     } else if (only === "home") {
       stickBtn = "Save home page";
       html = `
         <section class="panel">
           ${secHead("Hero introduction", "The welcome block at the top of your home page. The 3 product photos beside it are picked automatically from your featured product sections below.", "Top of Home page (/)", "pub")}
-          ${field("Main headline", "heroTitle", W.hero.title, "required", "text", "The last word is automatically highlighted in your brand red colour.")}
+          ${field("Main headline", "heroTitle", W.hero.title, "", "text", "The last word is automatically highlighted in your brand red colour.")}
           ${area("Introductory text", "heroText", W.hero.text, 2, "Short paragraph displayed directly underneath the main headline.")}
           <div class="fields2">
             ${field("Button label", "heroButton", W.hero.button, "", "text", "Text inside the main action button (e.g. 'Shop all products').")}
             ${field("Button link", "heroLink", W.hero.link, 'list="sitelinks"', "text", "Page or category opened when customers click the button.")}
           </div>
+          ${secFoot(true)}
         </section>
         <section class="panel">
           ${secHead("Promotional banners", "Optional sale or campaign images shown directly below the hero. Leave empty for no banners.", "Below Hero on Home page (/)", "pub")}
           <div id="banners"></div>
+          ${secFoot(true)}
         </section>
         <section class="panel">
           ${secHead("Featured product sections", "Rows of products on the home page. Choose any category or '★ Products on offer' (all discounted items, biggest savings first). Use ▲ / ▼ to reorder.", "Main rows on Home page (/)", "pub")}
           <div id="home"></div>
+          ${secFoot(true)}
         </section>`;
     } else if (only === "menu") {
       stickBtn = "Save navigation menu";
@@ -1518,7 +1589,7 @@
         </section>`;
     }
 
-    view().innerHTML = `${only === "home" ? datalist : ""}<form id="sf" class="settings">${html}
+    view().innerHTML = `${only === "home" ? datalist : ""}<form id="sf" class="settings" novalidate>${html}
       <div class="stick"><button class="btn">${esc(stickBtn)}</button>${only === "delivery" ? "" : ` <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button>`}<span class="stick-hint">${stickHint}</span></div></form>`;
 
     const f = $("#sf");
@@ -1552,10 +1623,15 @@
     if (only === "shop") {
       $("#logoup").onchange = run(async (e) => {
         if (!e.target.files[0]) return;
+        const prevUrl = f.logo.value.trim();
+        say("Uploading…");
         const url = await upload(e.target.files[0], "site", "logo");
+        say("");
+        if (prevUrl && prevUrl !== url && pendingUploads.has(prevUrl)) cleanupUploads([prevUrl]);
         f.logo.value = url;
         $("#logoprev").src = url;
         $("#logoprev").hidden = false;
+        e.target.value = "";
         unsaved = true;
       });
       f.logo.addEventListener("input", () => {
@@ -1579,7 +1655,7 @@
       );
       home = rows(
         $("#home"),
-        W.home || [],
+        (W.home || []).map((h) => ({ ...h, count: +h.count > 0 ? +h.count : 8 })),
         [
           { k: "title", label: "Section heading", placeholder: "e.g. Rice cookers" },
           { k: "cat", label: "Category or Offers", type: "select", options: catOptions },
@@ -1609,22 +1685,40 @@
       let shop = { ...W };
 
       if (only === "delivery") {
+        const zoneList = zones()
+          .map((z) => ({ ...z, label: (z.label || "").trim(), fee: Math.max(0, Math.floor(+z.fee) || 0), id: z.id || asciiId(z.label) }))
+          .filter((z) => z.label);
+        if (!zoneList.length) throw new Error("Add at least one delivery area with a name.");
+        const payList = pays()
+          .map((p) => ({ ...p, label: (p.label || "").trim(), number: (p.number || "").trim(), id: p.id || asciiId(p.label) }))
+          .filter((p) => p.label);
+        if (!payList.some((p) => p.enabled)) throw new Error("Keep at least one enabled payment method.");
         live = {
           ...L,
           ordersOpen: f.ordersOpen.checked,
           closedNote: d.closedNote,
           notice: d.notice.trim(),
-          freeOver: +d.freeOver,
-          minOrder: +d.minOrder,
-          delivery: zones().map((z) => ({ ...z, id: z.id || asciiId(z.label) })),
-          payments: pays().map((p) => ({ ...p, id: p.id || asciiId(p.label) })),
+          freeOver: Math.max(0, Math.floor(+d.freeOver) || 0),
+          minOrder: Math.max(0, Math.floor(+d.minOrder) || 0),
+          delivery: zoneList,
+          payments: payList,
         };
       } else if (only === "shop") {
+        const shopName = d.name.trim();
+        const phone = d.phone.trim();
+        if (!shopName) {
+          f.name.focus();
+          throw new Error("Shop name is required.");
+        }
+        if (!phone) {
+          f.phone.focus();
+          throw new Error("Main phone number is required.");
+        }
         shop = {
           ...W,
-          name: d.name.trim(),
+          name: shopName,
           tagline: d.tagline,
-          phone: d.phone.trim(),
+          phone,
           whatsapp: d.whatsapp.trim(),
           email: d.email.trim(),
           hours: d.hours,
@@ -1639,9 +1733,13 @@
       } else if (only === "home") {
         shop = {
           ...W,
-          hero: { title: d.heroTitle, text: d.heroText, button: d.heroButton, link: d.heroLink },
-          banners: banners().filter((b) => b.image),
-          home: home().filter((h) => h.title),
+          hero: { title: (d.heroTitle ?? "").trim(), text: d.heroText, button: d.heroButton, link: d.heroLink },
+          banners: banners()
+            .map((b) => ({ ...b, title: (b.title || "").trim(), link: (b.link || "").trim() || "/shop/", image: (b.image || "").trim() }))
+            .filter((b) => b.image),
+          home: home()
+            .filter((h) => (h.title || "").trim())
+            .map((h) => ({ ...h, title: h.title.trim(), count: Math.max(1, Math.floor(+h.count) || 8) })),
         };
       } else if (only === "menu") {
         shop = {
@@ -1705,6 +1803,7 @@
       return;
     }
     unsaved = false;
+    cleanupUploads();
     const [first, arg] = location.hash.slice(1).split("/");
     const tab = routes[first] ? first : "dashboard";
     here = location.hash.slice(1);
@@ -1801,6 +1900,7 @@
   addEventListener("beforeunload", (e) => {
     if (unsaved) e.preventDefault();
   });
+  addEventListener("pagehide", () => cleanupUploads());
   $("#out").onclick = () => logout();
   $("#login").onsubmit = (e) => {
     e.preventDefault();

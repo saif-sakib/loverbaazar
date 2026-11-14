@@ -301,6 +301,7 @@ func router() http.Handler {
 		a.Get("/settings", adminSettings)
 		a.Put("/settings", adminSaveSettings)
 		a.Post("/image", adminImage)
+		a.Post("/image/cleanup", adminCleanupImages)
 		a.Post("/publish", adminPublish)
 	})
 	return r
