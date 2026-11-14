@@ -130,6 +130,11 @@
   };
   let site = null; // shop details, for invoices
   let categories = [];
+  let allProducts = [];
+  let allTags = [];
+  let productsLoaded = false;
+  let catalogPromise = null;
+  let catsPromise = null;
   let lowStock = 5;
 
   async function api(path, opts = {}) {
@@ -157,6 +162,12 @@
       localStorage.removeItem("keep");
     } catch {}
     token = "";
+    categories = [];
+    allProducts = [];
+    allTags = [];
+    productsLoaded = false;
+    catalogPromise = null;
+    catsPromise = null;
     $("#loginErr").textContent = msg || "";
     $("#login").hidden = false;
     $("#app").hidden = true;
@@ -225,9 +236,33 @@
       };
   };
 
-  async function loadCategories() {
-    categories = await api("/content/cat");
-    return categories;
+  async function loadCategories(force = false) {
+    if (categories.length && !force) return categories;
+    if (catsPromise && !force) return catsPromise;
+    catsPromise = api("/content/cat")
+      .then((c) => {
+        categories = c;
+        return categories;
+      })
+      .finally(() => {
+        catsPromise = null;
+      });
+    return catsPromise;
+  }
+
+  async function ensureCatalog(force = false) {
+    if (productsLoaded && !force) return;
+    if (catalogPromise && !force) return catalogPromise;
+    catalogPromise = Promise.all([api("/products"), api("/content/tag"), loadCategories(force)])
+      .then(([p, t]) => {
+        allProducts = p;
+        allTags = t;
+        productsLoaded = true;
+      })
+      .finally(() => {
+        catalogPromise = null;
+      });
+    return catalogPromise;
   }
 
   // ---- Reusable form parts ----
@@ -649,12 +684,10 @@
 
   // ---- Products ----
 
-  let allProducts = [];
-  let allTags = [];
   const productFilter = { q: "", cat: "", show: "", limit: 50 };
 
   const products = run(async () => {
-    [allProducts, allTags] = await Promise.all([api("/products"), api("/content/tag"), loadCategories()]);
+    await ensureCatalog();
     view().innerHTML = `<div class="toolbar"><button class="btn" id="new">Add product</button>
       <input id="pq" type="search" placeholder="Search name or SKU" value="${esc(productFilter.q)}" aria-label="Search products">
       <select id="pcat" aria-label="Category"><option value="">All categories</option>${categories.map((c) => `<option value="${esc(c.slug)}" ${c.slug === productFilter.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
@@ -698,7 +731,7 @@
         .slice(0, limit)
         .map(
           (p) => `<tr data-id="${p.id}" class="${p.active ? "" : "off"}">
-      <td>${p.images?.[0] ? `<img class="mini" src="${esc(p.images[0].thumb || p.images[0].src)}" alt="" loading="lazy" width="44" height="44">` : ""}</td>
+      <td>${p.images?.[0] ? `<img class="mini" src="${esc(p.images[0].thumb || p.images[0].src)}" alt="" loading="lazy" decoding="async" width="44" height="44">` : ""}</td>
       <td><button type="button" class="link prod-title" data-e="${p.id}">${esc(p.name)}</button></td>
       <td data-l="Price"><input class="num" type="number" min="0" data-q="price" value="${p.price}" aria-label="Price of ${esc(p.name)}"></td>
       <td data-l="Old price"><input class="num" type="number" min="0" data-q="regular" value="${p.regular}" aria-label="Old price of ${esc(p.name)}"></td>
@@ -778,7 +811,7 @@
       const cur = $$('input[name="cat"]:checked', $("#pcatpick")).map((x) => x.value);
       if (!categories.some((c) => c.slug === slug)) {
         await api("/content/cat/" + encodeURIComponent(slug), { method: "PUT", body: { name, path: slug } });
-        categories.push({ name, slug, path: slug });
+        await loadCategories(true);
       }
       if (!cur.includes(slug)) cur.push(slug);
       $("#pcatpick").innerHTML = checkList("cat", cur, true);
@@ -797,6 +830,7 @@
         if (!confirm(`Delete ${p.name}? This can't be undone. If it has been ordered before, it will be hidden instead.`)) return;
         const r = await api("/products/" + p.id, { method: "DELETE" });
         unsaved = false;
+        await ensureCatalog(true);
         await products();
         needsPublish(r.deleted ? "Product deleted." : "This product has old orders, so it was hidden instead of deleted.");
       });
@@ -925,6 +959,7 @@
         out.stockDelta = +d.get("stock") - p.stock; // never an absolute number: orders may have come in since this form opened
         await api("/products/" + p.id, { method: "PUT", body: out });
       }
+      await ensureCatalog(true);
       await products();
       needsPublish("Product saved. Price, stock and visibility are live; click Publish changes for name, photo or text edits.");
     });
@@ -959,6 +994,7 @@
         method: "PUT",
         body: { name, slug, path: parent ? `${parent}/${slug}` : slug },
       });
+      await loadCategories(true);
       await cats();
       needsPublish(`Category "${name}" saved.`);
     });
@@ -970,6 +1006,7 @@
       b.onclick = run(async () => {
         if (!confirm("Delete this category? Its web address will stop working after Publish.")) return;
         await api("/content/cat/" + encodeURIComponent(b.dataset.x), { method: "DELETE" });
+        await loadCategories(true);
         await cats();
         needsPublish("Category deleted.");
       });
@@ -1003,6 +1040,7 @@
         method: "PUT",
         body: { ...c, name: nameEl.value.trim(), path: parent ? `${parent}/${slug}` : slug },
       });
+      await loadCategories(true);
       await cats();
       needsPublish("Category saved.");
     });
@@ -1276,6 +1314,7 @@
       const name = prompt("Name of the new tag")?.trim();
       if (!name) return;
       await api("/content/tag/" + encodeURIComponent(slugify(name)), { method: "PUT", body: { name } });
+      productsLoaded = false;
       await tags();
       needsPublish("Tag added.");
     });
@@ -1295,6 +1334,7 @@
           const t = l.find((x) => x.slug === b.dataset.s);
           t.name = $(`[data-n="${CSS.escape(t.slug)}"]`).value.trim();
           await api("/content/tag/" + encodeURIComponent(t.slug), { method: "PUT", body: t });
+          allTags = l;
           needsPublish("Saved.");
         });
       });
@@ -1302,6 +1342,7 @@
         b.onclick = run(async () => {
           if (!confirm("Delete this tag? Its web address will stop working after Publish.")) return;
           await api("/content/tag/" + encodeURIComponent(b.dataset.x), { method: "DELETE" });
+          productsLoaded = false;
           await tags();
           needsPublish("Deleted.");
         });
@@ -1591,13 +1632,14 @@
     menu: () => settings("menu"),
     settings: () => settings("delivery"), // old bookmarks
     product: async (id) => {
-      await products();
+      await ensureCatalog();
       const p = allProducts.find((x) => x.id === +id);
       if (p) editProduct(p);
+      else await products();
     },
     "new-product": async () => {
-      await products();
-      $("#new").click();
+      await ensureCatalog();
+      editProduct({ cats: [], images: [], attrs: [], active: true, price: 0, regular: 0, stock: 0, name: "", slug: "" }, true);
     },
     "new-post": () => blog.add(),
     publish: async () => {
@@ -1636,7 +1678,6 @@
   }
 
   // The search box finds tasks by their everyday words, and products by name.
-  let findList = null;
   function finder() {
     const box = $("#find"),
       res = $("#findres");
@@ -1644,11 +1685,11 @@
       res.hidden = true;
     };
     box.oninput = run(async () => {
-      findList ??= await api("/products");
+      if (!productsLoaded) await ensureCatalog();
       const q = box.value.trim().toLowerCase();
       if (!q) return close();
       const jobs = JOBS.filter(([label, , words]) => (label + " " + words).toLowerCase().includes(q)).slice(0, 5);
-      const items = (findList || []).filter((p) => (p.name + " " + (p.sku || "")).toLowerCase().includes(q)).slice(0, 6);
+      const items = allProducts.filter((p) => (p.name + " " + (p.sku || "")).toLowerCase().includes(q)).slice(0, 6);
       res.innerHTML =
         jobs.map(([label, href]) => `<a href="${href}">${esc(label)}</a>`).join("") +
         items.map((p) => `<a href="#product/${p.id}"><small>Product</small> ${esc(p.name)}</a>`).join("") ||
@@ -1692,6 +1733,7 @@
     } catch {}
     finder();
     go();
+    ensureCatalog().catch(() => {});
     const s = await api("/settings").catch(() => ({}));
     site = s.site || null;
     lowStock = s.live?.lowStock ?? lowStock;

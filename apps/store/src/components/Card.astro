@@ -1,10 +1,10 @@
 ---
 import { img, taka, off } from "../lib/shop";
-const { p, eager } = Astro.props;
+const { p, eager, hidden = false } = Astro.props;
 const d = off(p);
 ---
 
-<article class="card" data-card data-name={p.name.toLowerCase()} data-price={p.price} data-id={p.id} data-stocked={p.inStock ? "1" : "0"}>
+<article class="card" data-card data-name={p.name.toLowerCase()} data-price={p.price} data-id={p.id} data-stocked={p.inStock ? "1" : "0"} hidden={hidden}>
   <a href={`/product/${p.slug}/`} class="thumb">
     <img
       src={img(p.images[0]?.thumb)}

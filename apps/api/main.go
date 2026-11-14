@@ -48,8 +48,8 @@ var (
 	dev = os.Getenv("DEV") != ""
 
 	// Snapshots rebuilt only after a write, so browsing and builds never wake the database.
-	stockSnap, catalogSnap, storefrontSnap atomic.Pointer[[]byte]
-	snapMu                                 sync.Mutex
+	stockSnap, catalogSnap, storefrontSnap, adminProductsSnap atomic.Pointer[[]byte]
+	snapMu                                                    sync.Mutex
 
 	httpClient = &http.Client{Timeout: 8 * time.Second}
 )
@@ -84,6 +84,7 @@ func main() {
 		if err := applyContentUpdates(c); err != nil {
 			log.Print("content updates: ", err)
 		}
+		refresh()
 	}()
 	addr := "127.0.0.1:8080"
 	if p := os.Getenv("PORT"); p != "" {
@@ -144,14 +145,11 @@ func seed(ctx context.Context, productsFile, contentFile string) error {
 	if err = json.Unmarshal(b, &list); err != nil {
 		return err
 	}
-	for _, p := range list {
-		stock := 0
-		if p["inStock"] == true {
-			stock = 100 // WooCommerce's public API hides quantities: set the real ones in admin
-		}
-		j, _ := json.Marshal(p)
-		if _, err = db.Exec(ctx, `INSERT INTO products(id,slug,price,regular,stock,data) VALUES($1,$2,$3,$4,$5,$6::jsonb)
-			ON CONFLICT(id) DO NOTHING`, int64(p["id"].(float64)), p["slug"], int64(p["price"].(float64)), int64(p["regular"].(float64)), stock, string(j)); err != nil {
+	if len(list) > 0 {
+		if _, err = db.Exec(ctx, `INSERT INTO products(id,slug,price,regular,stock,data)
+			SELECT (p->>'id')::bigint, p->>'slug', (p->>'price')::bigint, (p->>'regular')::bigint,
+				CASE WHEN (p->>'inStock')='true' THEN 100 ELSE 0 END, p
+			FROM jsonb_array_elements($1::jsonb) p ON CONFLICT(id) DO NOTHING`, string(b)); err != nil {
 			return err
 		}
 	}
@@ -173,9 +171,10 @@ func seed(ctx context.Context, productsFile, contentFile string) error {
 		if has {
 			continue
 		}
-		for _, c := range content[key] {
-			j, _ := json.Marshal(c)
-			if _, err = db.Exec(ctx, `INSERT INTO content(kind,slug,data) VALUES($1,$2,$3::jsonb) ON CONFLICT DO NOTHING`, kind, c["slug"], string(j)); err != nil {
+		if len(content[key]) > 0 {
+			j, _ := json.Marshal(content[key])
+			if _, err = db.Exec(ctx, `INSERT INTO content(kind,slug,data)
+				SELECT $1, c->>'slug', c FROM jsonb_array_elements($2::jsonb) c ON CONFLICT DO NOTHING`, kind, string(j)); err != nil {
 				return err
 			}
 		}
@@ -261,8 +260,8 @@ func router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer, middleware.Timeout(45*time.Second), originGuard)
 	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
-	r.Get("/api/catalog", catalog)
-	r.Get("/api/storefront", storefront)
+	r.With(middleware.Compress(5)).Get("/api/catalog", catalog)
+	r.With(middleware.Compress(5)).Get("/api/storefront", storefront)
 	r.Get("/api/stock", stockFile)
 	r.With(limit(30, 10*time.Minute)).Post("/api/checkout", checkout)
 	r.With(limit(30, 10*time.Minute)).Post("/api/coupon", couponPreview)
@@ -275,7 +274,7 @@ func router() http.Handler {
 	r.Post("/api/logout", logout)
 	r.Get("/api/me", me)
 	r.Route("/api/admin", func(a chi.Router) {
-		a.Use(adminOnly)
+		a.Use(adminOnly, middleware.Compress(5))
 		a.Get("/dashboard", adminDashboard)
 		a.Get("/orders", adminOrders)
 		a.Get("/orders.csv", adminOrdersCSV)

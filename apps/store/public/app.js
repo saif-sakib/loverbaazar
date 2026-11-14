@@ -45,6 +45,7 @@
   let cart = get("cart", {});
   let wish = get("wish", []);
   let index = null; // the search index, with live prices merged in
+  let rawIndex = null;
   let stock = {}; // id: [price, regular, units], units capped at 99
   let live = null; // settings that take effect without a rebuild
   let repaintCheckout = () => {};
@@ -70,7 +71,16 @@
 
   async function items() {
     if (index) return index;
-    const list = await (await fetch("/search-index.json")).json();
+    rawIndex ||= fetch("/search-index.json")
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .catch((e) => {
+        rawIndex = null;
+        throw e;
+      });
+    const list = (await rawIndex).map((p) => ({ ...p }));
     const known = Object.keys(stock).length > 0;
     list.forEach((p) => {
       const s = stock[p.id];
@@ -266,6 +276,11 @@
   async function renderWish() {
     const el = $("[data-wishlist]");
     if (!el) return;
+    if (!wish.length) {
+      el.innerHTML = "<p>Your wishlist is empty.</p>";
+      badges();
+      return;
+    }
     const l = (await items()).filter((p) => wish.includes(p.id));
     el.innerHTML = l.map(card).join("") || "<p>Your wishlist is empty.</p>";
     badges();
@@ -345,6 +360,7 @@
   }
 
   async function totals() {
+    if (!Object.keys(cart).length) return { lines: [], sub: 0 };
     const all = await items();
     const gone = Object.keys(cart).filter((id) => !all.some((x) => x.id == id));
     if (gone.length) { // removed from the shop since it was added, so don't keep counting it
@@ -606,6 +622,10 @@
     const seen = get("seen", [])
       .filter((x) => x !== here)
       .slice(0, 4);
+    if (!seen.length) {
+      el.closest("[data-recent-wrap]").hidden = true;
+      return;
+    }
     const all = await items();
     const l = seen.map((id) => all.find((p) => p.id === id)).filter(Boolean);
     el.innerHTML = l.map(card).join("");

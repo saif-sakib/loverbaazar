@@ -162,6 +162,7 @@ func reset(t *testing.T) {
 	stockSnap.Store(nil)
 	catalogSnap.Store(nil)
 	storefrontSnap.Store(nil)
+	adminProductsSnap.Store(nil)
 	product(t, 1, 1000, 50)
 	product(t, 2, 500, 50)
 }

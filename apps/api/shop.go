@@ -106,6 +106,7 @@ func loadSettings(ctx context.Context) (Live, map[string]any, error) {
 func refresh() {
 	catalogSnap.Store(nil)
 	storefrontSnap.Store(nil)
+	adminProductsSnap.Store(nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := publishStock(ctx); err != nil {

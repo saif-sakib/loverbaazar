@@ -246,7 +246,13 @@ func adminResetPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func adminProducts(w http.ResponseWriter, r *http.Request) {
-	writeList(w, r, `SELECT data||jsonb_build_object('price',price,'regular',regular,'stock',stock,'active',active) FROM products ORDER BY id DESC`)
+	serveSnap(w, r, &adminProductsSnap, func(ctx context.Context) ([]byte, error) {
+		list, err := jsonRows(ctx, `SELECT data||jsonb_build_object('price',price,'regular',regular,'stock',stock,'active',active) FROM products ORDER BY id DESC`)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(list)
+	})
 }
 
 func wholeNumber(v any) (int64, bool) {

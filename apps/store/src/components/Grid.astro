@@ -23,12 +23,12 @@ const { items } = Astro.props;
 </div>
 <div class="grid" data-grid>
   {items.map((p: any, i: number) => (
-    <Card p={p} eager={i < 4} />
+    <Card p={p} eager={i < 4} hidden={i >= 24} />
   ))}
 </div>
 <p data-nomatch hidden>
   No products match these filters.
 </p>
-<button class="btn ghost more" data-more hidden>
+<button class="btn ghost more" data-more hidden={items.length <= 24}>
   Show more
 </button>
