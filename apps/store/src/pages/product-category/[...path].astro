@@ -1,17 +1,30 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { cats, inCat, fileSlug, SITE } from "../../lib/shop";
+import { cats, inCat, fileSlug, SITE, taka, siteUrl } from "../../lib/shop";
 export const getStaticPaths = () => cats.map((c) => ({ params: { path: fileSlug(c.path) }, props: { c } }));
 const { c } = Astro.props;
 const items = inCat(c.slug);
+const minPrice = items.length ? Math.min(...items.map((x: any) => x.price)) : 0;
+const seoDesc = items.length
+  ? `${c.name} price in Bangladesh starts from ${taka(minPrice)}. Shop ${items.length} ${c.name} products online at ${SITE.name} with cash on delivery.`
+  : `${c.name} price in Bangladesh. Buy ${c.name} online from ${SITE.name} with cash on delivery.`;
+const crumbs = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: siteUrl("/") },
+    { "@type": "ListItem", position: 2, name: "Shop", item: siteUrl("/shop/") },
+    { "@type": "ListItem", position: 3, name: c.name },
+  ],
+};
+const json = (o: any) => JSON.stringify(o).replace(/</g, "\\u003c");
 ---
 
-<Base
-  title={c.name}
-  description={`${c.name} price in Bangladesh. Buy ${c.name} online from ${SITE.name} with cash on delivery.`}
-  noindex={!items.length}
->
+<Base title={c.name} description={seoDesc} noindex={!items.length}>
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={json(crumbs)} />
+  </Fragment>
   <div class="wrap">
     <p class="crumbs">
       <a href="/">Home</a> / <a href="/shop/">Shop</a> / {c.name}

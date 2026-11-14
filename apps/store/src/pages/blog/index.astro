@@ -1,10 +1,10 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { posts } from "../../lib/shop";
+import { posts, SITE } from "../../lib/shop";
 const when = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 ---
 
-<Base title="Blog">
+<Base title="Blog" description={`Buying guides, appliance tips, and product updates from ${SITE.name} in Bangladesh.`}>
   <div class="wrap">
     <div class="pagehead">
       <h1 class="title">Blog</h1>

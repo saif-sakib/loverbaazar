@@ -8,20 +8,43 @@ const canon = new URL(Astro.url.pathname, Astro.site);
 const parts = SITE.name.split(/(?=[A-Z])/);
 const logoEnd = parts.length > 1 ? parts.pop() : "";
 const logoStart = parts.join("");
-const ogImage = image ? (image.startsWith("http") ? image : siteUrl(image)) : siteUrl(SITE.logo || "/og-image.jpg");
+const absUrl = (u: string) => (u.startsWith("http") ? u : siteUrl(u));
+const defaultOg = !image && !SITE.logo;
+const ogImage = image ? absUrl(image) : absUrl(SITE.logo || "/og-image.jpg");
+const payments = LIVE.payments.filter((p: any) => p.enabled);
 const org = {
   "@context": "https://schema.org",
   "@type": "Store",
   name: SITE.name,
   url: Astro.site?.href,
-  logo: siteUrl(SITE.logo || "/favicon.svg"),
+  logo: absUrl(SITE.logo || "/logo/primary-logo.jpg"),
   image: ogImage,
   telephone: telOf(SITE.phone),
   email: SITE.email,
-  address: SITE.address || undefined,
+  priceRange: "৳৳",
+  currenciesAccepted: "BDT",
+  paymentAccepted: payments.map((p: any) => p.label).join(", ") || undefined,
+  address: SITE.address
+    ? {
+        "@type": "PostalAddress",
+        streetAddress: SITE.address,
+        addressLocality: "Jashore",
+        addressCountry: "BD",
+      }
+    : undefined,
   sameAs: [SITE.facebook, SITE.youtube].filter(Boolean),
 };
-const payments = LIVE.payments.filter((p: any) => p.enabled);
+const webSiteLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: SITE.name,
+  url: siteUrl("/"),
+  potentialAction: {
+    "@type": "SearchAction",
+    target: `${siteUrl("/search/")}?q={search_term_string}`,
+    "query-input": "required name=search_term_string",
+  },
+};
 const standardSlugs = new Set(["about-us", "how-to-buy", "contact-us", "privacy-policy", "terms-conditions"]);
 const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slug));
 ---
@@ -33,20 +56,33 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>{full}</title>
     <meta name="description" content={description} />
+    <meta
+      name="robots"
+      content={noindex
+        ? "noindex, nofollow"
+        : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}
+    />
     <link rel="canonical" href={canon} />
-    {noindex && <meta name="robots" content="noindex" />}
+    <meta property="og:locale" content="en_BD" />
     <meta property="og:title" content={full} />
     <meta property="og:description" content={description} />
     <meta property="og:site_name" content={SITE.name} />
     <meta property="og:type" content={type} />
     <meta property="og:url" content={canon} />
     <meta property="og:image" content={ogImage} />
+    <meta property="og:image:alt" content={full} />
+    {defaultOg && <meta property="og:image:width" content="1200" />}
+    {defaultOg && <meta property="og:image:height" content="630" />}
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={full} />
+    <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
     <meta name="theme-color" content="#b3122e" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="alternate" type="application/rss+xml" title={`${SITE.name} Product Feed`} href={siteUrl("/feed.xml")} />
     <script type="application/ld+json" set:html={JSON.stringify(org).replace(/</g, "\\u003c")} />
+    <script type="application/ld+json" set:html={JSON.stringify(webSiteLd).replace(/</g, "\\u003c")} />
     <slot name="head" />
     <script is:inline src="/app.js" defer></script>
   </head>
@@ -66,14 +102,11 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     <header class="top">
       <div class="wrap bar">
         <a href="/" class="logo" aria-label={`${SITE.name} home`}>
-          {SITE.logo ? (
-            <img class="logo-img" src={SITE.logo} alt={SITE.name} height="38" />
-          ) : (
-            <>
-              <img class="logo-mark" src="/favicon.svg" alt="" width="34" height="34" />
-              <span>{logoStart}<em>{logoEnd}</em></span>
-            </>
-          )}
+          <img class="logo-mark" src={SITE.logo || "/favicon.svg"} alt="" width="40" height="40" />
+          <span class="logo-txt">
+            <span class="logo-name">{logoStart}<em>{logoEnd}</em></span>
+            <small class="logo-sub">Kitchen &amp; Home</small>
+          </span>
         </a>
         <form action="/search/" class="find" role="search">
           <input
@@ -154,14 +187,11 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
       <div class="wrap cols">
         <div>
           <a href="/" class="logo" aria-label={`${SITE.name} home`}>
-            {SITE.logo ? (
-              <img class="logo-img" src={SITE.logo} alt={SITE.name} height="34" />
-            ) : (
-              <>
-                <img class="logo-mark" src="/favicon.svg" alt="" width="30" height="30" />
-                <span>{logoStart}<em>{logoEnd}</em></span>
-              </>
-            )}
+            <img class="logo-mark" src={SITE.logo || "/favicon.svg"} alt="" width="38" height="38" />
+            <span class="logo-txt">
+              <span class="logo-name">{logoStart}<em>{logoEnd}</em></span>
+              <small class="logo-sub">Kitchen &amp; Home</small>
+            </span>
           </a>
           <p>{SITE.about}</p>
           {SITE.address && <p>{SITE.address}</p>}

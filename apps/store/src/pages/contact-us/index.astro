@@ -3,7 +3,10 @@ import Base from "../../layouts/Base.astro";
 import { SITE, telOf, waOf } from "../../lib/shop";
 ---
 
-<Base title="Contact us">
+<Base
+  title="Contact us"
+  description={`Contact ${SITE.name} by phone (${SITE.phone}), WhatsApp, or email, or visit us at ${SITE.address || "Jashore, Bangladesh"}.`}
+>
   <div class="wrap">
     <div class="pagehead">
       <h1 class="title">Contact us</h1>

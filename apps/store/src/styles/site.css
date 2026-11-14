@@ -45,6 +45,10 @@ img {
   height: auto;
   display: block;
 }
+img[src*="placeholder.svg"] {
+  mix-blend-mode: normal !important;
+  object-fit: cover;
+}
 h1,
 h2 {
   font-weight: 800;
@@ -116,26 +120,42 @@ h3 {
 .logo {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   font-weight: 800;
-  font-size: 24px;
-  letter-spacing: -0.04em;
+  font-size: 21px;
+  letter-spacing: -0.03em;
+  flex: none;
 }
 .logo em {
   font-style: normal;
   color: var(--brand);
 }
 .logo-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
   flex: none;
+  box-shadow: 0 3px 10px rgba(26, 23, 22, 0.14);
+  border: 1px solid rgba(26, 23, 22, 0.08);
 }
-.logo-img {
-  height: 38px;
-  width: auto;
-  max-width: 180px;
-  object-fit: contain;
+.logo-txt {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.08;
+  gap: 3px;
+}
+.logo-name {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.logo-sub {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
 }
 .find {
   flex: 1;
@@ -1159,14 +1179,19 @@ footer {
 }
 footer .logo {
   color: #fff;
+  margin-bottom: 12px;
 }
 footer .logo em {
-  color: #e9a9b3;
+  color: #f09a59;
+}
+footer .logo-sub {
+  color: #a69d94;
 }
 footer .logo-mark {
-  width: 30px;
-  height: 30px;
-  box-shadow: 0 0 0 1px #ffffff24;
+  width: 38px;
+  height: 38px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 .social {
   display: flex;

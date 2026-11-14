@@ -1,10 +1,13 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { products } from "../../lib/shop";
+import { products, SITE } from "../../lib/shop";
 ---
 
-<Base title="All products">
+<Base
+  title="All products"
+  description={`Browse all ${products.length} kitchen and home appliances, cookware, chairs, tables, and wardrobes at wholesale prices in Bangladesh from ${SITE.name}.`}
+>
   <div class="wrap">
     <div class="pagehead">
       <h1 class="title">All products</h1>

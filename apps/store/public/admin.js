@@ -676,8 +676,13 @@
     if (!w) return say("Your browser blocked the invoice window. Please allow pop-ups for this page.");
     w.document
       .write(`<!doctype html><title>Invoice ${esc(o.number)}</title><style>body{font:14px/1.5 system-ui,sans-serif;max-width:640px;margin:32px auto;color:#111}table{width:100%;border-collapse:collapse;margin:16px 0}td,th{border:1px solid #bbb;padding:8px;text-align:left}td:last-child,th:last-child{text-align:right}</style>
-      <h2 style="display:flex;align-items:center;gap:10px;margin:0 0 8px"><img src="${esc(s.logo || "/favicon.svg")}" alt="" width="36" height="36" style="border-radius:8px;object-fit:contain">${esc(s.name || "Invoice")}</h2><p>${esc(s.phone)}${s.address ? `<br>${esc(s.address)}` : ""}</p>
-      <p><b>Invoice ${esc(o.number)}</b><br>${esc(when(o.created_at))}</p>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:14px;border-bottom:2px solid #222;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <img src="${esc(s.logo || "/favicon.svg")}" alt="" width="42" height="42" style="border-radius:9px;object-fit:cover;flex:none">
+          <div><b style="font-size:18px;display:block">${esc(s.name || "LoverBaazar")}</b><span style="font-size:13px;color:#444">${esc(s.phone)}${s.address ? ` · ${esc(s.address)}` : ""}</span></div>
+        </div>
+        <div style="text-align:right"><b>Invoice ${esc(o.number)}</b><br><span style="font-size:13px;color:#444">${esc(when(o.created_at))}</span></div>
+      </div>
       <p><b>${esc(o.name)}</b>, ${esc(o.phone)}${o.email ? `, ${esc(o.email)}` : ""}<br>${esc(o.address)} (${esc(o.area)})</p>
       <table><tr><th>Item</th><th>Qty</th><th>Amount</th></tr>${(o.items || []).map((i) => `<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>${money(i.price * i.qty)}</td></tr>`).join("")}
       ${o.discount ? `<tr><td colspan=2>Discount (${esc(o.coupon)})</td><td>−${money(o.discount)}</td></tr>` : ""}

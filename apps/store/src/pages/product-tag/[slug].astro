@@ -1,13 +1,30 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { tags, products, fileSlug } from "../../lib/shop";
+import { tags, products, fileSlug, SITE, siteUrl } from "../../lib/shop";
 export const getStaticPaths = () => tags.map((t) => ({ params: { slug: fileSlug(t.slug) }, props: { t } }));
 const { t } = Astro.props;
 const items = products.filter((p) => p.tags.includes(t.slug));
+const crumbs = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: siteUrl("/") },
+    { "@type": "ListItem", position: 2, name: "Shop", item: siteUrl("/shop/") },
+    { "@type": "ListItem", position: 3, name: t.name },
+  ],
+};
+const json = (o: any) => JSON.stringify(o).replace(/</g, "\\u003c");
 ---
 
-<Base title={t.name} noindex={!items.length}>
+<Base
+  title={t.name}
+  description={`${t.name} products and prices in Bangladesh at ${SITE.name}. Order online with cash on delivery.`}
+  noindex={!items.length}
+>
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={json(crumbs)} />
+  </Fragment>
   <div class="wrap">
     <p class="crumbs">
       <a href="/">Home</a> / <a href="/shop/">Shop</a> / {t.name}

@@ -9,29 +9,43 @@ const url = siteUrl(`/product/${p.slug}/`);
 const myCats = p.cats.map((s: string) => cats.find((c: any) => c.slug === s)).filter(Boolean);
 const related = products.filter((x) => x.id !== p.id && x.cats.some((c: string) => p.cats.includes(c))).slice(0, 4);
 const stars = rating(p);
+const absImg = (u = "") => {
+  const s = img(u);
+  return s.startsWith("http") ? s : siteUrl(s);
+};
+const cleanDesc = (p.short || p.desc || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+const seoDesc =
+  p.short ||
+  `${p.name} price in Bangladesh is ${taka(p.price)} at ${SITE.name}. ${cleanDesc ? cleanDesc.slice(0, 110) : `Buy genuine ${myCats[0]?.name || "home appliances"} online with cash on delivery across Bangladesh.`}`;
+const brandName = p.attrs?.find((a: any) => /brand/i.test(a.name))?.values?.[0] || SITE.name;
 const ld = {
   "@context": "https://schema.org",
   "@type": "Product",
   name: p.name,
   sku: p.sku || undefined,
-  image: p.images.map((i: any) => img(i.src)),
-  description: p.short || p.name,
+  brand: { "@type": "Brand", name: brandName },
+  image: p.images.length ? p.images.map((i: any) => absImg(i.src)) : [siteUrl("/og-image.jpg")],
+  description: cleanDesc || p.name,
   offers: {
     "@type": "Offer",
     url,
     priceCurrency: "BDT",
     price: p.price,
+    itemCondition: "https://schema.org/NewCondition",
     availability: p.inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    seller: { "@type": "Organization", name: SITE.name },
   },
   aggregateRating: p.reviews.length
     ? { "@type": "AggregateRating", ratingValue: stars.toFixed(1), reviewCount: p.reviews.length }
     : undefined,
-  review: p.reviews.slice(0, 5).map((r: any) => ({
-    "@type": "Review",
-    author: { "@type": "Person", name: r.name },
-    reviewRating: { "@type": "Rating", ratingValue: r.rating },
-    reviewBody: r.body,
-  })),
+  review: p.reviews.length
+    ? p.reviews.slice(0, 5).map((r: any) => ({
+        "@type": "Review",
+        author: { "@type": "Person", name: r.name },
+        reviewRating: { "@type": "Rating", ratingValue: r.rating },
+        reviewBody: r.body,
+      }))
+    : undefined,
 };
 const crumbs = {
   "@context": "https://schema.org",
@@ -48,11 +62,14 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
 
 <Base
   title={p.name}
-  description={p.short || `Buy ${p.name} online in Bangladesh from ${SITE.name}.`}
-  image={img(p.images[0]?.src)}
+  description={seoDesc}
+  image={p.images[0]?.src ? absImg(p.images[0].src) : "/og-image.jpg"}
   type="product"
 >
   <Fragment slot="head">
+    <meta property="product:price:amount" content={String(p.price)} />
+    <meta property="product:price:currency" content="BDT" />
+    <meta property="product:availability" content={p.inStock ? "in stock" : "out of stock"} />
     <script type="application/ld+json" set:html={json(ld)} />
     <script type="application/ld+json" set:html={json(crumbs)} />
   </Fragment>
