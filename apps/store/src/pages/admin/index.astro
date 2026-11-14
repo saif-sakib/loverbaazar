@@ -11,27 +11,29 @@ import "../../styles/admin.css";
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="robots" content="noindex" />
     <title>LoverBaazar Admin</title>
-    <link rel="icon" href="data:," />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script is:inline src="/admin.js" defer></script>
   </head>
   <body class="admin">
     <div class="wrap">
       <form class="panel login" id="login">
-        <h1>LoverBaazar Admin</h1>
+        <div class="login-badge"><img class="adminlogo-mark" src="/favicon.svg" alt="" width="24" height="24" />LoverBaazar · Admin</div>
+        <h1>Sign in to Admin</h1>
+        <p class="login-sub">Enter your admin password to manage orders, catalog, and storefront settings.</p>
         <label class="field">
-          Admin password
+          <span class="flabel">Admin password</span>
           <input id="tok" type="password" autocomplete="current-password" required />
         </label>
         <label class="check field">
           <input id="keep" type="checkbox" /> Keep me signed in on this device
         </label>
         <p class="err" id="loginErr"></p>
-        <button class="btn small">Enter</button>
+        <button class="btn login-btn">Sign in</button>
       </form>
       <div id="app" hidden>
         <aside class="adminbar">
           <div class="adminbar-top">
-            <a class="adminlogo" href="#dashboard">LoverBaazar <span>Admin</span></a>
+            <a class="adminlogo" href="#dashboard"><img class="adminlogo-mark" src="/favicon.svg" alt="" width="24" height="24" />LoverBaazar <span>Admin</span></a>
             <a class="shop-ext" href="/" target="_blank" rel="noopener">View shop ↗</a>
           </div>
           <div class="adminfind">

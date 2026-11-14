@@ -267,7 +267,7 @@
   }
 
   const card = (p) => `<article class="card">
-    <a class="thumb" href="/product/${esc(p.slug)}/"><img loading="lazy" src="${esc(p.thumb)}" alt="${esc(p.name)}" width="300" height="300"></a>
+    <a class="thumb" href="/product/${esc(p.slug)}/"><img loading="lazy" src="${esc(p.thumb || "/placeholder.svg")}" alt="${esc(p.name)}" width="300" height="300"></a>
     <button class="heart" data-wish="${p.id}" aria-label="Add ${esc(p.name)} to wishlist">♥</button>
     <div class="body"><a class="name" href="/product/${esc(p.slug)}/">${esc(p.name)}</a>
     <div class="price">${priceHtml(p.price, p.regular)}</div>
@@ -345,7 +345,7 @@
         box.innerHTML = l
           .map(
             (p) =>
-              `<a href="/product/${esc(p.slug)}/"><img src="${esc(p.thumb)}" alt="" width="40" height="40" loading="lazy"><span>${esc(p.name)}</span><b>${taka(p.price)}</b></a>`,
+              `<a href="/product/${esc(p.slug)}/"><img src="${esc(p.thumb || "/placeholder.svg")}" alt="" width="40" height="40" loading="lazy"><span>${esc(p.name)}</span><b>${taka(p.price)}</b></a>`,
           )
           .join("");
         box.hidden = !l.length;
@@ -381,7 +381,7 @@
       lines
         .map(
           (l) => `<div class="line">
-      <img src="${esc(l.p.thumb)}" alt="" width="64" height="64">
+      <img src="${esc(l.p.thumb || "/placeholder.svg")}" alt="" width="64" height="64">
       <div><a href="/product/${esc(l.p.slug)}/">${esc(l.p.name)}</a><br>${taka(l.p.price)} ${l.p.inStock ? "" : "<b>Sold out</b>"}<br>
       <button class="link" data-del="${l.p.id}">Remove</button></div>
       <input type="number" min="1" max="${maxFor(l.p.id)}" value="${l.qty}" data-line="${l.p.id}" aria-label="Quantity of ${esc(l.p.name)}">

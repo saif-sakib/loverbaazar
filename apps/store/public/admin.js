@@ -327,7 +327,7 @@
           .join("")}</select></label>`;
       if (f.type === "cats") return `<label class="wide">${label}<div data-k="${f.k}" data-cats>${checkList("c", v || [])}</div></label>`;
       if (f.type === "image")
-        return `<div class="wide"><span class="flabel">${esc(f.label)}</span>${f.help ? `<small class="fhelp">${esc(f.help)}</small>` : ""}<div class="img-row"><img class="img-prev" src="${esc(v)}" alt="" ${v ? "" : "hidden"}><div class="inline"><input data-k="${f.k}" value="${esc(v)}" placeholder="${esc(f.placeholder || "Upload or paste image URL")}"><label class="btn ghost small upl-inline">Upload<input type="file" accept="image/*" data-up hidden></label></div></div></div>`;
+        return `<div class="wide"><span class="flabel">${esc(f.label)}</span>${f.help ? `<small class="fhelp">${esc(f.help)}</small>` : ""}<div class="img-row"><img class="img-prev" src="${esc(v || "/placeholder.svg")}" alt=""><div class="inline"><input data-k="${f.k}" value="${esc(v)}" placeholder="${esc(f.placeholder || "Upload or paste image URL")}"><label class="btn ghost small upl-inline">Upload<input type="file" accept="image/*" data-up hidden></label></div></div></div>`;
       if (f.type === "area")
         return `<label class="wide">${label}<textarea data-k="${f.k}" rows="4" placeholder="${esc(f.placeholder || "")}">${esc(v)}</textarea></label>`;
       return `<label>${label}<input data-k="${f.k}" type="${f.type || "text"}" value="${esc(v)}" ${f.min !== undefined ? `min="${f.min}"` : ""} ${f.max !== undefined ? `max="${f.max}"` : ""} placeholder="${esc(f.placeholder || "")}" ${f.list ? 'list="sitelinks"' : ""}></label>`;
@@ -377,8 +377,8 @@
           const prev = $(".img-prev", textInp.closest(".img-row"));
           if (!prev) return;
           const val = textInp.value.trim();
-          prev.src = val;
-          prev.hidden = !val;
+          prev.src = val || "/placeholder.svg";
+          prev.hidden = false;
         });
       });
       $$(".rep", host).forEach((row, i) => {
@@ -456,20 +456,26 @@
   const dashboard = run(async () => {
     const d = await api("/dashboard");
     const top = Math.max(...d.series.map((x) => x.sales), 1);
-    const tile = (label, value, link) => `<a class="tile" href="${link || "#orders"}"><b>${esc(value)}</b><span>${esc(label)}</span></a>`;
+    const hasSeries = d.series.some((x) => x.sales > 0);
+    const tile = (label, value, link, tone = "") =>
+      `<a class="tile${tone ? " " + tone : ""}" href="${link || "#orders"}"><b>${esc(value)}</b><span>${esc(label)}</span></a>`;
     view().innerHTML = `<div class="tiles">
-      ${tile("Sales today", money(d.todaySales), "#orders/all")}${tile("Waiting for confirmation", d.pending, "#orders/pending")}${tile("Ready to ship", d.toShip, "#orders/confirmed")}${tile("New messages", d.unread, "#messages")}${tile("Pending reviews", d.reviews, "#reviews")}${tile("Sales, last 30 days", money(d.monthSales), "#orders/all")}
+      ${tile("Sales today", money(d.todaySales), "#orders/all", "primary")}${tile("Waiting for confirmation", d.pending, "#orders/pending", d.pending > 0 ? "warn" : "")}${tile("Ready to ship", d.toShip, "#orders/confirmed", d.toShip > 0 ? "warn" : "")}${tile("New messages", d.unread, "#messages", d.unread > 0 ? "warn" : "")}${tile("Pending reviews", d.reviews, "#reviews", d.reviews > 0 ? "warn" : "")}${tile("Sales, last 30 days", money(d.monthSales), "#orders/all")}
     </div>
     <h3 class="jobhead">Quick actions</h3>
     <div class="jobs">${JOBS.slice(0, 10)
       .map(([label, href]) => `<a href="${href}">${esc(label)}</a>`)
       .join("")}</div>
-    <div class="panel"><h3>Daily sales, last 14 days</h3><div class="bars" role="img" aria-label="Daily sales for the last 14 days. Best day ${money(top)}.">
+    <div class="panel"><h3>Daily sales, last 14 days</h3>${
+      hasSeries
+        ? `<div class="bars" role="img" aria-label="Daily sales for the last 14 days. Best day ${money(top)}.">
       ${d.series.map((x) => `<div class="barcol" title="${esc(x.day)}: ${money(x.sales)}, ${x.orders} orders"><span class="val">${x.sales === top && x.sales ? money(x.sales) : ""}</span><i style="height:${Math.round((x.sales / top) * 100)}%"></i><small>${esc(x.day.slice(8))}</small></div>`).join("")}
-    </div></div>
+    </div>`
+        : `<p class="empty-state">No sales recorded in the last 14 days.</p>`
+    }</div>
     <div class="split">
-      <div class="panel"><h3>Best sellers, last 30 days</h3>${d.top.length ? `<table class="tbl">${d.top.map((t) => `<tr><td>${esc(t.name)}</td><td>${t.qty} sold</td><td>${money(t.sales)}</td></tr>`).join("")}</table>` : "<p>No sales yet.</p>"}</div>
-      <div class="panel"><h3>Low stock (≤ ${lowStock} left)</h3>${d.low.length ? `<table class="tbl">${d.low.map((p) => `<tr><td><a class="link" href="#product/${p.id}">${esc(p.name)}</a></td><td><b>${p.stock}</b> left</td></tr>`).join("")}</table>` : "<p>Everything is well stocked.</p>"}</div>
+      <div class="panel"><h3>Best sellers, last 30 days</h3>${d.top.length ? `<table class="tbl">${d.top.map((t) => `<tr><td>${esc(t.name)}</td><td>${t.qty} sold</td><td>${money(t.sales)}</td></tr>`).join("")}</table>` : `<p class="empty-state">No product sales yet.</p>`}</div>
+      <div class="panel"><h3>Low stock (≤ ${lowStock} left)</h3>${d.low.length ? `<table class="tbl">${d.low.map((p) => `<tr><td><a class="link" href="#product/${p.id}">${esc(p.name)}</a></td><td><b>${p.stock}</b> left</td></tr>`).join("")}</table>` : `<p class="empty-state">All products are well stocked.</p>`}</div>
     </div>`;
   });
 
@@ -493,8 +499,8 @@
       <div class="toolbar">
       <input id="oq" type="search" placeholder="Search order #, phone, name or address" value="${esc(orderFilter.q)}" aria-label="Search orders">
       <select id="ost" aria-label="Status"><option value="">All statuses</option>${statusOptions(orderFilter.status)}</select>
-      <label class="check">From <input id="ofrom" type="date" value="${esc(orderFilter.from)}"></label><label class="check">To <input id="oto" type="date" value="${esc(orderFilter.to)}"></label>
-      <button class="btn ghost" id="csv">Download Excel CSV</button></div><div id="olist"><p>Loading…</p></div>`;
+      <label class="check toolbar-date">From <input id="ofrom" type="date" value="${esc(orderFilter.from)}"></label><label class="check toolbar-date">To <input id="oto" type="date" value="${esc(orderFilter.to)}"></label>
+      <button class="btn ghost" id="csv">Download Excel CSV</button></div><div id="olist"><div class="panel empty-state">Loading…</div></div>`;
     const reload = () => {
       orderFilter.page = 0;
       drawOrders();
@@ -551,7 +557,7 @@
       if (o.status === "shipped") return `<button type="button" class="link primary-act" data-step="delivered" data-num="${esc(o.number)}">✓ Delivered</button> `;
       return "";
     };
-    $("#olist").innerHTML = `<p><b>${res.total}</b> orders · <b>${money(res.sales)}</b> sales, excluding cancelled and returned</p>
+    $("#olist").innerHTML = `<div class="summary-bar"><span><b>${res.total}</b> orders · <b>${money(res.sales)}</b> sales, excluding cancelled and returned</span><span>Use Confirm / Ship / Delivered for 1-click updates, or Details for courier &amp; notes.</span></div>
     <div class="scroll"><table class="tbl"><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr>
     ${
       l
@@ -565,13 +571,13 @@
       <td><select class="status" data-st="${esc(o.status)}" data-o="${esc(o.number)}" aria-label="Status of ${esc(o.number)}">${statusOptions(o.status)}</select></td>
       <td class="actions">${quickBtn(o)}${o.status === "confirmed" ? `<button type="button" class="link primary-act" data-more="${esc(o.number)}" data-ship-focus>📦 Ship / Track</button>` : `<button type="button" class="link" data-more="${esc(o.number)}">Details</button>`} <button type="button" class="link" data-print="${esc(o.number)}">Invoice</button></td>
     </tr>
-    <tr id="d-${esc(o.number)}" hidden><td colspan="7"><form class="inlineform" data-n="${esc(o.number)}">
+    <tr id="d-${esc(o.number)}" class="detail-row" hidden><td colspan="7"><form class="inlineform" data-n="${esc(o.number)}">
       ${field("Courier", "courier", o.courier, "", "text", "Shown on /track/.")}
       ${field("Tracking number", "tracking", o.tracking, "", "text", "Shown on /track/.")}
       ${field("Private note", "adminNote", o.admin_note, "", "text", "Staff only.")}
-      <button class="btn">Save details</button>${o.status === "cancelled" || o.status === "returned" ? "" : ` <button type="button" class="btn pub-now" data-ship="${esc(o.number)}">Save & Mark Shipped</button>`} <button type="button" class="btn ghost small" data-copy="${esc(o.number)}">Copy address</button></form></td></tr>`,
+      <div class="inlineform-actions"><button class="btn">Save details</button>${o.status === "cancelled" || o.status === "returned" ? "" : ` <button type="button" class="btn pub-now" data-ship="${esc(o.number)}">Save & Mark Shipped</button>`} <button type="button" class="btn ghost small" data-copy="${esc(o.number)}">Copy address</button></div></form></td></tr>`,
         )
-        .join("") || `<tr><td colspan="7">No orders match.</td></tr>`
+        .join("") || `<tr><td colspan="7" class="empty-cell">No orders match these filters.</td></tr>`
     }</table></div>
     ${pages > 1 ? `<div class="pager"><button class="btn ghost" id="prev" ${orderFilter.page ? "" : "disabled"}>Previous</button> Page ${orderFilter.page + 1} of ${pages} <button class="btn ghost" id="next" ${orderFilter.page + 1 < pages ? "" : "disabled"}>Next</button></div>` : ""}`;
     if ($("#prev")) {
@@ -670,7 +676,7 @@
     if (!w) return say("Your browser blocked the invoice window. Please allow pop-ups for this page.");
     w.document
       .write(`<!doctype html><title>Invoice ${esc(o.number)}</title><style>body{font:14px/1.5 system-ui,sans-serif;max-width:640px;margin:32px auto;color:#111}table{width:100%;border-collapse:collapse;margin:16px 0}td,th{border:1px solid #bbb;padding:8px;text-align:left}td:last-child,th:last-child{text-align:right}</style>
-      <h2>${esc(s.name || "Invoice")}</h2><p>${esc(s.phone)}${s.address ? `<br>${esc(s.address)}` : ""}</p>
+      <h2 style="display:flex;align-items:center;gap:10px;margin:0 0 8px"><img src="${esc(s.logo || "/favicon.svg")}" alt="" width="36" height="36" style="border-radius:8px;object-fit:contain">${esc(s.name || "Invoice")}</h2><p>${esc(s.phone)}${s.address ? `<br>${esc(s.address)}` : ""}</p>
       <p><b>Invoice ${esc(o.number)}</b><br>${esc(when(o.created_at))}</p>
       <p><b>${esc(o.name)}</b>, ${esc(o.phone)}${o.email ? `, ${esc(o.email)}` : ""}<br>${esc(o.address)} (${esc(o.area)})</p>
       <table><tr><th>Item</th><th>Qty</th><th>Amount</th></tr>${(o.items || []).map((i) => `<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>${money(i.price * i.qty)}</td></tr>`).join("")}
@@ -691,7 +697,8 @@
     view().innerHTML = `<div class="toolbar"><button class="btn" id="new">Add product</button>
       <input id="pq" type="search" placeholder="Search name or SKU" value="${esc(productFilter.q)}" aria-label="Search products">
       <select id="pcat" aria-label="Category"><option value="">All categories</option>${categories.map((c) => `<option value="${esc(c.slug)}" ${c.slug === productFilter.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
-      <select id="pshow" aria-label="Show"><option value="">All products</option><option value="low">Low stock</option><option value="out">Sold out</option><option value="hidden">Hidden</option></select></div>
+      <select id="pshow" aria-label="Show"><option value="">All products</option><option value="low">Low stock</option><option value="out">Sold out</option><option value="hidden">Hidden</option></select>
+      <span class="toolbar-count" id="pcount"></span></div>
       <div class="scroll"><table class="tbl"><tr><th></th><th>Product</th><th>Price</th><th>Old price</th><th>Stock</th><th>Visible</th><th></th></tr><tbody id="rows"></tbody></table></div><button class="btn ghost more" id="pmore" hidden>Show more</button>`;
     $("#pshow").value = productFilter.show;
     $("#new").onclick = () =>
@@ -726,12 +733,19 @@
           (show === "out" && p.stock === 0) ||
           (show === "hidden" && !p.active)),
     );
+    const shown = Math.min(l.length, limit);
+    if ($("#pcount")) {
+      $("#pcount").textContent =
+        l.length === allProducts.length
+          ? `Showing ${shown} of ${l.length} products`
+          : `Showing ${shown} of ${l.length} matching (${allProducts.length} total)`;
+    }
     $("#rows").innerHTML =
       l
         .slice(0, limit)
         .map(
           (p) => `<tr data-id="${p.id}" class="${p.active ? "" : "off"}">
-      <td>${p.images?.[0] ? `<img class="mini" src="${esc(p.images[0].thumb || p.images[0].src)}" alt="" loading="lazy" decoding="async" width="44" height="44">` : ""}</td>
+      <td><img class="mini" src="${esc(p.images?.[0]?.thumb || p.images?.[0]?.src || "/placeholder.svg")}" alt="" loading="lazy" decoding="async" width="44" height="44"></td>
       <td><button type="button" class="link prod-title" data-e="${p.id}">${esc(p.name)}</button></td>
       <td data-l="Price"><input class="num" type="number" min="0" data-q="price" value="${p.price}" aria-label="Price of ${esc(p.name)}"></td>
       <td data-l="Old price"><input class="num" type="number" min="0" data-q="regular" value="${p.regular}" aria-label="Old price of ${esc(p.name)}"></td>
@@ -739,7 +753,7 @@
       <td data-l="Visible"><input type="checkbox" data-q="active" ${p.active ? "checked" : ""} aria-label="${esc(p.name)} visible in shop"></td>
       <td class="actions"><button class="link" data-e="${p.id}">Edit</button> <button class="link" data-dup="${p.id}">Copy</button> <a class="link" href="/product/${esc(p.slug)}/" target="_blank" rel="noopener">View</a></td></tr>`,
         )
-        .join("") || `<tr><td colspan="7">No products match.</td></tr>`;
+        .join("") || `<tr><td colspan="7" class="empty-cell">No products match these filters.</td></tr>`;
     $("#pmore").hidden = l.length <= limit;
     const find = (id) => allProducts.find((p) => p.id === +id);
     $$("[data-e]").forEach((b) => {
@@ -981,9 +995,9 @@
           <button type="button" class="btn ghost" id="newcat">Full category form…</button>
         </div>
       </form>
-      <p class="meta">Categories appear at /product-category/&lt;address&gt;/. To show categories in the top menu and home page grid, open <a class="link" href="#menu">Website → Navigation menu</a>. To add a product row on the home page, open <a class="link" href="#home">Website → Home page</a>.</p>
+      <div class="summary-bar"><span><b>${categories.length}</b> categories</span><span>Click a category name or Edit to manage it. Show in header/home via <a class="link" href="#menu">Navigation menu</a> or <a class="link" href="#home">Home page</a>.</span></div>
       <div class="scroll"><table class="tbl"><tr><th>Name</th><th>Address</th><th></th></tr>
-      ${categories.map((c) => `<tr><td>${esc(c.name)}</td><td><small>/product-category/${esc(c.path)}/</small></td><td class="actions"><button class="link" data-e="${esc(c.slug)}">Edit</button> <button class="link" data-x="${esc(c.slug)}">Delete</button></td></tr>`).join("")}</table></div>`;
+      ${categories.map((c) => `<tr><td><button type="button" class="link row-title" data-e="${esc(c.slug)}">${esc(c.name)}</button></td><td><code class="code-pill">/product-category/${esc(c.path)}/</code></td><td class="actions"><button class="link" data-e="${esc(c.slug)}">Edit</button> <button class="link" data-x="${esc(c.slug)}">Delete</button></td></tr>`).join("") || `<tr><td colspan="3" class="empty-cell">No categories yet. Add one above.</td></tr>`}</table></div>`;
     const qf = $("#quickcatform");
     bindSavePublish(qf, async () => {
       const name = $('[name="name"]', qf).value.trim();
@@ -1023,7 +1037,7 @@
         isNew
           ? field("Web address (URL slug)", "slug", "", "required", "text", "Filled automatically from the name. Cannot be changed later.") +
             `<label class="field"><span class="flabel">Parent category (optional)</span><small class="fhelp">Nests this category's URL under an existing category.</small><select name="parent"><option value="">None (top-level category)</option>${categories.map((x) => `<option value="${esc(x.path)}">${esc(x.path)}</option>`).join("")}</select></label>`
-          : `<p class="meta"><b>Web address:</b> /product-category/${esc(c.path)}/</p>`
+          : `<p class="meta"><b>Web address:</b> <code class="code-pill">/product-category/${esc(c.path)}/</code></p>`
       }
       <div class="stick"><button class="btn">Save category</button> <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
     const f = $("#cf");
@@ -1070,11 +1084,11 @@
           .map(
             (
               c,
-            ) => `<tr class="${c.active ? "" : "off"}"><td><b>${esc(c.code)}</b>${c.active ? "" : ` <span class="tag">Paused</span>`}</td><td>${c.kind === "percent" ? c.value + "%" : money(c.value)}</td><td>${money(c.min_order)}</td><td>${c.used}${c.max_uses ? ` of ${c.max_uses}` : ""}</td><td>${c.expires_at ? esc(c.expires_at.slice(0, 10)) : "No expiry"}</td>
+            ) => `<tr class="${c.active ? "" : "off"}"><td><code class="code-pill"><b>${esc(c.code)}</b></code>${c.active ? "" : ` <span class="tag">Paused</span>`}</td><td>${c.kind === "percent" ? c.value + "%" : money(c.value)}</td><td>${money(c.min_order)}</td><td>${c.used}${c.max_uses ? ` of ${c.max_uses}` : ""}</td><td>${c.expires_at ? esc(c.expires_at.slice(0, 10)) : "No expiry"}</td>
         <td><input type="checkbox" data-toggle-cp="${esc(c.code)}" ${c.active ? "checked" : ""} aria-label="Active ${esc(c.code)}"></td>
         <td class="actions"><button class="link" data-e="${esc(c.code)}">Edit</button> <button class="link" data-x="${esc(c.code)}">Delete</button></td></tr>`,
           )
-          .join("") || `<tr><td colspan="7">No coupons yet.</td></tr>`
+          .join("") || `<tr><td colspan="7" class="empty-cell">No coupons yet. Create your first code above.</td></tr>`
       }</table></div>`;
     const f = $("#cpf");
     $("#cpclear").onclick = () => {
@@ -1139,13 +1153,16 @@
 
   const customers = run(async () => {
     view().innerHTML = `<div class="toolbar"><input id="cq" type="search" placeholder="Search by name or phone number" aria-label="Search customers"></div>
-      <form class="panel inlineform" id="reset">${field("Customer forgot their password? Enter their mobile number", "phone", "", "required inputmode=tel placeholder='01XXXXXXXXX'")}<button class="btn ghost">Set a new password</button></form>
-      <p class="note" id="newpass" hidden></p><div id="clist"><p>Loading…</p></div>`;
+      <form class="panel customer-reset" id="reset">
+        ${secHead("Reset a customer password", "Set a temporary password if a customer cannot sign in to My account.", "Account login (/my-account/)", "live")}
+        <div class="inlineform-row">${field("Customer mobile number", "phone", "", "required inputmode=tel placeholder='01XXXXXXXXX'")}<button class="btn ghost">Set a new password</button></div>
+      </form>
+      <p class="note" id="newpass" hidden></p><div id="clist"><div class="panel empty-state">Loading…</div></div>`;
     const draw = run(async () => {
       const l = await api("/customers?q=" + encodeURIComponent($("#cq").value));
       $("#clist").innerHTML =
         `<div class="scroll"><table class="tbl"><tr><th>Customer</th><th>Phone</th><th>Orders</th><th>Cancelled or returned</th><th>Spent</th><th>Last order</th></tr>
-        ${l.map((c) => `<tr><td>${esc(c.name)}</td><td><a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a></td><td><a class="link" href="#orders" data-phone="${esc(c.phone)}">${c.orders}</a></td><td>${c.cancelled}</td><td>${money(c.spent)}</td><td>${esc(when(c.last))}</td></tr>`).join("") || `<tr><td colspan="6">No customers yet.</td></tr>`}</table></div>`;
+        ${l.map((c) => `<tr><td>${esc(c.name)}</td><td><a class="link" href="tel:${esc(c.phone)}">${esc(c.phone)}</a></td><td><a class="link" href="#orders" data-phone="${esc(c.phone)}">${c.orders}</a></td><td>${c.cancelled}</td><td>${money(c.spent)}</td><td>${esc(when(c.last))}</td></tr>`).join("") || `<tr><td colspan="6" class="empty-cell">No customers match yet.</td></tr>`}</table></div>`;
       $$("[data-phone]", $("#clist")).forEach((a) => {
         a.onclick = () => {
           orderFilter.q = a.dataset.phone;
@@ -1171,17 +1188,29 @@
 
   // ---- Reviews and messages ----
 
+  const contactPill = (raw) => {
+    const c = String(raw || "").trim();
+    if (!c) return "";
+    if (/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(c)) return `<a class="code-pill" href="mailto:${esc(c)}">${esc(c)}</a>`;
+    if (/^\+?[0-9][0-9 -]{5,}$/.test(c)) return `<a class="code-pill" href="tel:${esc(c.replace(/\s+/g, ""))}">${esc(c)}</a>`;
+    return `<span class="code-pill">${esc(c)}</span>`;
+  };
+
   const reviews = run(async () => {
     const l = await api("/reviews");
     view().innerHTML =
       l
         .map(
-          (
-            r,
-          ) => `<div class="panel item"><b>${esc(r.name)}</b> ${"★".repeat(r.rating)} on <a class="link" href="/product/${esc(r.slug)}/" target="_blank" rel="noopener">${esc(r.product)}</a> ${r.approved ? "" : `<span class="tag">Waiting</span>`}<p>${esc(r.body)}</p>
-      ${r.approved ? "" : `<button class="btn" data-a="${r.id}">Approve</button> <button type="button" class="btn pub-now" data-ap="${r.id}">Approve &amp; Publish</button> `}<button class="btn ghost" data-x="${r.id}">Delete</button></div>`,
+          (r) => `<div class="panel item">
+            <div class="item-head">
+              <div class="item-meta"><b>${esc(r.name)}</b> <span class="stars-badge">${"★".repeat(Math.max(0, Math.min(5, +r.rating || 0)))}</span> <span class="meta">on <a class="link" href="/product/${esc(r.slug)}/" target="_blank" rel="noopener">${esc(r.product)}</a></span></div>
+              <div class="item-meta"><span class="meta">${esc(r.created_at ? when(r.created_at) : "")}</span> <span class="tag ${r.approved ? "delivered" : "pending"}">${r.approved ? "Approved" : "Waiting"}</span></div>
+            </div>
+            <p class="item-body">${esc(r.body)}</p>
+            <div class="item-actions">${r.approved ? "" : `<button class="btn small" data-a="${r.id}">Approve</button> <button type="button" class="btn small pub-now" data-ap="${r.id}">Approve &amp; Publish</button>`}<button class="btn small ghost" data-x="${r.id}">Delete</button></div>
+          </div>`,
         )
-        .join("") || "<p>No reviews yet.</p>";
+        .join("") || `<div class="panel empty-state">No customer reviews yet.</div>`;
     $$("[data-a]").forEach((b) => {
       b.onclick = run(async () => {
         await api("/reviews/" + b.dataset.a, { method: "PUT", body: {} });
@@ -1203,6 +1232,7 @@
         if (confirm("Delete this review?")) {
           await api("/reviews/" + b.dataset.x, { method: "DELETE" });
           await reviews();
+          counts();
         }
       });
     });
@@ -1213,12 +1243,16 @@
     view().innerHTML =
       l
         .map(
-          (
-            m,
-          ) => `<div class="panel item ${m.read ? "off" : ""}"><b>${esc(m.name)}</b> ${esc(m.contact)} <small>${esc(when(m.created_at))}</small><p>${esc(m.body)}</p>
-      ${m.read ? "" : `<button class="btn" data-r="${m.id}">Mark as read</button> `}<button class="btn ghost" data-x="${m.id}">Delete</button></div>`,
+          (m) => `<div class="panel item ${m.read ? "off" : ""}">
+            <div class="item-head">
+              <div class="item-meta"><b>${esc(m.name)}</b> ${contactPill(m.contact)}</div>
+              <div class="item-meta"><span class="meta">${esc(m.created_at ? when(m.created_at) : "")}</span> <span class="tag ${m.read ? "shipped" : "pending"}">${m.read ? "Read" : "New"}</span></div>
+            </div>
+            <p class="item-body">${esc(m.body)}</p>
+            <div class="item-actions">${m.read ? "" : `<button class="btn small" data-r="${m.id}">Mark as read</button>`}<button class="btn small ghost" data-x="${m.id}">Delete</button></div>
+          </div>`,
         )
-        .join("") || "<p>No messages.</p>";
+        .join("") || `<div class="panel empty-state">No customer messages yet.</div>`;
     $$("[data-r]").forEach((b) => {
       b.onclick = run(async () => {
         await api("/messages/" + b.dataset.r, { method: "PUT", body: {} });
@@ -1231,6 +1265,7 @@
         if (confirm("Delete this message?")) {
           await api("/messages/" + b.dataset.x, { method: "DELETE" });
           await messages();
+          counts();
         }
       });
     });
@@ -1245,10 +1280,10 @@
         kind === "page"
           ? "Pages live at /<address>/ (such as /about-us/). Writing {phone}, {email} or {name} automatically inserts your Shop details."
           : "Posts appear on /blog/ (newest first) and at /<address>/.";
-      view().innerHTML = `<div class="toolbar"><button class="btn" id="newdoc">Add ${word}</button></div>
-        <p class="meta">${esc(hint)}</p>
+      view().innerHTML = `<div class="toolbar"><button class="btn" id="newdoc">Add ${word}</button><span class="toolbar-count"><b>${l.length}</b> ${word}s · Changes go live after Publish</span></div>
+        <div class="summary-bar"><span>${esc(hint)}</span><span>Click any title or Edit to update content.</span></div>
         <div class="scroll"><table class="tbl"><tr><th>Title</th><th>Address</th><th></th></tr>
-        ${l.map((d) => `<tr class="${d.draft ? "off" : ""}"><td>${esc(d.title)}${d.draft ? ` <span class="tag">Draft</span>` : ""}</td><td><small>/${esc(d.slug)}/</small></td><td class="actions"><button class="link" data-e="${esc(d.slug)}">Edit</button> <a class="link" href="/${esc(d.slug)}/" target="_blank" rel="noopener">View</a> <button class="link" data-x="${esc(d.slug)}">Delete</button></td></tr>`).join("") || `<tr><td colspan="3">Nothing here yet.</td></tr>`}</table></div>`;
+        ${l.map((d) => `<tr class="${d.draft ? "off" : ""}"><td><button type="button" class="link row-title" data-e="${esc(d.slug)}">${esc(d.title)}</button>${d.draft ? ` <span class="tag">Draft</span>` : ""}</td><td><code class="code-pill">/${esc(d.slug)}/</code></td><td class="actions"><button class="link" data-e="${esc(d.slug)}">Edit</button> <a class="link" href="/${esc(d.slug)}/" target="_blank" rel="noopener">View</a> <button class="link" data-x="${esc(d.slug)}">Delete</button></td></tr>`).join("") || `<tr><td colspan="3" class="empty-cell">Nothing here yet.</td></tr>`}</table></div>`;
       $("#newdoc").onclick = () => edit({ title: "", slug: "", html: "" }, true);
       $$("[data-e]").forEach((b) => {
         b.onclick = () => edit(l.find((d) => d.slug === b.dataset.e));
@@ -1272,7 +1307,7 @@
       view().innerHTML = `<form class="panel editor" id="df">
         ${secHead(`${isNew ? "Add" : "Edit"} ${word}`, desc, where, "pub")}
         ${field("Title", "title", d.title, "required", "text", kind === "page" ? "Page heading and footer link label." : "Article headline.")}
-        ${isNew ? field("Web address (URL slug)", "slug", "", "required", "text", "Filled automatically from the title. Cannot be changed later.") : `<p class="meta"><b>Web address:</b> /${esc(d.slug)}/</p>`}
+        ${isNew ? field("Web address (URL slug)", "slug", "", "required", "text", "Filled automatically from the title. Cannot be changed later.") : `<p class="meta"><b>Web address:</b> <code class="code-pill">/${esc(d.slug)}/</code></p>`}
         ${kind === "post" ? field("Publish date", "date", d.date, "", "date", "Posts are ordered newest first.") + field("Short summary", "excerpt", d.excerpt, "maxlength=180", "text", "Shown below the title on /blog/ and in Google search results.") : ""}
         <div class="field"><span class="flabel">Content</span><div id="body"></div></div>
         ${toggle("Draft (keep hidden)", "draft", d.draft, "Hidden from customers even after Publish until unchecked.")}
@@ -1307,28 +1342,37 @@
 
   const tags = run(async () => {
     const l = await api("/content/tag");
-    view().innerHTML = `<div class="toolbar"><input id="tq" type="search" placeholder="Find a tag" aria-label="Find a tag"><button class="btn ghost" id="newtag">Add tag</button></div>
-      <p class="meta">Tags create /product-tag/&lt;slug&gt;/ pages for Google and can also be edited directly on each product. Changes go live after Publish.</p>
+    view().innerHTML = `<div class="toolbar"><input id="tq" type="search" placeholder="Filter tags…" aria-label="Filter tags"><input class="toolbar-inp" id="newtagname" type="text" placeholder="New tag name (e.g. Energy Saving)" aria-label="New tag name"><button class="btn" id="newtag">Add tag</button></div>
+      <div class="summary-bar"><span><b>${l.length}</b> search tags</span><span>Tags create <code class="code-pill">/product-tag/&lt;slug&gt;/</code> pages and can also be edited on each product. Changes go live after Publish.</span></div>
       <div class="scroll"><table class="tbl" id="tt"></table></div>`;
-    $("#newtag").onclick = run(async () => {
-      const name = prompt("Name of the new tag")?.trim();
+    const addTag = run(async () => {
+      const inp = $("#newtagname");
+      const name = (inp?.value || "").trim() || prompt("Name of the new tag")?.trim();
       if (!name) return;
-      await api("/content/tag/" + encodeURIComponent(slugify(name)), { method: "PUT", body: { name } });
+      const slug = slugify(name);
+      if (!slug) throw Error("Enter a valid tag name.");
+      await api("/content/tag/" + encodeURIComponent(slug), { method: "PUT", body: { name } });
       productsLoaded = false;
       await tags();
-      needsPublish("Tag added.");
+      needsPublish(`Tag "${name}" added.`);
     });
+    $("#newtag").onclick = addTag;
+    $("#newtagname").onkeydown = (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      addTag();
+    };
     const draw = () => {
       const q = $("#tq").value.toLowerCase();
       const hits = l.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 100);
       $("#tt").innerHTML =
         `<tr><th>Name</th><th>Address</th><th></th></tr>` +
-        hits
+        (hits
           .map(
             (t) =>
-              `<tr><td><input value="${esc(t.name)}" data-n="${esc(t.slug)}" aria-label="Tag name"></td><td><small>/product-tag/${esc(t.slug)}/</small></td><td class="actions"><button class="link" data-s="${esc(t.slug)}">Save</button> <button class="link" data-x="${esc(t.slug)}">Delete</button></td></tr>`,
+              `<tr><td><input value="${esc(t.name)}" data-n="${esc(t.slug)}" aria-label="Tag name"></td><td><code class="code-pill">/product-tag/${esc(t.slug)}/</code></td><td class="actions"><button class="link" data-s="${esc(t.slug)}">Save</button> <button class="link" data-x="${esc(t.slug)}">Delete</button></td></tr>`,
           )
-          .join("");
+          .join("") || `<tr><td colspan="3" class="empty-cell">No tags match your filter.</td></tr>`);
       $$("[data-s]").forEach((b) => {
         b.onclick = run(async () => {
           const t = l.find((x) => x.slug === b.dataset.s);
@@ -1411,7 +1455,7 @@
             <span class="flabel">Logo image</span>
             <small class="fhelp">Shown in the top header instead of the text logo. Leave empty to display your styled shop name.</small>
             <div class="img-row">
-              <img class="img-prev" id="logoprev" src="${esc(W.logo)}" alt="Shop logo preview" ${W.logo ? "" : "hidden"}>
+              <img class="img-prev" id="logoprev" src="${esc(W.logo || "/favicon.svg")}" alt="Shop logo preview">
               <div class="inline">
                 <input name="logo" value="${esc(W.logo)}" placeholder="Upload an image or paste a URL">
                 <label class="btn ghost small upl-inline">Upload<input type="file" accept="image/*" id="logoup" hidden></label>
@@ -1511,8 +1555,8 @@
       });
       f.logo.addEventListener("input", () => {
         const val = f.logo.value.trim();
-        $("#logoprev").src = val;
-        $("#logoprev").hidden = !val;
+        $("#logoprev").src = val || "/favicon.svg";
+        $("#logoprev").hidden = false;
       });
     }
 
@@ -1672,7 +1716,7 @@
             .map(([k, v]) => `<a href="#${k}" class="${k === nav ? "on" : ""}">${esc(v)}</a>`)
             .join("")}</div>`
         : "") + `<div class="headrow"><h1>${esc(title)}</h1>${badges ? `<div class="headbadges">${badges}</div>` : ""}</div><p class="meta">${esc(help)}</p>`;
-    view().innerHTML = "<p>Loading…</p>";
+    view().innerHTML = `<div class="panel empty-state">Loading…</div>`;
     routes[tab](arg);
     scrollTo(0, 0);
   }
