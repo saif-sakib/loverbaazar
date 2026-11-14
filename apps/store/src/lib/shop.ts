@@ -43,6 +43,9 @@ export const img = (u = "") => (u || "/placeholder.svg");
 export const taka = (n: number) => "৳" + Number(n).toLocaleString("en-IN");
 export const off = (p: any) => (p.regular > p.price ? Math.round(((p.regular - p.price) / p.regular) * 100) : 0);
 export const inCat = (slug: string) => products.filter((p) => p.cats.includes(slug));
+// Everything priced below its regular price, biggest discount first. Home sections use the name "on-sale".
+export const onSale = () => products.filter((p) => off(p) > 0).sort((a, b) => off(b) - off(a));
+export const homeItems = (slug: string) => (slug === "on-sale" ? onSale() : inCat(slug));
 // WordPress stores Bangla slugs percent-encoded, but a browser's request is decoded before the file
 // is looked up. So the build must write the real letters, or those pages answer 404.
 export const fileSlug = (s: string) => {

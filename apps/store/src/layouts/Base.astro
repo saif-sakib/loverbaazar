@@ -163,19 +163,24 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
           </a>
           <p>{SITE.about}</p>
           {SITE.address && <p>{SITE.address}</p>}
-          <p>
-            {SITE.facebook && (
-              <a href={SITE.facebook} rel="noopener">
-                Facebook
-              </a>
-            )}
-            {SITE.facebook && SITE.youtube && " · "}
-            {SITE.youtube && (
-              <a href={SITE.youtube} rel="noopener">
-                YouTube
-              </a>
-            )}
-          </p>
+          {(SITE.facebook || SITE.youtube) && (
+            <div class="social">
+              {SITE.facebook && (
+                <a class="fb" href={SITE.facebook} rel="noopener" target="_blank" aria-label={`${SITE.name} on Facebook`} title="Facebook">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M13.5 21v-7.5h2.5l.4-3h-2.9V8.6c0-.9.3-1.500 1.500-1.500h1.500V4.400c-.3 0-1.200-.1-2.200-.1-2.200 0-3.700 1.300-3.700 3.800v2.400H8v3h2.500V21h3Z" />
+                  </svg>
+                </a>
+              )}
+              {SITE.youtube && (
+                <a class="yt" href={SITE.youtube} rel="noopener" target="_blank" aria-label={`${SITE.name} on YouTube`} title="YouTube">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21.600 7.200a2.500 2.500 0 0 0-1.800-1.800C18.200 5 12 5 12 5s-6.200 0-7.800.4A2.500 2.500 0 0 0 2.400 7.200 26 26 0 0 0 2 12a26 26 0 0 0 .4 4.800 2.500 2.500 0 0 0 1.800 1.800C5.800 19 12 19 12 19s6.200 0 7.800-.4a2.500 2.500 0 0 0 1.800-1.800A26 26 0 0 0 22 12a26 26 0 0 0-.4-4.800ZM10 15V9l5.200 3L10 15Z" />
+                  </svg>
+                </a>
+              )}
+            </div>
+          )}
         </div>
         {SITE.footer.map((col: any) => (
           <div>

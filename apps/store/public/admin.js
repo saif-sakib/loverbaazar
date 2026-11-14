@@ -376,7 +376,7 @@
       .map(
         (o) => `<tr>
       <td class="nowrap"><b>${esc(o.number)}</b><br><small>${esc(when(o.created_at))}</small></td>
-      <td>${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}${o.bad_phone > 0 ? ` <span class="tag warn">${o.bad_phone} cancelled or returned</span>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a><br>${esc(o.address)} (${esc(o.area)})${o.note ? `<br><i>${esc(o.note)}</i>` : ""}</td>
+      <td>${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}${o.bad_phone > 0 ? ` <span class="tag warn">${o.bad_phone} cancelled or returned</span>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a>${o.email ? `<br><a class="link" href="mailto:${esc(o.email)}">${esc(o.email)}</a>` : ""}<br>${esc(o.address)} (${esc(o.area)})${o.note ? `<br><i>${esc(o.note)}</i>` : ""}</td>
       <td>${(o.items || []).map((i) => `${esc(i.name)} × ${i.qty}`).join("<br>")}</td>
       <td>${money(o.total)}${o.discount ? `<br><small>${money(o.discount)} off, ${esc(o.coupon)}</small>` : ""}</td>
       <td>${esc(o.payment)}<br><small>${esc(o.txn_id)}</small></td>
@@ -452,11 +452,12 @@
       .write(`<!doctype html><title>Invoice ${esc(o.number)}</title><style>body{font:14px/1.5 system-ui,sans-serif;max-width:640px;margin:32px auto;color:#111}table{width:100%;border-collapse:collapse;margin:16px 0}td,th{border:1px solid #bbb;padding:8px;text-align:left}td:last-child,th:last-child{text-align:right}</style>
       <h2>${esc(s.name || "Invoice")}</h2><p>${esc(s.phone)}${s.address ? `<br>${esc(s.address)}` : ""}</p>
       <p><b>Invoice ${esc(o.number)}</b><br>${esc(when(o.created_at))}</p>
-      <p><b>${esc(o.name)}</b>, ${esc(o.phone)}<br>${esc(o.address)} (${esc(o.area)})</p>
+      <p><b>${esc(o.name)}</b>, ${esc(o.phone)}${o.email ? `, ${esc(o.email)}` : ""}<br>${esc(o.address)} (${esc(o.area)})</p>
       <table><tr><th>Item</th><th>Qty</th><th>Amount</th></tr>${(o.items || []).map((i) => `<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>${money(i.price * i.qty)}</td></tr>`).join("")}
       ${o.discount ? `<tr><td colspan=2>Discount (${esc(o.coupon)})</td><td>−${money(o.discount)}</td></tr>` : ""}
-      <tr><td colspan=2>Delivery</td><td>${money(o.shipping)}</td></tr><tr><td colspan=2><b>Total</b></td><td><b>${money(o.total)}</b></td></tr></table>
-      <p>Payment: ${esc(o.payment)} ${esc(o.txn_id)}</p>`);
+      <tr><td colspan=2>Delivery charge</td><td>${o.shipping ? money(o.shipping) : "Free"}</td></tr><tr><td colspan=2><b>Total</b></td><td><b>${money(o.total)}</b></td></tr></table>
+      <p>Payment: ${esc(o.payment)} ${esc(o.txn_id)}</p>
+      <p style="text-align:center;margin-top:32px"><b>Thanks for shopping from ${esc(s.name || "LoverBaazar")}!</b><br>We hope to see you again soon.${s.phone ? ` Questions? Call ${esc(s.phone)}.` : ""}</p>`);
     w.document.close();
     w.print();
   }
@@ -1046,9 +1047,10 @@
     const L = s.live,
       W = s.site;
     site = W;
-    const catOptions = () => categories.map((c) => [c.slug, c.name]);
+    const catOptions = () => [["on-sale", "★ Products on offer (any with a discount)"], ...categories.map((c) => [c.slug, c.name])];
     const places = [
       ["/shop/", "All products"],
+      ["/offers/", "Offers: every discounted product"],
       ["/blog/", "Blog"],
       ["/contact-us/", "Contact us"],
       ["/track/", "Track your order"],
@@ -1057,7 +1059,7 @@
     ];
     view().innerHTML = `<datalist id="sitelinks">${places.map(([u, n]) => `<option value="${esc(u)}" label="${esc(n)}"></option>`).join("")}</datalist>
       <form id="sf" class="settings">
-      <section class="panel" data-s="delivery"><h2>Delivery areas</h2><p class="meta">Set the charge to 0 to make delivery free in that area. Customers must choose their area at checkout.</p><div id="zones"></div>
+      <section class="panel" data-s="delivery"><h2>Delivery areas</h2><p class="meta">The charge is per piece: 5 pieces at ৳100 each pay ৳500. Set it to 0 to make delivery free in that area. Customers must choose their area at checkout.</p><div id="zones"></div>
         ${field("Free delivery everywhere on orders over (৳), 0 to switch off", "freeOver", L.freeOver, "min=0", "number")}
       </section>
       <section class="panel" data-s="delivery"><h2>Payment methods</h2><p class="meta">Add a number for mobile payments, and customers will be asked for a transaction ID. Leave the number empty for cash on delivery.</p><div id="pays"></div></section>
@@ -1088,7 +1090,7 @@
       <section class="panel" data-s="home"><h2>Category pictures</h2>
         ${toggle("Show the Shop by category section", "showCats", W.showCats !== false)}
         <div class="field">Which categories to show, leave empty to use the menu ${checkList("tiles", W.catTiles || [])}</div></section>
-      <section class="panel" data-s="home"><h2>Product sections</h2><p class="meta">Each section shows products from one category. Use the arrows to change the order.</p><div id="home"></div></section>
+      <section class="panel" data-s="home"><h2>Product sections</h2><p class="meta">Each section shows products from one category. Choose “Products on offer” to show every product whose price is below its regular price, biggest discount first. Use the arrows to change the order.</p><div id="home"></div></section>
       <section class="panel" data-s="menu"><h2>Drop-down menus</h2><div id="menu"></div></section>
       <section class="panel" data-s="menu"><h2>Other menu links</h2><div id="links"></div></section>
       <section class="panel" data-s="menu"><h2>Footer links</h2><p class="meta">Links with the same column name appear together.</p><div id="footlinks"></div></section>
@@ -1104,7 +1106,7 @@
       L.delivery,
       [
         { k: "label", label: "Area" },
-        { k: "fee", label: "Charge (৳), 0 for free", type: "number" },
+        { k: "fee", label: "Charge per piece (৳), 0 for free", type: "number" },
         { k: "days", label: "Delivery time, such as 2 to 3 days" },
       ],
       { label: "", fee: 0 },

@@ -1,9 +1,9 @@
 ---
 import Base from "../layouts/Base.astro";
 import Card from "../components/Card.astro";
-import { products, inCat, MENU, catUrl, img, SITE, cats, fill, say } from "../lib/shop";
+import { products, inCat, homeItems, MENU, catUrl, img, SITE, cats, fill, say } from "../lib/shop";
 const withPhoto = (l: any[]) => l.filter((p) => p.images[0]);
-const heroPics = withPhoto(SITE.home.flatMap((h: any) => inCat(h.cat)))
+const heroPics = withPhoto(SITE.home.flatMap((h: any) => homeItems(h.cat)))
   .filter((p: any, i: number, all: any[]) => all.findIndex((x) => x.id === p.id) === i)
   .filter((_: any, i: number) => i % 7 === 0)
   .slice(0, 3);
@@ -82,14 +82,14 @@ const heroEnd = heroWords.pop();
     )}
     {SITE.home.map(
       (h: any) =>
-        inCat(h.cat).length > 0 && (
+        homeItems(h.cat).length > 0 && (
           <>
             <div class="sec">
               <h2>{h.title}</h2>
-              <a href={catUrl(cats.find((c: any) => c.slug === h.cat) || { path: h.cat })}>{say("seeAll")}</a>
+              <a href={h.cat === "on-sale" ? "/offers/" : catUrl(cats.find((c: any) => c.slug === h.cat) || { path: h.cat })}>{say("seeAll")}</a>
             </div>
             <section class="grid">
-              {inCat(h.cat)
+              {homeItems(h.cat)
                 .slice(0, h.count || 8)
                 .map((p: any) => (
                   <Card p={p} />

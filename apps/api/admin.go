@@ -36,7 +36,7 @@ var (
 	idRe    = regexp.MustCompile(`^[a-z0-9-]+$`)
 	colorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 	// Top-level addresses the shop already uses. A page with one of these names would break the build.
-	reservedSlugs = []string{"admin", "api", "blog", "cart", "checkout", "contact-us", "feed.xml", "my-account", "product", "product-category", "product-tag", "search", "shop", "track", "wishlist", "wp-content", "uploads", "404", "_astro", "feed", "page"}
+	reservedSlugs = []string{"admin", "api", "blog", "cart", "checkout", "contact-us", "feed.xml", "my-account", "offers", "product", "product-category", "product-tag", "search", "shop", "track", "wishlist", "wp-content", "uploads", "404", "_astro", "feed", "page"}
 	statuses      = []string{"pending", "confirmed", "shipped", "delivered", "cancelled", "returned"}
 )
 
@@ -113,7 +113,7 @@ func adminOrders(w http.ResponseWriter, r *http.Request) {
 	}
 	const size = 50
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	list, err := jsonRows(ctx, `SELECT `+orderFields+`||jsonb_build_object('admin_note',o.admin_note,'same_phone',(SELECT count(*) FROM orders x WHERE x.phone=o.phone),'bad_phone',(SELECT count(*) FROM orders x WHERE x.phone=o.phone AND x.status IN `+outStatuses+`))
+	list, err := jsonRows(ctx, `SELECT `+orderFields+`||jsonb_build_object('admin_note',o.admin_note,'email',o.email,'same_phone',(SELECT count(*) FROM orders x WHERE x.phone=o.phone),'bad_phone',(SELECT count(*) FROM orders x WHERE x.phone=o.phone AND x.status IN `+outStatuses+`))
 		FROM orders o WHERE `+where+fmt.Sprintf(` ORDER BY o.created_at DESC LIMIT %d OFFSET %d`, size, size*max(page, 0)), args...)
 	if err != nil {
 		oops(w, err)

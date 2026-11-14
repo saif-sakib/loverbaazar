@@ -220,7 +220,7 @@ func order(extra M, items ...M) M {
 func TestCheckoutUsesDatabasePrice(t *testing.T) {
 	reset(t)
 	code, out := call(t, nil, "POST", "/api/checkout", order(M{"price": 1, "total": 1}, M{"id": 1, "qty": 2, "price": 1}), false)
-	if code != 200 || out["total"].(float64) != 2060 {
+	if code != 200 || out["total"].(float64) != 2120 { // 2 x 1000, plus 60 delivery per piece
 		t.Fatalf("%d %v", code, out)
 	}
 }
@@ -228,7 +228,7 @@ func TestCheckoutUsesDatabasePrice(t *testing.T) {
 func TestDuplicateLinesAreMerged(t *testing.T) {
 	reset(t)
 	code, out := call(t, nil, "POST", "/api/checkout", order(nil, M{"id": 1, "qty": 1}, M{"id": 1, "qty": 2}), false)
-	if code != 200 || out["total"].(float64) != 3060 || stockOf(t, 1) != 47 {
+	if code != 200 || out["total"].(float64) != 3180 || stockOf(t, 1) != 47 {
 		t.Fatalf("%d %v stock=%d", code, out, stockOf(t, 1))
 	}
 }
@@ -459,6 +459,21 @@ func saveLive(t *testing.T, change func(M)) {
 	change(s["live"].(M))
 	if code, out := call(t, nil, "PUT", "/api/admin/settings", s, true); code != 200 {
 		t.Fatalf("%d %v", code, out)
+	}
+}
+
+func TestCheckoutEmail(t *testing.T) {
+	reset(t)
+	if code, _ := call(t, nil, "POST", "/api/checkout", order(M{"email": "not an email"}, M{"id": 1, "qty": 1}), false); code != 400 {
+		t.Fatalf("a bad email must be refused: %d", code)
+	}
+	code, out := call(t, nil, "POST", "/api/checkout", order(M{"email": " Rahim@Example.com "}, M{"id": 1, "qty": 1}), false)
+	if code != 200 {
+		t.Fatalf("%d %v", code, out)
+	}
+	var email string
+	if err := db.QueryRow(bg, `SELECT email FROM orders WHERE number=$1`, out["number"]).Scan(&email); err != nil || email != "rahim@example.com" {
+		t.Fatalf("email %q %v", email, err)
 	}
 }
 

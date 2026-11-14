@@ -24,6 +24,7 @@ import (
 )
 
 var phoneRe = regexp.MustCompile(`^01[3-9]\d{8}$`)
+var emailRe = regexp.MustCompile(`^[^@\s<>,;"]+@[^@\s<>,;"]+\.[a-z]{2,}$`)
 
 const maxQty = 20
 
@@ -234,12 +235,13 @@ func discountOf(kind string, value, sub int64) int64 {
 	return min(d, sub)
 }
 
-// deliveryFee is what the customer pays for a zone once any discount is taken off.
-func deliveryFee(z Zone, live Live, goods int64) int64 {
+// deliveryFee is what the customer pays for a zone once any discount is taken off. The zone's
+// charge is per piece: the goods are heavy, so five rice cookers cost five times one to carry.
+func deliveryFee(z Zone, live Live, goods int64, pieces int) int64 {
 	if live.FreeOver > 0 && goods >= live.FreeOver {
 		return 0
 	}
-	return z.Fee
+	return z.Fee * int64(pieces)
 }
 
 // useCoupon claims one use with a relative update, so a limited coupon can never be over-used.
@@ -291,16 +293,17 @@ func couponPreview(w http.ResponseWriter, r *http.Request) {
 
 func checkout(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Items                                            []item `json:"items"`
-		Name, Phone, Address, Area, Payment, TxnID, Note string
-		Coupon, Key                                      string
-		Expected                                         int64
-		Turnstile                                        string `json:"turnstile"`
+		Items                                                   []item `json:"items"`
+		Name, Phone, Email, Address, Area, Payment, TxnID, Note string
+		Coupon, Key                                             string
+		Expected                                                int64
+		Turnstile                                               string `json:"turnstile"`
 	}
 	if !read(w, r, &in) {
 		return
 	}
 	in.Phone, in.Name, in.Address = normPhone(in.Phone), clip(in.Name, 100), clip(in.Address, 500)
+	in.Email = strings.ToLower(clip(strings.TrimSpace(in.Email), 100))
 	in.TxnID, in.Note, in.Coupon, in.Key = clip(in.TxnID, 60), clip(in.Note, 500), strings.ToUpper(clip(in.Coupon, 40)), clip(in.Key, 64)
 	switch {
 	case len(in.Items) == 0 || len(in.Items) > 50:
@@ -311,6 +314,9 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	case !phoneRe.MatchString(in.Phone):
 		fail(w, 400, "please enter a valid Bangladeshi mobile number")
+		return
+	case in.Email != "" && !emailRe.MatchString(in.Email):
+		fail(w, 400, "please check your email address, or leave it empty")
 		return
 	}
 	items, err := mergeItems(in.Items)
@@ -328,7 +334,7 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	live, _, err := loadSettings(ctx)
+	live, site, err := loadSettings(ctx)
 	if err != nil {
 		oops(w, err)
 		return
@@ -380,12 +386,14 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 	}
 	number := "LB-" + token(4)
 	var total int64
+	var bill receipt
 	repeat := false
 	err = pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
+		bill = receipt{}
 		var oid int64
-		err := tx.QueryRow(ctx, `INSERT INTO orders(number,user_id,name,phone,address,area,payment,txn_id,note,subtotal,shipping,total,idem)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,0,0,0,$10) ON CONFLICT(idem) DO NOTHING RETURNING id`,
-			number, uid, in.Name, in.Phone, in.Address, zone.Label, pay.Label, in.TxnID, in.Note, idem).Scan(&oid)
+		err := tx.QueryRow(ctx, `INSERT INTO orders(number,user_id,name,phone,email,address,area,payment,txn_id,note,subtotal,shipping,total,idem)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,0,0,$11) ON CONFLICT(idem) DO NOTHING RETURNING id`,
+			number, uid, in.Name, in.Phone, in.Email, in.Address, zone.Label, pay.Label, in.TxnID, in.Note, idem).Scan(&oid)
 		if errors.Is(err, pgx.ErrNoRows) { // the same order arrived twice at once
 			repeat = true
 			return tx.QueryRow(ctx, `SELECT number,total FROM orders WHERE idem=$1`, in.Key).Scan(&number, &total)
@@ -393,6 +401,7 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		var sub, discount int64
+		pieces := 0
 		for _, it := range items {
 			var price int64
 			var name string
@@ -404,6 +413,8 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 			sub += price * int64(it.Qty)
+			pieces += it.Qty
+			bill.lines = append(bill.lines, fmt.Sprintf("%s × %d: ৳%d", name, it.Qty, price*int64(it.Qty)))
 			if _, err = tx.Exec(ctx, `INSERT INTO order_items VALUES($1,$2,$3,$4,$5)`, oid, it.ID, name, price, it.Qty); err != nil {
 				return err
 			}
@@ -416,8 +427,9 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 		}
-		fee := deliveryFee(*zone, live, sub-discount)
+		fee := deliveryFee(*zone, live, sub-discount, pieces)
 		total = sub - discount + fee
+		bill.sub, bill.discount, bill.fee = sub, discount, fee
 		if in.Expected != 0 && in.Expected != total {
 			return userErr{409, fmt.Sprintf("the total changed to ৳%d. Please check your order and try again", total)}
 		}
@@ -436,7 +448,15 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	refresh()
-	go notify(fmt.Sprintf("New order %s: ৳%d", number, total), fmt.Sprintf("%s, %s, %s (%s, %s)", in.Name, in.Phone, in.Address, zone.Label, pay.Label))
+	bill.number, bill.total, bill.area, bill.payment = number, total, zone.Label, pay.Label
+	details := bill.text()
+	go notify(fmt.Sprintf("New order %s: ৳%d", number, total),
+		fmt.Sprintf("Customer: %s, %s%s\nAddress: %s\nNote: %s\n\n%s", in.Name, in.Phone, orBlank(", ", in.Email), in.Address, in.Note, details))
+	if in.Email != "" {
+		shop, _ := site["name"].(string)
+		phone, _ := site["phone"].(string)
+		go sendMail([]string{in.Email}, fmt.Sprintf("Your %s order %s", shop, number), customerMail(in.Name, shop, phone, details))
+	}
 	ok(w, map[string]any{"number": number, "total": total})
 }
 
@@ -502,13 +522,70 @@ func human(r *http.Request, tok string) bool {
 	return out.Success
 }
 
-// notify emails the shop through Brevo. Call it with `go`: a slow or failed email must never hold up an order.
+// receipt is an order written out for the emails.
+type receipt struct {
+	number, area, payment     string
+	lines                     []string
+	sub, discount, fee, total int64
+}
+
+func (b receipt) text() string {
+	var t strings.Builder
+	fmt.Fprintf(&t, "Order %s\n\n", b.number)
+	for _, l := range b.lines {
+		t.WriteString(l + "\n")
+	}
+	fmt.Fprintf(&t, "\nSubtotal: ৳%d\n", b.sub)
+	if b.discount > 0 {
+		fmt.Fprintf(&t, "Discount: -৳%d\n", b.discount)
+	}
+	if b.fee > 0 {
+		fmt.Fprintf(&t, "Delivery charge (%s): ৳%d\n", b.area, b.fee)
+	} else {
+		fmt.Fprintf(&t, "Delivery charge (%s): Free\n", b.area)
+	}
+	fmt.Fprintf(&t, "Total: ৳%d\nPayment: %s\n", b.total, b.payment)
+	return t.String()
+}
+
+func customerMail(name, shop, phone, details string) string {
+	track := ""
+	if u := strings.TrimRight(os.Getenv("SITE_URL"), "/"); u != "" {
+		track = fmt.Sprintf("Track your order any time: %s/track/\n", u)
+	}
+	return fmt.Sprintf("Dear %s,\n\nThank you for your order. We will call you soon to confirm it.\n\n%s\n%sQuestions? Call us on %s.\n\nThanks for shopping from %s!\n", name, details, track, phone, shop)
+}
+
+func orBlank(prefix, s string) string {
+	if s == "" {
+		return ""
+	}
+	return prefix + s
+}
+
+// notify emails the admin through Brevo: ADMIN_EMAIL (one address or several, comma separated), or
+// SHOP_EMAIL when that is empty. Call it with `go`: a slow or failed email must never hold up an order.
 func notify(subject, text string) {
-	key, to := os.Getenv("BREVO_KEY"), os.Getenv("SHOP_EMAIL")
-	if key == "" || to == "" {
+	to := os.Getenv("ADMIN_EMAIL")
+	if to == "" {
+		to = os.Getenv("SHOP_EMAIL")
+	}
+	sendMail(strings.Split(to, ","), subject, text)
+}
+
+// sendMail sends a plain text email from SHOP_EMAIL, the sender confirmed in Brevo.
+func sendMail(to []string, subject, text string) {
+	key, from := os.Getenv("BREVO_KEY"), os.Getenv("SHOP_EMAIL")
+	var list []map[string]string
+	for _, t := range to {
+		if t = strings.TrimSpace(t); t != "" {
+			list = append(list, map[string]string{"email": t})
+		}
+	}
+	if key == "" || from == "" || len(list) == 0 {
 		return
 	}
-	b, _ := json.Marshal(map[string]any{"sender": map[string]string{"email": to, "name": "LoverBaazar"}, "to": []map[string]string{{"email": to}}, "subject": subject, "textContent": text})
+	b, _ := json.Marshal(map[string]any{"sender": map[string]string{"email": from, "name": "LoverBaazar"}, "to": list, "subject": subject, "textContent": text})
 	req, _ := http.NewRequest("POST", "https://api.brevo.com/v3/smtp/email", bytes.NewReader(b))
 	req.Header.Set("api-key", key)
 	req.Header.Set("Content-Type", "application/json")

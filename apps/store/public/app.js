@@ -269,9 +269,30 @@
     badges();
   }
 
+  // Each word typed must start a word of the product, so "rice" no longer finds every "price" tag.
+  // Names that match best come first, then products in stock.
+  const tokens = (s) => String(s ?? "").toLowerCase().split(/[^\p{L}\p{M}\p{N}.]+/u).filter(Boolean);
   const matches = (list, q) => {
-    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    return words.length ? list.filter((p) => words.every((w) => p.text.includes(w))) : [];
+    const words = tokens(q);
+    if (!words.length) return [];
+    const phrase = words.join(" "),
+      glued = words.join("");
+    return list
+      .map((p) => {
+        p._t ||= tokens(p.text);
+        p._n ||= tokens(p.name);
+        const name = p._n.join(" ");
+        const found = words.every((w) => p._t.some((t) => t.startsWith(w))) ||
+          (glued.length >= 4 && name.replaceAll(" ", "").includes(glued)); // "ricecooker" typed without the space
+        if (!found) return null;
+        let score = (" " + name).includes(" " + phrase) ? 100 : 0;
+        score += words.filter((w) => p._n.some((t) => t.startsWith(w))).length * 10;
+        if (p.inStock) score += 5;
+        return [score, p];
+      })
+      .filter(Boolean)
+      .sort((a, b) => b[0] - a[0])
+      .map((x) => x[1]);
   };
 
   async function search() {
@@ -398,7 +419,7 @@
       select.innerHTML =
         (hint ? `<option value="">${esc(hint)}</option>` : "") +
         list
-          .map((o) => `<option value="${esc(o.id)}">${esc(o.label)}${o.fee === undefined ? "" : ` (${o.fee ? taka(o.fee) : "Free"})`}</option>`)
+          .map((o) => `<option value="${esc(o.id)}">${esc(o.label)}${o.fee === undefined ? "" : ` (${o.fee ? `${taka(o.fee)} per piece` : "Free"})`}</option>`)
           .join("");
       if (list.some((o) => o.id === keep)) select.value = keep;
     };
@@ -421,7 +442,9 @@
       const pay = s.payments.find((p) => p.id === f.payment.value);
       discount = Math.min(discount, data.sub);
       const goods = data.sub - discount;
-      const fee = !zone || (s.freeOver > 0 && goods >= s.freeOver) ? 0 : zone.fee;
+      // The charge is per piece, as the server counts it: the goods are heavy to carry.
+      const pieces = lines.reduce((a, l) => a + l.qty, 0);
+      const fee = !zone || (s.freeOver > 0 && goods >= s.freeOver) ? 0 : zone.fee * pieces;
       total = goods + fee;
       $("[data-sum]").innerHTML =
         lines
@@ -431,7 +454,7 @@
           )
           .join("") +
         (discount ? `<div class="row"><span>Discount (${esc(code)})</span><b>−${taka(discount)}</b></div>` : "") +
-        `<div class="row"><span>Delivery</span><b>${!zone ? "Choose your area" : fee ? taka(fee) : "Free"}</b></div><div class="row total"><span>Total</span><span>${taka(total)}</span></div>`;
+        `<div class="row"><span>Delivery charge${fee && pieces > 1 ? ` (${taka(zone.fee)} × ${pieces})` : ""}</span><b>${!zone ? "Choose your area" : fee ? taka(fee) : "Free"}</b></div><div class="row total"><span>Total</span><span>${taka(total)}</span></div>`;
       $("[data-eta]").textContent = zone?.days ? `Usually arrives in ${zone.days}.` : "";
       $("[data-txn]").hidden = !pay?.number;
       $("[data-pay]").textContent = !pay?.number
@@ -509,6 +532,7 @@
           items: lines.map((l) => ({ id: l.p.id, qty: l.qty })),
           name: d.name,
           phone: d.phone,
+          email: d.email || "",
           address: d.address,
           area: d.area,
           payment: d.payment,
@@ -554,7 +578,7 @@
       ${o.courier ? `<p class="meta">Courier: ${esc(o.courier)}${o.tracking ? `, tracking number ${esc(o.tracking)}` : ""}</p>` : ""}
       ${(o.items || []).map((i) => `<div class="row"><span>${esc(i.name)} × ${i.qty}</span><b>${taka(i.price * i.qty)}</b></div>`).join("")}
       ${o.discount ? `<div class="row"><span>Discount</span><b>−${taka(o.discount)}</b></div>` : ""}
-      <div class="row"><span>Delivery</span><b>${o.shipping ? taka(o.shipping) : "Free"}</b></div>
+      <div class="row"><span>Delivery charge</span><b>${o.shipping ? taka(o.shipping) : "Free"}</b></div>
       <div class="row total"><span>Total</span><span>${taka(o.total)}</span></div>
       ${(o.items || []).some((i) => i.id) ? `<button class="btn ghost" data-again="${esc(JSON.stringify(o.items.map((i) => ({ id: i.id, qty: i.qty }))))}">Buy again</button>` : ""}</div>`;
   };
@@ -565,7 +589,7 @@
     if (!el || !live) return;
     const free = live.freeOver > 0 ? `<li>Free delivery on orders of ${taka(live.freeOver)} or more</li>` : "";
     el.innerHTML =
-      live.delivery.map((z) => `<li>${esc(z.label)}: <b>${z.fee ? taka(z.fee) : "Free"}</b>${z.days ? `, ${esc(z.days)}` : ""}</li>`).join("") + free;
+      live.delivery.map((z) => `<li>${esc(z.label)}: <b>${z.fee ? `${taka(z.fee)} per piece` : "Free"}</b>${z.days ? `, ${esc(z.days)}` : ""}</li>`).join("") + free;
   }
 
   function rememberProduct() {
@@ -599,6 +623,42 @@
     };
     addEventListener("scroll", update, { passive: true });
     update();
+  }
+
+  // Product photo: hovering shows a magnified view beside it on a computer; a tap or click opens it full screen.
+  function zoom() {
+    const pic = $("[data-main]");
+    if (!pic) return;
+    const stage = pic.closest(".stage");
+    const pane = document.createElement("div");
+    pane.className = "zoompane";
+    pane.hidden = true;
+    stage.append(pane);
+    const wide = matchMedia("(hover: hover) and (min-width: 900px)");
+    const url = () => `url("${(pic.currentSrc || pic.src).replace(/["\\\n]/g, encodeURIComponent)}")`;
+    pic.addEventListener("mousemove", (e) => {
+      if (!wide.matches) return;
+      const r = pic.getBoundingClientRect();
+      pane.style.backgroundImage = url();
+      pane.style.backgroundPosition = `${((e.clientX - r.left) / r.width) * 100}% ${((e.clientY - r.top) / r.height) * 100}%`;
+      pane.hidden = false;
+    });
+    pic.addEventListener("mouseleave", () => {
+      pane.hidden = true;
+    });
+    pic.addEventListener("click", () => {
+      const box = document.createElement("div");
+      box.className = "lightbox";
+      box.innerHTML = `<img src="${esc(pic.currentSrc || pic.src)}" alt="${esc(pic.alt)}"><button class="x" aria-label="Close">×</button>`;
+      const close = () => {
+        box.remove();
+        removeEventListener("keydown", key);
+      };
+      const key = (e) => e.key === "Escape" && close();
+      box.onclick = close;
+      addEventListener("keydown", key);
+      document.body.append(box);
+    });
   }
 
   function track() {
@@ -748,6 +808,7 @@
   grids();
   suggestions();
   buyBar();
+  zoom();
   track();
   account();
   checkout();

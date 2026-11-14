@@ -511,6 +511,26 @@ func TestBotCheckSaysWhyItFailed(t *testing.T) {
 	}
 }
 
+func TestReceiptText(t *testing.T) {
+	b := receipt{number: "LB-1", area: "Outside", payment: "Cash", lines: []string{"Rice cooker × 5: ৳10000"}, sub: 10000, fee: 500, total: 10500}
+	got := customerMail("Rahim", "LoverBaazar", "01710-076076", b.text())
+	for _, want := range []string{"Delivery charge (Outside): ৳500", "Total: ৳10500", "Thanks for shopping from LoverBaazar"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in\n%s", want, got)
+		}
+	}
+}
+
+func TestDeliveryIsPerPiece(t *testing.T) {
+	z := Zone{Fee: 100}
+	if f := deliveryFee(z, Live{}, 5000, 5); f != 500 {
+		t.Fatalf("5 pieces at 100 = %d", f)
+	}
+	if f := deliveryFee(z, Live{FreeOver: 4000}, 5000, 5); f != 0 {
+		t.Fatalf("free over the limit = %d", f)
+	}
+}
+
 func TestEmailSaysWhyItFailed(t *testing.T) {
 	t.Setenv("BREVO_KEY", "key")
 	t.Setenv("SHOP_EMAIL", "shop@example.com")

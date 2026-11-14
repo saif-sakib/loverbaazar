@@ -1,0 +1,15 @@
+---
+import Base from "../../layouts/Base.astro";
+import Grid from "../../components/Grid.astro";
+import { onSale } from "../../lib/shop";
+const items = onSale();
+---
+
+<Base title="Offers" description="Every product on offer right now, biggest discount first.">
+  <div class="wrap">
+    <div class="pagehead">
+      <h1 class="title">Offers</h1>
+    </div>
+    {items.length ? <Grid items={items} /> : <p>No offers right now. <a class="link" href="/shop/">See everything we sell</a>.</p>}
+  </div>
+</Base>

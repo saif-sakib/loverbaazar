@@ -39,6 +39,10 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
           <input name="phone" required inputmode="tel" placeholder="01XXXXXXXXX" autocomplete="tel" />
         </label>
         <label class="field">
+          Email (optional, for your order confirmation)
+          <input name="email" type="email" maxlength="100" placeholder="you@example.com" autocomplete="email" />
+        </label>
+        <label class="field">
           Full address<textarea name="address" rows="3" required maxlength="500" autocomplete="street-address"></textarea>
         </label>
         <label class="field">

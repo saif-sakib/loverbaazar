@@ -131,7 +131,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
         <ul class="delivery" data-delivery>
           {LIVE.delivery.map((z: any) => (
             <li>
-              {z.label}: <b>{z.fee ? taka(z.fee) : "Free"}</b>
+              {z.label}: <b>{z.fee ? `${taka(z.fee)} per piece` : "Free"}</b>
               {z.days && `, ${z.days}`}
             </li>
           ))}
