@@ -20,6 +20,7 @@
   const STATUSES = ["pending", "confirmed", "shipped", "delivered", "cancelled", "returned"];
   const statusOptions = (current) =>
     STATUSES.map((v) => `<option value="${v}" ${v === current ? "selected" : ""}>${v[0].toUpperCase() + v.slice(1)}</option>`).join("");
+
   // Eight places to go. A place with several parts shows them as tabs at the top of the page.
   const NAV = [
     ["dashboard", "Home"],
@@ -28,45 +29,54 @@
     ["coupons", "Coupons"],
     ["customers", "Customers"],
     ["messages", "Inbox", { messages: "Messages", reviews: "Reviews" }],
-    ["home", "Website", { home: "Home page", menu: "Menu and footer", pages: "Pages", blog: "Blog", words: "Words" }],
+    ["home", "Website", { home: "Home page", menu: "Navigation menu", pages: "Pages", blog: "Blog" }],
     ["delivery", "Settings", { delivery: "Delivery and payment", shop: "Shop details" }],
   ];
-  const LIVE = "Changes here reach customers within about 2 minutes.";
-  const PUB = "After saving, press Publish changes so customers can see it.";
+
+  const LIVE_BADGE = `<span class="effect live">● Live — updates in ~2 min</span>`;
+  const PUB_BADGE = `<span class="effect pub">◆ Needs Publish</span>`;
+  const effectBadges = (mode) =>
+    mode === "live"
+      ? LIVE_BADGE
+      : mode === "pub"
+        ? PUB_BADGE
+        : mode === "both"
+          ? `${LIVE_BADGE} ${PUB_BADGE}`
+          : "";
+
   const HEADS = {
-    dashboard: ["Welcome", "Your shop today, and shortcuts to what you change most."],
-    orders: ["Orders", "Find an order, change its status, or print an invoice."],
-    messages: ["Messages", "What customers sent from the contact page."],
-    reviews: ["Reviews", `Approve a review to show it on the product page. ${PUB}`],
-    products: ["Products", `Type in a price or stock box and it saves by itself. Customers see it within about 2 minutes.`],
-    categories: ["Categories", `The groups products are sorted into. ${PUB}`],
-    coupons: ["Coupons", `Discount codes for customers. ${LIVE}`],
-    customers: ["Customers", "Everyone who has ordered. You can also set a new password for a customer who forgot theirs."],
-    tags: ["Tags", `Extra keywords on products, used by Google. ${PUB}`],
-    home: ["Home page", `The heading, banners and product sections on your home page. ${PUB}`],
-    menu: ["Menu and footer", `The links at the top and bottom of every page. ${PUB}`],
-    pages: ["Pages", `About Us, How To Buy, Terms and other pages. ${PUB}`],
-    blog: ["Blog", `Articles for your customers and for Google. ${PUB}`],
-    words: ["Words on the site", `Headings and small messages used around the shop. ${PUB}`],
-    delivery: ["Delivery and payment", `Delivery charges, payment numbers, and opening or closing orders. ${LIVE}`],
-    shop: ["Shop details", `Your phone, address, logo and colours. ${PUB}`],
+    dashboard: ["Welcome", "Your shop today, and quick links to the tasks you do most.", ""],
+    orders: ["Orders", "Find orders, update shipping status, save courier tracking, or print invoices. Status updates appear on order tracking immediately.", ""],
+    messages: ["Messages", "Questions sent by customers from the Contact Us page (/contact-us/).", ""],
+    reviews: ["Reviews", "Customer product reviews waiting for moderation. Approved reviews appear on product pages after you click Publish.", "pub"],
+    products: ["Products", "Edit prices, old prices, stock, and visibility inline — they save automatically and go live in ~2 minutes. Click Edit for names, photos, categories, and descriptions.", "both"],
+    categories: ["Categories", "Product groups served at /product-category/<path>/. Add categories to your top menu or home grid under Website → Navigation menu.", "pub"],
+    coupons: ["Coupons", "Discount codes customers apply on the Checkout page. Active coupons start working immediately.", "live"],
+    customers: ["Customers", "Everyone who has ordered. Click an order count to view their orders, or reset a forgotten customer account password.", ""],
+    tags: ["Tags", "Search keywords on products, used on /product-tag/ pages and by Google.", "pub"],
+    home: ["Home page", "Edit the main hero headline, promotional banners, and featured product rows on your storefront home page (/).", "pub"],
+    menu: ["Navigation menu", "Choose which category groups appear in the top header dropdowns and the home page 'Shop by category' grid.", "pub"],
+    pages: ["Pages", "Edit About Us, How To Buy, Terms, Privacy Policy, and other pages. Any extra published pages are added to the Company footer column.", "pub"],
+    blog: ["Blog", "Articles shown on /blog/ and at /<slug>/ for customers and Google search.", "pub"],
+    delivery: ["Delivery and payment", "Configure delivery fees, free shipping threshold, payment numbers, announcement bar, and whether checkout is open.", "live"],
+    shop: ["Shop details", "Manage your shop name, logo, phone numbers, address, opening hours, return policy, and social links used across the store and invoices.", "pub"],
   };
+
   // The search box and the home screen. The last word list is what people might type.
   const JOBS = [
     ["Change a price or stock", "#products", "price stock quantity sold out discount offer"],
     ["Add a new product", "#new-product", "create product photo image"],
     ["Change delivery charges", "#delivery", "delivery charge free shipping fee courier area jashore dhaka"],
     ["Change payment numbers", "#delivery", "bkash nagad rocket payment cash number"],
-    ["Edit the home page", "#home", "hero heading banner picture promises top strip sections"],
-    ["Change phone or address", "#shop", "phone whatsapp address email facebook youtube hours contact"],
-    ["Change the menu or footer", "#menu", "menu footer links navigation"],
+    ["Edit the home page", "#home", "hero heading banner picture sections"],
+    ["Change phone or address", "#shop", "phone whatsapp address email facebook youtube hours contact returns"],
+    ["Change the navigation menu", "#menu", "menu categories dropdown navigation"],
     ["Make a discount coupon", "#coupons", "coupon code discount offer sale"],
     ["Edit About, Terms or Privacy", "#pages", "about terms privacy how to buy policy page"],
     ["Write a blog post", "#new-post", "blog article post"],
     ["Close or reopen online orders", "#delivery", "closed holiday eid stop open"],
     ["Show an announcement bar", "#delivery", "notice announcement sale eid message"],
-    ["Change the logo or colours", "#shop", "logo colour color brand"],
-    ["Change words on the site", "#words", "text words heading message thank you"],
+    ["Change the shop logo", "#shop", "logo image brand"],
     ["Publish the website now", "#publish", "publish rebuild update"],
   ];
 
@@ -154,7 +164,7 @@
   const checkList = (
     name,
     chosen,
-  ) => `<details class="picker"><summary>${chosen.length} chosen</summary><input type="search" placeholder="Filter" data-pick-filter aria-label="Filter categories"><div>
+  ) => `<details class="picker"><summary>${chosen.length} chosen</summary><input type="search" placeholder="Filter categories…" data-pick-filter aria-label="Filter categories"><div>
     ${categories.map((c) => `<label class="check" data-pick="${esc(c.name.toLowerCase())}"><input type="checkbox" name="${esc(name)}" value="${esc(c.slug)}" ${chosen.includes(c.slug) ? "checked" : ""}> ${esc(c.name)}</label>`).join("")}
   </div></details>`;
 
@@ -178,14 +188,25 @@
     return (await api(`/image?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(base)}`, { body: file })).url;
   };
 
+  const field = (label, name, value, extra = "", type = "text", help = "") =>
+    `<label class="field"><span class="flabel">${esc(label)}</span>${help ? `<small class="fhelp">${esc(help)}</small>` : ""}<input name="${name}" type="${type}" value="${esc(value ?? "")}" ${extra}></label>`;
+  const area = (label, name, value, n = 3, help = "") =>
+    `<label class="field"><span class="flabel">${esc(label)}</span>${help ? `<small class="fhelp">${esc(help)}</small>` : ""}<textarea name="${name}" rows="${n}">${esc(value ?? "")}</textarea></label>`;
+  const toggle = (label, name, on, help = "") =>
+    `<label class="check field"><input type="checkbox" name="${name}" ${on ? "checked" : ""}><span><span class="flabel">${esc(label)}</span>${help ? `<small class="fhelp">${esc(help)}</small>` : ""}</span></label>`;
+  const secHead = (title, desc, where = "", mode = "") => {
+    const badge = effectBadges(mode);
+    return `<div class="sec-head"><div><h2>${esc(title)}</h2>${desc ? `<p class="sec-desc">${esc(desc)}</p>` : ""}</div>${where || badge ? `<div class="sec-tags">${where ? `<span class="where-badge">Where: ${esc(where)}</span>` : ""}${badge}</div>` : ""}</div>`;
+  };
+
   // Editable rows: delivery areas, payment methods, homepage sections and so on.
-  function rows(host, items, fields, blank) {
+  function rows(host, items, fields, blank, opts = {}) {
     let list = items.map((x) => ({ ...x }));
     const cell = (f, it) => {
       const v = it[f.k] ?? "";
-      const label = `<span>${esc(f.label)}</span>`;
+      const label = `<span class="flabel">${esc(f.label)}</span>${f.help ? `<small class="fhelp">${esc(f.help)}</small>` : ""}`;
       if (f.type === "bool")
-        return `<label class="check"><input type="checkbox" data-k="${f.k}" ${v ? "checked" : ""}> ${esc(f.label)}</label>`;
+        return `<label class="check"><input type="checkbox" data-k="${f.k}" ${v ? "checked" : ""}> <span>${esc(f.label)}</span></label>`;
       if (f.type === "select")
         return `<label>${label}<select data-k="${f.k}">${f
           .options()
@@ -193,9 +214,10 @@
           .join("")}</select></label>`;
       if (f.type === "cats") return `<label class="wide">${label}<div data-k="${f.k}" data-cats>${checkList("c", v || [])}</div></label>`;
       if (f.type === "image")
-        return `<label class="wide">${label}<span class="inline"><input data-k="${f.k}" value="${esc(v)}" placeholder="Image address"><input type="file" accept="image/*" data-up aria-label="Upload image"></span></label>`;
-      if (f.type === "area") return `<label class="wide">${label}<textarea data-k="${f.k}" rows="4">${esc(v)}</textarea></label>`;
-      return `<label>${label}<input data-k="${f.k}" type="${f.type || "text"}" value="${esc(v)}" ${f.list ? 'list="sitelinks"' : ""}></label>`;
+        return `<div class="wide"><span class="flabel">${esc(f.label)}</span>${f.help ? `<small class="fhelp">${esc(f.help)}</small>` : ""}<div class="img-row"><img class="img-prev" src="${esc(v)}" alt="" ${v ? "" : "hidden"}><div class="inline"><input data-k="${f.k}" value="${esc(v)}" placeholder="${esc(f.placeholder || "Upload or paste image URL")}"><label class="btn ghost small upl-inline">Upload<input type="file" accept="image/*" data-up hidden></label></div></div></div>`;
+      if (f.type === "area")
+        return `<label class="wide">${label}<textarea data-k="${f.k}" rows="4" placeholder="${esc(f.placeholder || "")}">${esc(v)}</textarea></label>`;
+      return `<label>${label}<input data-k="${f.k}" type="${f.type || "text"}" value="${esc(v)}" ${f.min !== undefined ? `min="${f.min}"` : ""} ${f.max !== undefined ? `max="${f.max}"` : ""} placeholder="${esc(f.placeholder || "")}" ${f.list ? 'list="sitelinks"' : ""}></label>`;
     };
     const read = () => {
       list = $$(".rep", host).map((row, i) => {
@@ -212,16 +234,38 @@
       return list;
     };
     const draw = () => {
-      host.innerHTML =
-        list
-          .map(
-            (it) => `<div class="rep">${fields.map((f) => cell(f, it)).join("")}
-        <span class="repbtn"><button type="button" data-up-row aria-label="Move up">▲</button><button type="button" data-down aria-label="Move down">▼</button><button type="button" data-remove aria-label="Remove">✕</button></span></div>`,
-          )
-          .join("") + `<button type="button" class="btn ghost small add" data-add-row>Add</button>`;
+      const body = list.length
+        ? list
+            .map(
+              (it) => `<div class="rep">${fields.map((f) => cell(f, it)).join("")}
+        <span class="repbtn"><button type="button" data-up-row aria-label="Move up" title="Move up">▲</button><button type="button" data-down aria-label="Move down" title="Move down">▼</button><button type="button" data-remove aria-label="Remove" title="Remove">✕</button></span></div>`,
+            )
+            .join("")
+        : opts.empty
+          ? `<p class="rep-empty">${esc(opts.empty)}</p>`
+          : "";
+      host.innerHTML = body + `<button type="button" class="btn ghost small add" data-add-row>${esc(opts.addLabel || "Add")}</button>`;
       $$("[data-up]", host).forEach((inp) => {
         inp.onchange = run(async () => {
-          $("input[data-k]", inp.parentElement).value = await upload(inp.files[0], "site");
+          if (!inp.files[0]) return;
+          const row = inp.closest(".img-row");
+          const url = await upload(inp.files[0], "site");
+          $("input[data-k]", row).value = url;
+          const prev = $(".img-prev", row);
+          if (prev) {
+            prev.src = url;
+            prev.hidden = false;
+          }
+          unsaved = true;
+        });
+      });
+      $$(".img-row input[data-k]", host).forEach((textInp) => {
+        textInp.addEventListener("input", () => {
+          const prev = $(".img-prev", textInp.closest(".img-row"));
+          if (!prev) return;
+          const val = textInp.value.trim();
+          prev.src = val;
+          prev.hidden = !val;
         });
       });
       $$(".rep", host).forEach((row, i) => {
@@ -230,6 +274,7 @@
           if (list[j]) {
             [list[i], list[j]] = [list[j], list[i]];
             draw();
+            unsaved = true;
           }
         };
         $("[data-up-row]", row).onclick = () => swap(i - 1);
@@ -238,12 +283,14 @@
           read();
           list.splice(i, 1);
           draw();
+          unsaved = true;
         };
       });
       $("[data-add-row]", host).onclick = () => {
         read();
         list.push({ ...blank });
         draw();
+        unsaved = true;
       };
     };
     draw();
@@ -291,13 +338,6 @@
     return () => (src.hidden ? box.innerHTML : src.value);
   }
 
-  const field = (label, name, value, extra = "", type = "text") =>
-    `<label class="field">${esc(label)}<input name="${name}" type="${type}" value="${esc(value ?? "")}" ${extra}></label>`;
-  const area = (label, name, value, n = 3) =>
-    `<label class="field">${esc(label)}<textarea name="${name}" rows="${n}">${esc(value ?? "")}</textarea></label>`;
-  const toggle = (label, name, on) =>
-    `<label class="check field"><input type="checkbox" name="${name}" ${on ? "checked" : ""}> ${esc(label)}</label>`;
-
   // ---- Dashboard ----
 
   const dashboard = run(async () => {
@@ -307,7 +347,7 @@
     view().innerHTML = `<div class="tiles">
       ${tile("Sales today", money(d.todaySales))}${tile("Waiting for confirmation", d.pending)}${tile("Ready to ship", d.toShip)}${tile("New messages and reviews", d.unread + d.reviews, "#messages")}${tile("Sales, last 30 days", money(d.monthSales))}
     </div>
-    <h3 class="jobhead">What do you want to do?</h3>
+    <h3 class="jobhead">Quick actions</h3>
     <div class="jobs">${JOBS.slice(0, 10)
       .map(([label, href]) => `<a href="${href}">${esc(label)}</a>`)
       .join("")}</div>
@@ -316,7 +356,7 @@
     </div></div>
     <div class="split">
       <div class="panel"><h3>Best sellers, last 30 days</h3>${d.top.length ? `<table class="tbl">${d.top.map((t) => `<tr><td>${esc(t.name)}</td><td>${t.qty} sold</td><td>${money(t.sales)}</td></tr>`).join("")}</table>` : "<p>No sales yet.</p>"}</div>
-      <div class="panel"><h3>Low stock</h3>${d.low.length ? `<table class="tbl">${d.low.map((p) => `<tr><td><a class="link" href="#product/${p.id}">${esc(p.name)}</a></td><td><b>${p.stock}</b> left</td></tr>`).join("")}</table>` : "<p>Everything is well stocked.</p>"}</div>
+      <div class="panel"><h3>Low stock (≤ ${lowStock} left)</h3>${d.low.length ? `<table class="tbl">${d.low.map((p) => `<tr><td><a class="link" href="#product/${p.id}">${esc(p.name)}</a></td><td><b>${p.stock}</b> left</td></tr>`).join("")}</table>` : "<p>Everything is well stocked.</p>"}</div>
     </div>`;
   });
 
@@ -327,10 +367,10 @@
 
   const orders = run(async () => {
     view().innerHTML = `<div class="toolbar">
-      <input id="oq" type="search" placeholder="Search orders" value="${esc(orderFilter.q)}" aria-label="Search orders">
+      <input id="oq" type="search" placeholder="Search order #, phone, name or address" value="${esc(orderFilter.q)}" aria-label="Search orders">
       <select id="ost" aria-label="Status"><option value="">All statuses</option>${statusOptions(orderFilter.status)}</select>
       <label class="check">From <input id="ofrom" type="date" value="${esc(orderFilter.from)}"></label><label class="check">To <input id="oto" type="date" value="${esc(orderFilter.to)}"></label>
-      <button class="btn ghost" id="csv">Download as Excel file</button></div><div id="olist"><p>Loading…</p></div>`;
+      <button class="btn ghost" id="csv">Download Excel CSV</button></div><div id="olist"><p>Loading…</p></div>`;
     const reload = () => {
       orderFilter.page = 0;
       drawOrders();
@@ -370,7 +410,7 @@
     const res = await api("/orders?" + query());
     const l = res.orders;
     const pages = Math.ceil(res.total / res.size);
-    $("#olist").innerHTML = `<p><b>${res.total}</b> orders · <b>${money(res.sales)}</b> sales, not counting cancelled or returned</p>
+    $("#olist").innerHTML = `<p><b>${res.total}</b> orders · <b>${money(res.sales)}</b> sales, excluding cancelled and returned</p>
     <div class="scroll"><table class="tbl"><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr>
     ${l
       .map(
@@ -384,7 +424,9 @@
       <td class="actions"><button class="link" data-more="${esc(o.number)}">Details</button> <button class="link" data-print="${esc(o.number)}">Invoice</button></td>
     </tr>
     <tr id="d-${esc(o.number)}" hidden><td colspan="7"><form class="inlineform" data-n="${esc(o.number)}">
-      ${field("Courier", "courier", o.courier)}${field("Tracking number", "tracking", o.tracking)}${field("Private note, customers never see this", "adminNote", o.admin_note)}
+      ${field("Courier", "courier", o.courier, "", "text", "Shown to customer on /track/.")}
+      ${field("Tracking number", "tracking", o.tracking, "", "text", "Shown to customer on /track/.")}
+      ${field("Private note", "adminNote", o.admin_note, "", "text", "Staff only — customers never see this.")}
       <button class="btn">Save</button></form></td></tr>`,
       )
       .join("")}</table></div>
@@ -561,22 +603,28 @@
   function editProduct(p, isNew) {
     say("");
     let images = (p.images || []).map((i) => ({ ...i }));
-    view().innerHTML = `<form class="panel editor" id="pf"><h2>${isNew ? "Add product" : "Edit product"}</h2>
-      ${field("Name", "name", p.name, "required maxlength=200")}
+    view().innerHTML = `<form class="panel editor" id="pf">
+      ${secHead(isNew ? "Add product" : "Edit product", "Fill in product details below. Price, stock and visibility update live; name, photos, categories and text require Publish.", isNew ? "Shop & new /product/<slug>/ page" : `/product/${p.slug}/`, "both")}
+      ${field("Product name", "name", p.name, "required maxlength=200", "text", "Shown on product cards, search results, cart, and customer invoices. (Needs Publish)")}
       <details class="advanced"><summary>Web address: /product/<span id="slugview">${esc(p.slug) || "made-from-the-name"}</span>/</summary>
-        ${field("Web address", "slug", p.slug, `required pattern="[^\\s\\/?#.]+"`)}
-        <p class="meta">This is filled in for you. ${isNew ? "" : "Changing it breaks old links to this product."}</p></details>
-      <div class="fields3">${field("Selling price (৳)", "price", p.price, "required min=0 step=1", "number")}${field("Old price (৳), shown crossed out", "regular", p.regular, "min=0 step=1", "number")}${field("How many in stock", "stock", p.stock, "required min=0 step=1", "number")}</div>
-      ${field("Product code (SKU), optional", "sku", p.sku)}${field("Short description, shown beside the photo", "short", p.short, "maxlength=300")}
-      <div class="field">Categories ${checkList("cat", p.cats || [])}</div>
-      <div class="field">Photos <span class="meta">The first photo is the main one.</span><div id="imgs" class="imgs"></div>
+        ${field("Web address (URL slug)", "slug", p.slug, `required pattern="[^\\s\\/?#.]+"`, "text", isNew ? "Automatically filled from the product name." : "Changing an existing web address breaks old links to this product.")}
+      </details>
+      <div class="fields3">
+        ${field("Selling price (৳)", "price", p.price, "required min=0 step=1", "number", "Actual checkout price. Live in ~2 min.")}
+        ${field("Old price (৳)", "regular", p.regular, "min=0 step=1", "number", "Crossed out to show % off & list on /offers/. 0 for none.")}
+        ${field("Stock quantity", "stock", p.stock, "required min=0 step=1", "number", "0 marks the item as Sold out. Live in ~2 min.")}
+      </div>
+      ${field("Product code (SKU)", "sku", p.sku, "", "text", "Optional product code shown on the product page and searchable.")}
+      ${field("Short description", "short", p.short, "maxlength=300", "text", "Shown right beside the main photo and used as the Google search snippet.")}
+      <div class="field"><span class="flabel">Categories</span><small class="fhelp">Choose which category pages and home page rows include this product. (Needs Publish)</small>${checkList("cat", p.cats || [])}</div>
+      <div class="field"><span class="flabel">Product photos</span><small class="fhelp">The first photo is the main thumbnail on product cards. Use ◀ / ▶ to reorder. (Needs Publish)</small><div id="imgs" class="imgs"></div>
         <label class="btn ghost small upl">Upload photos<input id="up" type="file" accept="image/*" multiple hidden></label>
         <input id="imgurl" placeholder="Or paste an image address and press Enter" aria-label="Image address"></div>
-      <div class="field">Specifications<div id="attrs"></div></div>
-      <label class="field">Search words, separated by commas<input name="tagnames" value="${esc((p.tags || []).map((t) => allTags.find((x) => x.slug === t)?.name || t).join(", "))}"></label>
-      <div class="field">Description<div id="desc"></div></div>
-      ${toggle("Visible in shop", "active", p.active)}
-      <div class="stick"><button class="btn">Save</button> <button type="button" class="btn ghost" id="back">Back</button>${isNew ? "" : ` <button type="button" class="link danger" id="del">Delete product</button>`}</div></form>`;
+      <div class="field"><span class="flabel">Specifications</span><small class="fhelp">Optional key details shown under Buy buttons, such as Colour, Capacity, or Warranty.</small><div id="attrs"></div></div>
+      <label class="field"><span class="flabel">Search tags (comma-separated)</span><small class="fhelp">Extra keywords for search engines and /product-tag/ pages.</small><input name="tagnames" value="${esc((p.tags || []).map((t) => allTags.find((x) => x.slug === t)?.name || t).join(", "))}"></label>
+      <div class="field"><span class="flabel">Full description</span><small class="fhelp">Detailed features and product info shown below the main section. (Needs Publish)</small><div id="desc"></div></div>
+      ${toggle("Visible in shop", "active", p.active, "Turn off to hide this product from customers without deleting it. (Live in ~2 min)")}
+      <div class="stick"><button class="btn">Save product</button> <button type="button" class="btn ghost" id="back">Back</button>${isNew ? "" : ` <button type="button" class="link danger" id="del">Delete product</button>`}<span class="stick-hint">Price, stock & visibility go live in ~2 min. Other edits need Publish.</span></div></form>`;
     const f = $("#pf");
     if (!isNew)
       $("#del").onclick = run(async () => {
@@ -600,6 +648,7 @@
         if (images[b]) {
           [images[a], images[b]] = [images[b], images[a]];
           drawImages();
+          unsaved = true;
         }
       };
       $$("[data-alt]").forEach((b) => {
@@ -617,6 +666,7 @@
         b.onclick = () => {
           images.splice(+b.dataset.x, 1);
           drawImages();
+          unsaved = true;
         };
       });
     };
@@ -624,6 +674,7 @@
     const addImage = (src) => {
       images.push({ src, thumb: src.replace("/upload/f_auto,q_auto/", "/upload/f_auto,q_auto,w_300/"), alt: "" });
       drawImages();
+      unsaved = true;
     };
     $("#up").onchange = run(async (e) => {
       say("Uploading…");
@@ -646,10 +697,11 @@
       $("#attrs"),
       (p.attrs || []).map((a) => ({ name: a.name, values: (a.values || []).join(", ") })),
       [
-        { k: "name", label: "Name, such as Colour" },
-        { k: "values", label: "Values, separated by commas" },
+        { k: "name", label: "Specification name", placeholder: "e.g. Colour or Capacity" },
+        { k: "values", label: "Values (comma-separated)", placeholder: "e.g. Red, Silver" },
       ],
       { name: "", values: "" },
+      { addLabel: "+ Add specification", empty: "No specifications added yet (optional)." },
     );
     const desc = rich($("#desc"), p.desc);
     f.name.addEventListener("input", () => {
@@ -708,7 +760,7 @@
         await api("/products/" + p.id, { method: "PUT", body: out });
       }
       await products();
-      needsPublish("Saved. Price and stock are live.");
+      needsPublish("Product saved. Price, stock and visibility are live; click Publish changes for name, photo or text edits.");
     });
   }
 
@@ -717,7 +769,7 @@
   const cats = run(async () => {
     await loadCategories();
     view().innerHTML = `<div class="toolbar"><button class="btn" id="newcat">Add category</button></div>
-      <p class="meta">To put a category in the menu, use <a class="link" href="#menu">Menu and footer</a>. To show one on the home page, use <a class="link" href="#home">Home page</a>.</p>
+      <p class="meta">Categories appear at /product-category/&lt;address&gt;/. To show categories in the top menu and home page grid, open <a class="link" href="#menu">Website → Navigation menu</a>. To add a product row on the home page, open <a class="link" href="#home">Website → Home page</a>.</p>
       <div class="scroll"><table class="tbl"><tr><th>Name</th><th>Address</th><th></th></tr>
       ${categories.map((c) => `<tr><td>${esc(c.name)}</td><td><small>/product-category/${esc(c.path)}/</small></td><td class="actions"><button class="link" data-e="${esc(c.slug)}">Edit</button> <button class="link" data-x="${esc(c.slug)}">Delete</button></td></tr>`).join("")}</table></div>`;
     $("#newcat").onclick = () => editCat({ name: "", slug: "" }, true);
@@ -737,10 +789,16 @@
   function editCat(c, isNew) {
     say("");
     const parentPath = isNew ? "" : (c.path || "").split("/").slice(0, -1).join("/");
-    view().innerHTML = `<form class="panel editor" id="cf"><h2>${isNew ? "Add category" : "Edit category"}</h2>
-      ${field("Name", "name", c.name, "required")}
-      ${isNew ? field("Web address, filled in for you", "slug", "", "required") + `<label class="field">Sits under, optional<select name="parent"><option value="">Nothing, it stands alone</option>${categories.map((x) => `<option value="${esc(x.path)}">${esc(x.path)}</option>`).join("")}</select></label>` : `<p class="meta">/product-category/${esc(c.path)}/</p>`}
-      <div class="stick"><button class="btn">Save</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
+    view().innerHTML = `<form class="panel editor" id="cf">
+      ${secHead(isNew ? "Add category" : "Edit category", "Categories organize products on your storefront and in Google search.", "Category pages & Navigation menu", "pub")}
+      ${field("Category name", "name", c.name, "required", "text", "Display name shown in menus, breadcrumbs, and category headings.")}
+      ${
+        isNew
+          ? field("Web address (URL slug)", "slug", "", "required", "text", "Filled automatically from the name. Cannot be changed later.") +
+            `<label class="field"><span class="flabel">Parent category (optional)</span><small class="fhelp">Nests this category's URL under an existing category.</small><select name="parent"><option value="">None (top-level category)</option>${categories.map((x) => `<option value="${esc(x.path)}">${esc(x.path)}</option>`).join("")}</select></label>`
+          : `<p class="meta"><b>Web address:</b> /product-category/${esc(c.path)}/</p>`
+      }
+      <div class="stick"><button class="btn">Save category</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
     const f = $("#cf");
     if (isNew)
       f.name.addEventListener("input", () => {
@@ -764,23 +822,38 @@
 
   const coupons = run(async () => {
     const l = await api("/coupons");
-    view().innerHTML = `<form class="panel inlineform" id="cpf">
-      ${field("Code", "code", "", "required pattern=[A-Za-z0-9_\\-]{2,40}")}
-      <label class="field">Type<select name="kind"><option value="percent">Percent off</option><option value="amount">Taka off</option></select></label>
-      ${field("Value", "value", "", "required min=1", "number")}${field("Minimum order (৳)", "minOrder", 0, "min=0", "number")}${field("Use limit, 0 for none", "maxUses", 0, "min=0", "number")}${field("Last day", "expires", "", "", "date")}
-      ${toggle("Active", "active", true)}<button class="btn">Save coupon</button></form>
-      <div class="scroll"><table class="tbl"><tr><th>Code</th><th>Discount</th><th>Minimum</th><th>Used</th><th>Last day</th><th></th></tr>
+    view().innerHTML = `<form class="panel coupon-form" id="cpf">
+      ${secHead("Create or edit a coupon", "Enter an existing code to update it, or type a new code. Customers apply coupons on the Checkout page.", "Checkout page", "live")}
+      <div class="fields3">
+        ${field("Coupon code", "code", "", "required pattern=[A-Za-z0-9_\\-]{2,40} placeholder='EID10'", "text", "2–40 letters, numbers, - or _. Saved in uppercase.")}
+        <label class="field"><span class="flabel">Discount type</span><small class="fhelp">Percentage or fixed Taka amount off.</small><select name="kind"><option value="percent">Percent off (%)</option><option value="amount">Flat Taka off (৳)</option></select></label>
+        ${field("Discount value", "value", "", "required min=1 placeholder='10'", "number", "Enter 1–100 for %, or Taka amount.")}
+      </div>
+      <div class="fields3">
+        ${field("Minimum order (৳)", "minOrder", 0, "min=0", "number", "Minimum cart subtotal required. 0 for none.")}
+        ${field("Total use limit", "maxUses", 0, "min=0", "number", "Max total redemptions allowed. 0 for unlimited.")}
+        ${field("Expiry date (optional)", "expires", "", "", "date", "Ends at 11:59 PM on this day (BD time).")}
+      </div>
+      ${toggle("Active", "active", true, "Uncheck to pause this coupon without deleting it.")}
+      <div class="inline-actions"><button class="btn">Save coupon</button> <button type="button" class="btn ghost" id="cpclear" hidden>Cancel edit</button></div></form>
+      <div class="scroll"><table class="tbl"><tr><th>Code</th><th>Discount</th><th>Minimum order</th><th>Used</th><th>Expires</th><th></th></tr>
       ${
         l
           .map(
             (
               c,
-            ) => `<tr class="${c.active ? "" : "off"}"><td><b>${esc(c.code)}</b></td><td>${c.kind === "percent" ? c.value + "%" : money(c.value)}</td><td>${money(c.min_order)}</td><td>${c.used}${c.max_uses ? ` of ${c.max_uses}` : ""}</td><td>${c.expires_at ? esc(c.expires_at.slice(0, 10)) : "None"}</td>
+            ) => `<tr class="${c.active ? "" : "off"}"><td><b>${esc(c.code)}</b>${c.active ? "" : ` <span class="tag">Paused</span>`}</td><td>${c.kind === "percent" ? c.value + "%" : money(c.value)}</td><td>${money(c.min_order)}</td><td>${c.used}${c.max_uses ? ` of ${c.max_uses}` : ""}</td><td>${c.expires_at ? esc(c.expires_at.slice(0, 10)) : "No expiry"}</td>
         <td class="actions"><button class="link" data-e="${esc(c.code)}">Edit</button> <button class="link" data-x="${esc(c.code)}">Delete</button></td></tr>`,
           )
           .join("") || `<tr><td colspan="6">No coupons yet.</td></tr>`
       }</table></div>`;
     const f = $("#cpf");
+    $("#cpclear").onclick = () => {
+      f.reset();
+      f.active.checked = true;
+      $("#cpclear").hidden = true;
+      unsaved = false;
+    };
     f.onsubmit = run(async (e) => {
       e.preventDefault();
       const d = Object.fromEntries(new FormData(f));
@@ -789,7 +862,7 @@
         body: { kind: d.kind, value: +d.value, minOrder: +d.minOrder, maxUses: +d.maxUses, expires: d.expires, active: !!d.active },
       });
       await coupons();
-      say("Coupon saved. It works straight away.");
+      say("Coupon saved. It works straight away at checkout.");
     });
     $$("[data-e]").forEach((b) => {
       b.onclick = () => {
@@ -801,6 +874,7 @@
         f.maxUses.value = c.max_uses;
         f.expires.value = c.expires_at ? c.expires_at.slice(0, 10) : "";
         f.active.checked = c.active;
+        $("#cpclear").hidden = false;
         scrollTo(0, 0);
       };
     });
@@ -816,8 +890,8 @@
   // ---- Customers ----
 
   const customers = run(async () => {
-    view().innerHTML = `<div class="toolbar"><input id="cq" type="search" placeholder="Name or phone" aria-label="Search customers"></div>
-      <form class="panel inlineform" id="reset">${field("Customer forgot their password? Enter their mobile number", "phone", "", "required inputmode=tel")}<button class="btn ghost">Set a new password</button></form>
+    view().innerHTML = `<div class="toolbar"><input id="cq" type="search" placeholder="Search by name or phone number" aria-label="Search customers"></div>
+      <form class="panel inlineform" id="reset">${field("Customer forgot their password? Enter their mobile number", "phone", "", "required inputmode=tel placeholder='01XXXXXXXXX'")}<button class="btn ghost">Set a new password</button></form>
       <p class="note" id="newpass" hidden></p><div id="clist"><p>Loading…</p></div>`;
     const draw = run(async () => {
       const l = await api("/customers?q=" + encodeURIComponent($("#cq").value));
@@ -865,7 +939,7 @@
         await api("/reviews/" + b.dataset.a, { method: "PUT", body: {} });
         await reviews();
         counts();
-        needsPublish("Review approved.");
+        needsPublish("Review approved. Click Publish changes to show it on the product page.");
       });
     });
     $$("[data-x]").forEach((b) => {
@@ -911,7 +985,13 @@
   const writing = (kind, word) => {
     const list = run(async () => {
       const l = await api("/content/" + kind);
-      view().innerHTML = `<div class="toolbar"><button class="btn" id="newdoc">Add ${word}</button></div><div class="scroll"><table class="tbl"><tr><th>Title</th><th>Address</th><th></th></tr>
+      const hint =
+        kind === "page"
+          ? "Pages live at /<address>/ (such as /about-us/). Writing {phone}, {email} or {name} automatically inserts your Shop details."
+          : "Posts appear on /blog/ (newest first) and at /<address>/.";
+      view().innerHTML = `<div class="toolbar"><button class="btn" id="newdoc">Add ${word}</button></div>
+        <p class="meta">${esc(hint)}</p>
+        <div class="scroll"><table class="tbl"><tr><th>Title</th><th>Address</th><th></th></tr>
         ${l.map((d) => `<tr class="${d.draft ? "off" : ""}"><td>${esc(d.title)}${d.draft ? ` <span class="tag">Draft</span>` : ""}</td><td><small>/${esc(d.slug)}/</small></td><td class="actions"><button class="link" data-e="${esc(d.slug)}">Edit</button> <a class="link" href="/${esc(d.slug)}/" target="_blank" rel="noopener">View</a> <button class="link" data-x="${esc(d.slug)}">Delete</button></td></tr>`).join("") || `<tr><td colspan="3">Nothing here yet.</td></tr>`}</table></div>`;
       $("#newdoc").onclick = () => edit({ title: "", slug: "", html: "" }, true);
       $$("[data-e]").forEach((b) => {
@@ -928,13 +1008,19 @@
     });
     const edit = (d, isNew) => {
       say("");
-      view().innerHTML = `<form class="panel editor" id="df"><h2>${isNew ? "Add" : "Edit"} ${word}</h2>
-        ${field("Title", "title", d.title, "required")}
-        ${isNew ? field("Web address, filled in for you", "slug", "", "required") : `<p class="meta">Web address: /${esc(d.slug)}/</p>`}
-        ${kind === "post" ? field("Date", "date", d.date, "", "date") + field("Short summary, shown on the blog page", "excerpt", d.excerpt, "maxlength=180") : ""}
-        <div class="field">Text<div id="body"></div></div>
-        ${toggle("Draft: keep this hidden for now", "draft", d.draft)}
-        <div class="stick"><button class="btn">Save</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
+      const where = kind === "page" ? (isNew ? "Website page & Company footer" : `/${d.slug}/`) : isNew ? "Blog (/blog/)" : `/${d.slug}/ & /blog/`;
+      const desc =
+        kind === "page"
+          ? "Tip: write {phone}, {email}, or {name} inside the page text so your shop details stay updated automatically."
+          : "Articles appear on your Blog page and are indexed by search engines.";
+      view().innerHTML = `<form class="panel editor" id="df">
+        ${secHead(`${isNew ? "Add" : "Edit"} ${word}`, desc, where, "pub")}
+        ${field("Title", "title", d.title, "required", "text", kind === "page" ? "Page heading and footer link label." : "Article headline.")}
+        ${isNew ? field("Web address (URL slug)", "slug", "", "required", "text", "Filled automatically from the title. Cannot be changed later.") : `<p class="meta"><b>Web address:</b> /${esc(d.slug)}/</p>`}
+        ${kind === "post" ? field("Publish date", "date", d.date, "", "date", "Posts are ordered newest first.") + field("Short summary", "excerpt", d.excerpt, "maxlength=180", "text", "Shown below the title on /blog/ and in Google search results.") : ""}
+        <div class="field"><span class="flabel">Content</span><div id="body"></div></div>
+        ${toggle("Draft (keep hidden)", "draft", d.draft, "Hidden from customers even after Publish until unchecked.")}
+        <div class="stick"><button class="btn">Save ${word}</button> <button type="button" class="btn ghost" id="back">Back</button><span class="stick-hint">◆ Remember to click <b>Publish changes</b> afterwards.</span></div></form>`;
       const f = $("#df");
       const body = rich($("#body"), d.html);
       if (isNew)
@@ -966,7 +1052,9 @@
 
   const tags = run(async () => {
     const l = await api("/content/tag");
-    view().innerHTML = `<div class="toolbar"><input id="tq" type="search" placeholder="Find a tag" aria-label="Find a tag"><button class="btn ghost" id="newtag">Add tag</button></div><div class="scroll"><table class="tbl" id="tt"></table></div>`;
+    view().innerHTML = `<div class="toolbar"><input id="tq" type="search" placeholder="Find a tag" aria-label="Find a tag"><button class="btn ghost" id="newtag">Add tag</button></div>
+      <p class="meta">Tags create /product-tag/&lt;slug&gt;/ pages for Google and can also be edited directly on each product. Changes go live after Publish.</p>
+      <div class="scroll"><table class="tbl" id="tt"></table></div>`;
     $("#newtag").onclick = run(async () => {
       const name = prompt("Name of the new tag")?.trim();
       if (!name) return;
@@ -1008,46 +1096,12 @@
 
   // ---- Settings ----
 
-  const WORDS = [
-    ["searchPlaceholder", "Search box hint"],
-    ["shopAll", "Shop all link"],
-    ["callLine", "Call line in the top strip"],
-    ["categoriesHeading", "Home: categories heading"],
-    ["viewAll", "Home: view all link"],
-    ["seeAll", "Home: see all link"],
-    ["recentlyViewed", "Recently viewed heading"],
-    ["allProducts", "Shop page heading"],
-    ["blogHeading", "Blog page heading"],
-    ["contactHeading", "Contact page heading"],
-    ["contactIntro", "Contact page intro"],
-    ["cartHeading", "Cart page heading"],
-    ["cartNote", "Cart: note under the subtotal"],
-    ["checkoutHeading", "Checkout page heading"],
-    ["checkoutHelp", "Checkout: help line"],
-    ["trackHeading", "Track page heading"],
-    ["wishlistHeading", "Wishlist page heading"],
-    ["accountHeading", "Account page heading"],
-    ["productPromise", "Product: line under delivery charges"],
-    ["orderByPhone", "Product: order by phone words"],
-    ["descriptionHeading", "Product: description heading"],
-    ["reviewsHeading", "Product: reviews heading"],
-    ["noReviews", "Product: no reviews yet"],
-    ["alsoLike", "Product: related products heading"],
-    ["emptyCategory", "Empty category message"],
-    ["notFoundHeading", "Page not found: heading"],
-    ["notFoundText", "Page not found: text"],
-    ["paymentHeading", "Footer: payment heading"],
-    ["orderPlaced", "Thank you after an order"],
-    ["reviewThanks", "Thank you after a review"],
-    ["messageThanks", "Thank you after a message"],
-  ];
-
   const settings = run(async (only) => {
     const [s, pageList] = await Promise.all([api("/settings"), api("/content/page"), loadCategories()]);
-    const L = s.live,
+    let L = s.live,
       W = s.site;
     site = W;
-    const catOptions = () => [["on-sale", "★ Products on offer (any with a discount)"], ...categories.map((c) => [c.slug, c.name])];
+    const catOptions = () => [["on-sale", "★ Products on offer (any discounted product)"], ...categories.map((c) => [c.slug, c.name])];
     const places = [
       ["/shop/", "All products"],
       ["/offers/", "Offers: every discounted product"],
@@ -1057,198 +1111,245 @@
       ...pageList.map((p) => [`/${p.slug}/`, p.title]),
       ...categories.map((c) => [`/product-category/${c.path}/`, c.name]),
     ];
-    view().innerHTML = `<datalist id="sitelinks">${places.map(([u, n]) => `<option value="${esc(u)}" label="${esc(n)}"></option>`).join("")}</datalist>
-      <form id="sf" class="settings">
-      <section class="panel" data-s="delivery"><h2>Delivery areas</h2><p class="meta">The charge is per piece: 5 pieces at ৳100 each pay ৳500. Set it to 0 to make delivery free in that area. Customers must choose their area at checkout.</p><div id="zones"></div>
-        ${field("Free delivery everywhere on orders over (৳), 0 to switch off", "freeOver", L.freeOver, "min=0", "number")}
-      </section>
-      <section class="panel" data-s="delivery"><h2>Payment methods</h2><p class="meta">Add a number for mobile payments, and customers will be asked for a transaction ID. Leave the number empty for cash on delivery.</p><div id="pays"></div></section>
-      <section class="panel" data-s="delivery"><h2>Taking orders</h2>
-        ${toggle("We are taking online orders", "ordersOpen", L.ordersOpen)}
-        ${field("Message to show when orders are closed", "closedNote", L.closedNote)}
-        ${field("Announcement bar on every page, leave empty to hide it", "notice", L.notice, "placeholder='Eid sale: 10% off with code EID10'")}
-        <details class="advanced"><summary>More options</summary>
-        <div class="fields3">${field("Smallest order allowed (৳), 0 for none", "minOrder", L.minOrder, "min=0", "number")}${field("Warn me when stock falls to", "lowStock", L.lowStock, "min=0", "number")}${field("Unconfirmed orders allowed per phone, 0 for no limit", "maxPending", L.maxPending, "min=0", "number")}</div>
-        ${toggle("Show “Only 3 left” on products when stock is low", "showLeft", L.showLeft)}</details>
-      </section>
-      <section class="panel" data-s="shop"><h2>Contact details</h2>
-        <div class="fields2">${field("Shop name", "name", W.name, "required")}${field("Tagline", "tagline", W.tagline)}${field("Phone", "phone", W.phone, "required")}${field("WhatsApp number, leave empty to hide", "whatsapp", W.whatsapp)}${field("Email", "email", W.email, "", "email")}${field("Opening hours", "hours", W.hours)}${field("Facebook link", "facebook", W.facebook, "", "url")}${field("YouTube link", "youtube", W.youtube, "", "url")}</div>
-        ${field("Shop address", "address", W.address)}${area("Return and warranty policy, shown on products, leave empty to hide", "returns", W.returns, 2)}${area("A sentence about the shop, shown in the footer", "about", W.about, 2)}${area("Description of the shop for Google", "description", W.description, 2)}
-      </section>
-      <section class="panel" data-s="shop"><h2>Logo and colours</h2>
-        <label class="field">Logo, shown instead of the shop name<span class="inline"><input name="logo" value="${esc(W.logo)}" placeholder="Upload a picture, or paste its address"><input type="file" accept="image/*" id="logoup" aria-label="Upload logo"></span></label>
-        <div class="fields2">${field("Main colour", "brandColor", W.brandColor, "", "color")}${field("Dark colour", "brandDark", W.brandDark, "", "color")}</div>
-      </section>
-      <section class="panel" data-s="home"><h2>Main heading</h2>
-        ${field("Heading", "heroTitle", W.hero.title, "required")}${area("Text under the heading", "heroText", W.hero.text, 2)}
-        <div class="fields2">${field("Button words", "heroButton", W.hero.button)}${field("Button goes to", "heroLink", W.hero.link, 'list="sitelinks"')}</div>
-      </section>
-      <section class="panel" data-s="home"><h2>Pictures beside the heading</h2><p class="meta">Add up to 3. Leave this empty and the shop picks products for you.</p><div id="heroimgs"></div></section>
-      <section class="panel" data-s="home"><h2>Text strip at the very top</h2>${area("One line for each message", "ticker", (W.ticker || []).join("\n"), 3)}</section>
-      <section class="panel" data-s="home"><h2>Banner pictures</h2><p class="meta">Shown under the main heading. Leave this empty for no banners.</p><div id="banners"></div></section>
-      <section class="panel" data-s="home"><h2>Promises</h2><p class="meta">The four short promises under the main heading.</p><div id="perks"></div></section>
-      <section class="panel" data-s="home"><h2>Category pictures</h2>
-        ${toggle("Show the Shop by category section", "showCats", W.showCats !== false)}
-        <div class="field">Which categories to show, leave empty to use the menu ${checkList("tiles", W.catTiles || [])}</div></section>
-      <section class="panel" data-s="home"><h2>Product sections</h2><p class="meta">Each section shows products from one category. Choose “Products on offer” to show every product whose price is below its regular price, biggest discount first. Use the arrows to change the order.</p><div id="home"></div></section>
-      <section class="panel" data-s="menu"><h2>Drop-down menus</h2><div id="menu"></div></section>
-      <section class="panel" data-s="menu"><h2>Other menu links</h2><div id="links"></div></section>
-      <section class="panel" data-s="menu"><h2>Footer links</h2><p class="meta">Links with the same column name appear together.</p><div id="footlinks"></div></section>
-      <section class="panel" data-s="words"><h2>Words</h2><p class="meta">Tip: writing {phone}, {email} or {name} fills in your shop details, here and on Pages, so they stay correct if they change.</p>
-        <div class="fields2">${WORDS.map(([k, label]) => field(label, "copy_" + k, W.copy?.[k])).join("")}</div></section>
-      <div class="stick"><button class="btn">Save changes</button></div></form>`;
-    $$("#sf > section").forEach((p) => {
-      p.hidden = p.dataset.s !== only;
-    });
+    const datalist = `<datalist id="sitelinks">${places.map(([u, n]) => `<option value="${esc(u)}" label="${esc(n)}"></option>`).join("")}</datalist>`;
+
+    let html = "";
+    let stickBtn = "Save changes";
+    let stickHint = "◆ Remember to click <b>Publish changes</b> afterwards so customers see updates.";
+
+    if (only === "delivery") {
+      stickBtn = "Save delivery & payment";
+      stickHint = "● Takes effect live within ~2 minutes (no Publish needed).";
+      html = `
+        <section class="panel">
+          ${secHead("Online orders & announcement bar", "Pause online checkout anytime (such as during Eid holidays) or show an announcement banner across the storefront.", "Top of every page & Checkout", "live")}
+          ${toggle("Accepting online orders", "ordersOpen", L.ordersOpen, "When turned off, customers can still browse products, but placing orders at checkout is paused.")}
+          ${field("Closed message", "closedNote", L.closedNote, "", "text", "Shown in a notice box at the top of the Checkout page when online orders are paused.")}
+          ${field("Top announcement bar", "notice", L.notice, "placeholder='Eid Sale: 10% off with code EID10'", "text", "Shown as a bar at the very top of every page. Leave empty to hide.")}
+        </section>
+        <section class="panel">
+          ${secHead("Delivery areas & order rules", "Configure delivery areas and fees shown on product pages and checkout. Fees are charged per piece because appliances are heavy.", "Product pages, Cart & Checkout", "live")}
+          <div id="zones"></div>
+          <div class="fields2">
+            ${field("Free delivery threshold (৳)", "freeOver", L.freeOver, "min=0 step=1", "number", "Orders at or above this subtotal (after coupon discount) get free delivery everywhere. Set 0 to disable.")}
+            ${field("Minimum order amount (৳)", "minOrder", L.minOrder, "min=0 step=1", "number", "Smallest cart subtotal allowed to place an online order. Set 0 for no minimum.")}
+          </div>
+        </section>
+        <section class="panel">
+          ${secHead("Payment methods", "Enable or disable payment options at checkout. Active methods are also listed in the website footer.", "Checkout & Website footer", "live")}
+          <p class="hint-box"><strong>How mobile payments work:</strong> Add a mobile/account number (such as bKash, Nagad, or Rocket) and checkout instructs the customer to send money there and asks for their Transaction ID. Leave the number empty for Cash on delivery.</p>
+          <div id="pays"></div>
+        </section>`;
+    } else if (only === "shop") {
+      stickBtn = "Save shop details";
+      html = `
+        <section class="panel">
+          ${secHead("Shop identity & logo", "Your business name, tagline, header logo, and descriptions shown in the footer and search engines.", "Header, Browser tab, Footer & Google search", "pub")}
+          <div class="fields2">
+            ${field("Shop name", "name", W.name, "required", "text", "Shown in the header, footer, emails, and printed customer invoices.")}
+            ${field("Tagline", "tagline", W.tagline, "", "text", "Shown above the hero headline on the home page and in browser tab titles.")}
+          </div>
+          <div class="field">
+            <span class="flabel">Logo image</span>
+            <small class="fhelp">Shown in the top header instead of the text logo. Leave empty to display your styled shop name.</small>
+            <div class="img-row">
+              <img class="img-prev" id="logoprev" src="${esc(W.logo)}" alt="Shop logo preview" ${W.logo ? "" : "hidden"}>
+              <div class="inline">
+                <input name="logo" value="${esc(W.logo)}" placeholder="Upload an image or paste a URL">
+                <label class="btn ghost small upl-inline">Upload<input type="file" accept="image/*" id="logoup" hidden></label>
+              </div>
+            </div>
+          </div>
+          ${area("Footer summary", "about", W.about, 2, "Short sentence shown under your shop name in the website footer.")}
+          ${area("Google search description (SEO)", "description", W.description, 2, "Summary shown under your website link in Google search results and social link previews.")}
+        </section>
+        <section class="panel">
+          ${secHead("Phone, WhatsApp & location", "Support numbers and address shown in the header, Contact Us page, product pages, floating buttons, and invoices.", "Header strip, Product pages, Contact page, Floating buttons & Invoices", "pub")}
+          <div class="fields2">
+            ${field("Main phone number", "phone", W.phone, "required", "text", "Used in the top call line, product pages ('Order by phone'), Contact page, invoices, and floating call button.")}
+            ${field("WhatsApp number", "whatsapp", W.whatsapp, "", "text", "Enables the floating WhatsApp chat button and 'WhatsApp' order link on products. Leave empty to hide.")}
+            ${field("Email address", "email", W.email, "", "email", "Shown on Contact Us and receives new order/message notifications.")}
+            ${field("Opening hours", "hours", W.hours, "placeholder='Sat–Thu, 9:00 AM – 9:00 PM'", "text", "Shown on the Contact Us page. Leave empty to hide.")}
+          </div>
+          ${field("Shop address", "address", W.address, "", "text", "Shown in the footer, Contact Us page, and printed on customer invoices.")}
+        </section>
+        <section class="panel">
+          ${secHead("Return policy & social links", "Warranty/return details shown on product pages and social media links in the footer.", "Product pages & Website footer", "pub")}
+          ${area("Return and warranty policy", "returns", W.returns, 2, "Shown on every product page below the delivery charges. Leave empty to hide.")}
+          <div class="fields2">
+            ${field("Facebook page URL", "facebook", W.facebook, "", "url", "Shows the Facebook icon in the website footer. Leave empty to hide.")}
+            ${field("YouTube channel URL", "youtube", W.youtube, "", "url", "Shows the YouTube icon in the website footer. Leave empty to hide.")}
+          </div>
+        </section>`;
+    } else if (only === "home") {
+      stickBtn = "Save home page";
+      html = `
+        <section class="panel">
+          ${secHead("Hero introduction", "The welcome block at the top of your home page. The 3 product photos beside it are picked automatically from your featured product sections below.", "Top of Home page (/)", "pub")}
+          ${field("Main headline", "heroTitle", W.hero.title, "required", "text", "The last word is automatically highlighted in your brand red colour.")}
+          ${area("Introductory text", "heroText", W.hero.text, 2, "Short paragraph displayed directly underneath the main headline.")}
+          <div class="fields2">
+            ${field("Button label", "heroButton", W.hero.button, "", "text", "Text inside the main action button (e.g. 'Shop all products').")}
+            ${field("Button link", "heroLink", W.hero.link, 'list="sitelinks"', "text", "Page or category opened when customers click the button.")}
+          </div>
+        </section>
+        <section class="panel">
+          ${secHead("Promotional banners", "Optional sale or campaign images shown directly below the hero. Leave empty for no banners.", "Below Hero on Home page (/)", "pub")}
+          <div id="banners"></div>
+        </section>
+        <section class="panel">
+          ${secHead("Featured product sections", "Rows of products on the home page. Choose any category or '★ Products on offer' (all discounted items, biggest savings first). Use ▲ / ▼ to reorder.", "Main rows on Home page (/)", "pub")}
+          <div id="home"></div>
+        </section>`;
+    } else if (only === "menu") {
+      stickBtn = "Save navigation menu";
+      html = `
+        <section class="panel">
+          ${secHead("Header category menus & home category grid", "Each group appears as a dropdown in the top navigation bar. The categories chosen here also power the 'Shop by category' grid on the home page.", "Top navigation bar & Home page category grid", "pub")}
+          <p class="hint-box"><strong>Note:</strong> Standard store links (Shop all, Offers, New, Popular, Blog, Track order, Contact) and footer Company/Policies columns are managed automatically.</p>
+          <div id="menu"></div>
+        </section>`;
+    }
+
+    view().innerHTML = `${only === "home" ? datalist : ""}<form id="sf" class="settings">${html}
+      <div class="stick"><button class="btn">${esc(stickBtn)}</button><span class="stick-hint">${stickHint}</span></div></form>`;
+
     const f = $("#sf");
-    const zones = rows(
-      $("#zones"),
-      L.delivery,
-      [
-        { k: "label", label: "Area" },
-        { k: "fee", label: "Charge per piece (৳), 0 for free", type: "number" },
-        { k: "days", label: "Delivery time, such as 2 to 3 days" },
-      ],
-      { label: "", fee: 0 },
-    );
-    const pays = rows(
-      $("#pays"),
-      L.payments,
-      [
-        { k: "label", label: "Name" },
-        { k: "number", label: "Number" },
-        { k: "enabled", label: "On", type: "bool" },
-      ],
-      { label: "", number: "", enabled: true },
-    );
-    const banners = rows(
-      $("#banners"),
-      W.banners || [],
-      [
-        { k: "title", label: "What the picture shows" },
-        { k: "link", label: "Goes to", list: true },
-        { k: "image", label: "Picture", type: "image" },
-      ],
-      { title: "", link: "/shop/", image: "" },
-    );
-    const perks = rows(
-      $("#perks"),
-      W.perks || [],
-      [
-        { k: "title", label: "Title" },
-        { k: "text", label: "Text" },
-      ],
-      { title: "", text: "" },
-    );
-    const home = rows(
-      $("#home"),
-      W.home || [],
-      [
-        { k: "title", label: "Heading" },
-        { k: "cat", label: "Category", type: "select", options: catOptions },
-        { k: "count", label: "How many products", type: "number" },
-      ],
-      { title: "", cat: categories[0]?.slug || "", count: 8 },
-    );
-    const heroimgs = rows(
-      $("#heroimgs"),
-      W.heroImages || [],
-      [
-        { k: "title", label: "What the picture shows" },
-        { k: "link", label: "Goes to", list: true },
-        { k: "image", label: "Picture", type: "image" },
-      ],
-      { title: "", link: "/shop/", image: "" },
-    );
-    const menu = rows(
-      $("#menu"),
-      W.menu || [],
-      [
-        { k: "title", label: "Title" },
-        { k: "cats", label: "Categories", type: "cats" },
-      ],
-      { title: "", cats: [] },
-    );
-    const links = rows(
-      $("#links"),
-      W.links || [],
-      [
-        { k: "label", label: "Words" },
-        { k: "url", label: "Goes to", list: true },
-      ],
-      { label: "", url: "/" },
-    );
-    const footlinks = rows(
-      $("#footlinks"),
-      (W.footer || []).flatMap((c) => c.links.map((l) => ({ col: c.title, label: l.label, url: l.url }))),
-      [
-        { k: "col", label: "Column" },
-        { k: "label", label: "Words" },
-        { k: "url", label: "Goes to", list: true },
-      ],
-      { col: W.footer?.[0]?.title || "Company", label: "", url: "/" },
-    );
-    $("#logoup").onchange = run(async (e) => {
-      f.logo.value = await upload(e.target.files[0], "site", "logo");
-    });
+    let zones, pays, banners, home, menu;
+
+    if (only === "delivery") {
+      zones = rows(
+        $("#zones"),
+        L.delivery,
+        [
+          { k: "label", label: "Area name", placeholder: "e.g. Inside Jashore" },
+          { k: "fee", label: "Charge per piece (৳)", type: "number", min: 0, help: "0 for free delivery" },
+          { k: "days", label: "Delivery time (optional)", placeholder: "e.g. 2 to 3 days" },
+        ],
+        { label: "", fee: 0, days: "" },
+        { addLabel: "+ Add delivery area", empty: "No delivery areas configured. Add at least one area so customers can check out." },
+      );
+      pays = rows(
+        $("#pays"),
+        L.payments,
+        [
+          { k: "label", label: "Method name", placeholder: "e.g. bKash" },
+          { k: "number", label: "Account / mobile number", placeholder: "Leave empty for Cash on delivery" },
+          { k: "enabled", label: "Enabled", type: "bool" },
+        ],
+        { label: "", number: "", enabled: true },
+        { addLabel: "+ Add payment method", empty: "No payment methods added yet." },
+      );
+    }
+
+    if (only === "shop") {
+      $("#logoup").onchange = run(async (e) => {
+        if (!e.target.files[0]) return;
+        const url = await upload(e.target.files[0], "site", "logo");
+        f.logo.value = url;
+        $("#logoprev").src = url;
+        $("#logoprev").hidden = false;
+        unsaved = true;
+      });
+      f.logo.addEventListener("input", () => {
+        const val = f.logo.value.trim();
+        $("#logoprev").src = val;
+        $("#logoprev").hidden = !val;
+      });
+    }
+
+    if (only === "home") {
+      banners = rows(
+        $("#banners"),
+        W.banners || [],
+        [
+          { k: "title", label: "Banner description (alt text)", placeholder: "e.g. Eid Appliance Sale" },
+          { k: "link", label: "Goes to (URL)", list: true, placeholder: "/offers/" },
+          { k: "image", label: "Banner image", type: "image" },
+        ],
+        { title: "", link: "/shop/", image: "" },
+        { addLabel: "+ Add promotional banner", empty: "No promotional banners yet. Leave empty if you don't want banners on the home page." },
+      );
+      home = rows(
+        $("#home"),
+        W.home || [],
+        [
+          { k: "title", label: "Section heading", placeholder: "e.g. Rice cookers" },
+          { k: "cat", label: "Category or Offers", type: "select", options: catOptions },
+          { k: "count", label: "Products to show", type: "number", min: 1 },
+        ],
+        { title: "", cat: categories[0]?.slug || "", count: 8 },
+        { addLabel: "+ Add product section", empty: "No product sections added yet." },
+      );
+    }
+
+    if (only === "menu") {
+      menu = rows(
+        $("#menu"),
+        W.menu || [],
+        [
+          { k: "title", label: "Menu title", placeholder: "e.g. Kitchen or Furniture" },
+          { k: "cats", label: "Categories in this dropdown", type: "cats" },
+        ],
+        { title: "", cats: [] },
+        { addLabel: "+ Add menu group", empty: "No category dropdown menus yet." },
+      );
+    }
+
     f.onsubmit = run(async (e) => {
       e.preventDefault();
       const d = Object.fromEntries(new FormData(f));
-      const live = {
-        ...L,
-        ordersOpen: f.ordersOpen.checked,
-        closedNote: d.closedNote,
-        notice: d.notice.trim(),
-        freeOver: +d.freeOver,
-        minOrder: +d.minOrder,
-        lowStock: +d.lowStock,
-        showLeft: f.showLeft.checked,
-        maxPending: +d.maxPending,
-        delivery: zones().map((z) => ({ ...z, id: z.id || asciiId(z.label) })),
-        payments: pays().map((p) => ({ ...p, id: p.id || asciiId(p.label) })),
-      };
-      const shop = {
-        ...W,
-        name: d.name.trim(),
-        tagline: d.tagline,
-        phone: d.phone.trim(),
-        whatsapp: d.whatsapp.trim(),
-        email: d.email.trim(),
-        hours: d.hours,
-        facebook: d.facebook.trim(),
-        youtube: d.youtube.trim(),
-        address: d.address,
-        returns: d.returns,
-        about: d.about,
-        description: d.description,
-        brandColor: d.brandColor,
-        brandDark: d.brandDark,
-        logo: d.logo.trim(),
-        hero: { title: d.heroTitle, text: d.heroText, button: d.heroButton, link: d.heroLink },
-        ticker: d.ticker
-          .split("\n")
-          .map((t) => t.trim())
-          .filter(Boolean),
-        banners: banners().filter((b) => b.image),
-        perks: perks().filter((p) => p.title),
-        home: home().filter((h) => h.title),
-        heroImages: heroimgs().filter((h) => h.image),
-        showCats: f.showCats.checked,
-        catTiles: new FormData(f).getAll("tiles"),
-        menu: menu().filter((m) => m.title),
-        links: links().filter((l) => l.label),
-        footer: [...new Set(footlinks().map((l) => l.col.trim()))]
-          .filter(Boolean)
-          .map((title) => ({
-            title,
-            links: footlinks()
-              .filter((l) => l.col.trim() === title && l.label && l.url)
-              .map(({ label, url }) => ({ label, url })),
-          })),
-        copy: Object.fromEntries(WORDS.map(([k]) => [k, d["copy_" + k] ?? ""])),
-      };
+      let live = { ...L };
+      let shop = { ...W };
+
+      if (only === "delivery") {
+        live = {
+          ...L,
+          ordersOpen: f.ordersOpen.checked,
+          closedNote: d.closedNote,
+          notice: d.notice.trim(),
+          freeOver: +d.freeOver,
+          minOrder: +d.minOrder,
+          delivery: zones().map((z) => ({ ...z, id: z.id || asciiId(z.label) })),
+          payments: pays().map((p) => ({ ...p, id: p.id || asciiId(p.label) })),
+        };
+      } else if (only === "shop") {
+        shop = {
+          ...W,
+          name: d.name.trim(),
+          tagline: d.tagline,
+          phone: d.phone.trim(),
+          whatsapp: d.whatsapp.trim(),
+          email: d.email.trim(),
+          hours: d.hours,
+          facebook: d.facebook.trim(),
+          youtube: d.youtube.trim(),
+          address: d.address,
+          returns: d.returns,
+          about: d.about,
+          description: d.description,
+          logo: d.logo.trim(),
+        };
+      } else if (only === "home") {
+        shop = {
+          ...W,
+          hero: { title: d.heroTitle, text: d.heroText, button: d.heroButton, link: d.heroLink },
+          banners: banners().filter((b) => b.image),
+          home: home().filter((h) => h.title),
+        };
+      } else if (only === "menu") {
+        shop = {
+          ...W,
+          menu: menu().filter((m) => m.title),
+        };
+      }
+
       await api("/settings", { method: "PUT", body: { live, site: shop } });
-      if (only === "delivery") say("Saved. Customers will see this within about 2 minutes.");
+      L = live;
+      W = shop;
+      site = shop;
+      lowStock = live.lowStock ?? lowStock;
+      if (only === "delivery") say("Saved. Customers will see delivery & payment changes within about 2 minutes.");
       else needsPublish("Saved.");
     });
   });
@@ -1258,6 +1359,7 @@
   const blog = writing("post", "post");
   const publish = run(async () => {
     $("#pub").disabled = true;
+    $("#pub2").disabled = true;
     say("Publishing…");
     try {
       const r = await api("/publish", { method: "POST" });
@@ -1268,6 +1370,7 @@
       $("#dirtybar").hidden = true;
     } finally {
       $("#pub").disabled = false;
+      $("#pub2").disabled = false;
     }
   });
   const routes = {
@@ -1286,7 +1389,6 @@
     shop: () => settings("shop"),
     home: () => settings("home"),
     menu: () => settings("menu"),
-    words: () => settings("words"),
     settings: () => settings("delivery"), // old bookmarks
     product: async (id) => {
       await products();
@@ -1318,16 +1420,17 @@
     const nav = NAVTAB[tab] || tab;
     say("");
     $("#err").textContent = "";
-    const [title, help] = HEADS[nav] || ["", ""];
+    const [title, help, mode] = HEADS[nav] || ["", "", ""];
     const place = NAV.find(([k, , parts]) => k === nav || parts?.[nav]);
     const parts = place?.[2];
     $$("#tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + place?.[0]));
+    const badges = effectBadges(mode);
     $("#head").innerHTML =
       (parts
         ? `<div class="subtabs">${Object.entries(parts)
             .map(([k, v]) => `<a href="#${k}" class="${k === nav ? "on" : ""}">${esc(v)}</a>`)
             .join("")}</div>`
-        : "") + `<h1>${esc(title)}</h1><p class="meta">${esc(help)}</p>`;
+        : "") + `<div class="headrow"><h1>${esc(title)}</h1>${badges ? `<div class="headbadges">${badges}</div>` : ""}</div><p class="meta">${esc(help)}</p>`;
     view().innerHTML = "<p>Loading…</p>";
     routes[tab](arg);
     scrollTo(0, 0);

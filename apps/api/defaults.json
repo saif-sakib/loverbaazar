@@ -32,14 +32,7 @@
     "hours": "",
     "facebook": "https://www.facebook.com/profile.php?id=100091885353080",
     "youtube": "https://www.youtube.com/channel/UCZu0It_vU51HDCGxWnGjIQA",
-    "brandColor": "#b3122e",
-    "brandDark": "#7d0b20",
     "logo": "",
-    "ticker": [
-      "Wholesale prices on home appliances",
-      "Cash on delivery across Bangladesh",
-      "bKash, Nagad and Rocket accepted"
-    ],
     "hero": {
       "title": "Everything for your home, at wholesale prices.",
       "text": "Rice cookers, cookware, wardrobes, chairs and more from Kiam, RFL and Akij. Delivered across Bangladesh, and you pay on delivery.",
@@ -47,77 +40,15 @@
       "link": "/shop/"
     },
     "banners": [],
-    "perks": [
-      { "title": "Cash on delivery", "text": "Pay when it arrives" },
-      { "title": "Mobile payment", "text": "bKash, Nagad, Rocket" },
-      { "title": "Wholesale prices", "text": "Trusted brands" },
-      { "title": "Need help?", "text": "Call {phone}" }
-    ],
     "home": [
       { "title": "Latest products", "cat": "latest-product", "count": 8 },
       { "title": "Popular items", "cat": "popular-item", "count": 8 },
       { "title": "Rice cookers", "cat": "rice-cooker", "count": 8 },
       { "title": "Chairs", "cat": "rfl-chair", "count": 8 }
     ],
-    "showCats": true,
-    "catTiles": [],
-    "heroImages": [],
     "menu": [
       { "title": "Kitchen", "cats": ["rice-cooker", "pressure-cooker", "anodized", "nonstick", "induction-infrared", "electric-kettle", "flask", "mixer-grinder", "dc", "gas-stove"] },
       { "title": "Furniture", "cats": ["wardrobe", "rfl-wardrobe", "almirah", "akij-almirah", "rfl-almirah", "chair", "rfl-chair", "table", "rfl-table", "kitchen-rack"] }
-    ],
-    "links": [
-      { "label": "New", "url": "/product-category/latest-product/" },
-      { "label": "Popular", "url": "/product-category/popular-item/" },
-      { "label": "Blog", "url": "/blog/" },
-      { "label": "Track order", "url": "/track/" },
-      { "label": "Contact", "url": "/contact-us/" }
-    ],
-    "footer": [
-      { "title": "Company", "links": [
-        { "label": "About us", "url": "/about-us/" },
-        { "label": "How to buy", "url": "/how-to-buy/" },
-        { "label": "Contact us", "url": "/contact-us/" },
-        { "label": "Blog", "url": "/blog/" }
-      ] },
-      { "title": "Policies", "links": [
-        { "label": "Privacy policy", "url": "/privacy-policy/" },
-        { "label": "Terms and conditions", "url": "/terms-conditions/" },
-        { "label": "Track your order", "url": "/track/" }
-      ] }
-    ],
-    "copy": {
-      "searchPlaceholder": "Search rice cooker, chair, wardrobe…",
-      "shopAll": "Shop all",
-      "callLine": "Call {phone}",
-      "categoriesHeading": "Shop by category",
-      "viewAll": "View all",
-      "seeAll": "See all",
-      "recentlyViewed": "Recently viewed",
-      "allProducts": "All products",
-      "blogHeading": "Blog",
-      "contactHeading": "Contact us",
-      "contactIntro": "Questions about a product or an order? Send us a message or give us a call.",
-      "cartHeading": "Your cart",
-      "cartNote": "Delivery is added at checkout.",
-      "checkoutHeading": "Checkout",
-      "checkoutHelp": "Trouble ordering? Call {phone}.",
-      "trackHeading": "Track your order",
-      "wishlistHeading": "Your wishlist",
-      "accountHeading": "My account",
-      "productPromise": "Cash on delivery. No account needed to order.",
-      "orderByPhone": "Order by phone:",
-      "descriptionHeading": "Description",
-      "reviewsHeading": "Customer reviews",
-      "noReviews": "No reviews yet. Be the first to share your experience.",
-      "alsoLike": "You may also like",
-      "emptyCategory": "No products here yet. See everything else we sell in the shop.",
-      "notFoundHeading": "We couldn't find that page",
-      "notFoundText": "It may have moved. Everything we sell is in the shop.",
-      "paymentHeading": "Payment",
-      "orderPlaced": "Thank you! Your order is placed. We'll call you to confirm.",
-      "reviewThanks": "Thank you! Your review will appear after we check it.",
-      "messageThanks": "Message sent. Thank you!"
-    }
+    ]
   }
 }

@@ -619,8 +619,16 @@ func adminSaveSettings(w http.ResponseWriter, r *http.Request) {
 		oops(w, err)
 		return
 	}
+	if s, _ := in.Site["name"].(string); strings.TrimSpace(s) == "" {
+		fail(w, 400, "shop name is required")
+		return
+	}
+	if s, _ := in.Site["phone"].(string); strings.TrimSpace(s) == "" {
+		fail(w, 400, "shop phone number is required")
+		return
+	}
 	for _, k := range []string{"brandColor", "brandDark"} {
-		if c, _ := in.Site[k].(string); !colorRe.MatchString(c) {
+		if c, ok := in.Site[k].(string); ok && c != "" && !colorRe.MatchString(c) {
 			fail(w, 400, "please choose valid colours")
 			return
 		}

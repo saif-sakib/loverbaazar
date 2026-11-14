@@ -1,15 +1,13 @@
 ---
 import "@fontsource-variable/plus-jakarta-sans";
 import "../styles/site.css";
-import { MENU, SITE, LIVE, catUrl, telOf, waOf, say } from "../lib/shop";
+import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf } from "../lib/shop";
 const { title, description = SITE.description, image, noindex, type = "website" } = Astro.props;
 const full = title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`;
 const canon = new URL(Astro.url.pathname, Astro.site);
 const parts = SITE.name.split(/(?=[A-Z])/);
 const logoEnd = parts.length > 1 ? parts.pop() : "";
 const logoStart = parts.join("");
-const hex = /^#[0-9a-fA-F]{6}$/;
-const theme = hex.test(SITE.brandColor) && hex.test(SITE.brandDark) ? `:root{--brand:${SITE.brandColor};--brand2:${SITE.brandDark}}` : "";
 const org = {
   "@context": "https://schema.org",
   "@type": "Store",
@@ -21,16 +19,12 @@ const org = {
   sameAs: [SITE.facebook, SITE.youtube].filter(Boolean),
 };
 const payments = LIVE.payments.filter((p: any) => p.enabled);
+const standardSlugs = new Set(["about-us", "how-to-buy", "contact-us", "privacy-policy", "terms-conditions"]);
+const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slug));
 ---
 
 <!doctype html>
-<html
-  lang="en"
-  data-phone={SITE.phone}
-  data-order-placed={say("orderPlaced")}
-  data-review-thanks={say("reviewThanks")}
-  data-message-thanks={say("messageThanks")}
->
+<html lang="en" data-phone={SITE.phone}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -45,12 +39,11 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
     <meta property="og:url" content={canon} />
     {image && <meta property="og:image" content={image} />}
     <meta name="twitter:card" content={image ? "summary_large_image" : "summary"} />
-    <meta name="theme-color" content={SITE.brandColor} />
+    <meta name="theme-color" content="#b3122e" />
     <link
       rel="icon"
-      href={`data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='${SITE.brandColor.replace("#", "%23")}'/><text x='16' y='23' font-size='20' font-weight='800' text-anchor='middle' fill='white' font-family='sans-serif'>${SITE.name[0]}</text></svg>`}
+      href={`data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23b3122e'/><text x='16' y='23' font-size='20' font-weight='800' text-anchor='middle' fill='white' font-family='sans-serif'>${SITE.name[0]}</text></svg>`}
     />
-    {theme && <style set:html={theme} is:inline />}
     <script type="application/ld+json" set:html={JSON.stringify(org).replace(/</g, "\\u003c")} />
     <slot name="head" />
     <script is:inline src="/app.js" defer></script>
@@ -60,16 +53,14 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
       Skip to content
     </a>
     <div class="notice" data-notice hidden role="status"></div>
-    {SITE.ticker.length > 0 && (
-      <div class="ticker">
-        <div>
-          {SITE.ticker.map((t: string) => (
-            <span>{t}</span>
-          ))}
-          <span>{say("callLine")}</span>
-        </div>
+    <div class="ticker">
+      <div>
+        <span>Wholesale prices on home appliances</span>
+        <span>Cash on delivery across Bangladesh</span>
+        <span>bKash, Nagad and Rocket accepted</span>
+        <span>Call {SITE.phone}</span>
       </div>
-    )}
+    </div>
     <header class="top">
       <div class="wrap bar">
         <a href="/" class="logo" aria-label={`${SITE.name} home`}>
@@ -86,7 +77,7 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
           <input
             name="q"
             type="search"
-            placeholder={say("searchPlaceholder")}
+            placeholder="Search rice cooker, chair, wardrobe…"
             aria-label="Search products"
             autocomplete="off"
             data-suggest
@@ -135,7 +126,7 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
         </nav>
       </div>
       <div class="wrap nav">
-        <a href="/shop/">{say("shopAll")}</a>
+        <a href="/shop/">Shop all</a>
         {MENU.map((g: any) => (
           <details class="mega">
             <summary>{g.title}</summary>
@@ -146,9 +137,12 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
             </div>
           </details>
         ))}
-        {SITE.links.map((l: any) => (
-          <a href={l.url}>{l.label}</a>
-        ))}
+        <a href="/offers/">Offers</a>
+        <a href="/product-category/latest-product/">New</a>
+        <a href="/product-category/popular-item/">Popular</a>
+        <a href="/blog/">Blog</a>
+        <a href="/track/">Track order</a>
+        <a href="/contact-us/">Contact</a>
       </div>
     </header>
     <main id="main">
@@ -182,16 +176,24 @@ const payments = LIVE.payments.filter((p: any) => p.enabled);
             </div>
           )}
         </div>
-        {SITE.footer.map((col: any) => (
-          <div>
-            <h4>{col.title}</h4>
-            {col.links.map((l: any) => (
-              <a href={l.url}>{l.label}</a>
-            ))}
-          </div>
-        ))}
         <div>
-          <h4>{say("paymentHeading")}</h4>
+          <h4>Company</h4>
+          <a href="/about-us/">About us</a>
+          <a href="/how-to-buy/">How to buy</a>
+          <a href="/contact-us/">Contact us</a>
+          <a href="/blog/">Blog</a>
+          {extraPages.map((p: any) => (
+            <a href={`/${p.slug}/`}>{p.title}</a>
+          ))}
+        </div>
+        <div>
+          <h4>Policies</h4>
+          <a href="/privacy-policy/">Privacy policy</a>
+          <a href="/terms-conditions/">Terms and conditions</a>
+          <a href="/track/">Track your order</a>
+        </div>
+        <div>
+          <h4>Payment</h4>
           <p data-payments>
             {payments.map((p: any) => (
               <>

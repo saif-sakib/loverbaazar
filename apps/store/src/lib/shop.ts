@@ -31,11 +31,9 @@ export const cats = pick("cats"),
   pages = pick("pages");
 export const posts = [...pick("posts")].sort((a, b) => String(b.date).localeCompare(String(a.date)));
 export const SITE: any = { ...defaults.site, ...store.site };
-SITE.copy = { ...defaults.site.copy, ...store.site?.copy };
-// {phone}, {email} and {name} let the admin write text that stays right when those details change.
+// {phone}, {email} and {name} let the admin write text on Pages that stays right when those details change.
 export const fill = (text = "") =>
   text.replaceAll("{phone}", SITE.phone).replaceAll("{email}", SITE.email).replaceAll("{name}", SITE.name);
-export const say = (key: string) => fill(SITE.copy[key] ?? "");
 export const siteUrl = (path: string) => new URL(path, import.meta.env.SITE).href;
 export const LIVE: any = { ...defaults.live, ...store.live }; // only a fallback: the browser reads /api/stock
 

@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Card from "../../components/Card.astro";
-import { products, cats, img, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, say, siteUrl } from "../../lib/shop";
+import { products, cats, img, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, siteUrl } from "../../lib/shop";
 export const getStaticPaths = () => products.map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
 const d = off(p);
@@ -136,14 +136,14 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
             </li>
           ))}
         </ul>
-        <p class="meta">{say("productPromise")}</p>
+        <p class="meta">Cash on delivery. No account needed to order.</p>
         {SITE.returns && (
           <p class="meta">
             <b>Returns:</b> {SITE.returns}
           </p>
         )}
         <p class="note">
-          {say("orderByPhone")}{" "}
+          Order by phone:{" "}
           <a href={`tel:${telOf(SITE.phone)}`}>
             <b>{SITE.phone}</b>
           </a>
@@ -161,13 +161,13 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
     </section>
     {p.desc && (
       <section class="prose">
-        <h2>{say("descriptionHeading")}</h2>
+        <h2>Description</h2>
         <Fragment set:html={p.desc} />
       </section>
     )}
     <section class="prose" id="reviews">
-      <h2>{say("reviewsHeading")}</h2>
-      {p.reviews.length === 0 && <p>{say("noReviews")}</p>}
+      <h2>Customer reviews</h2>
+      {p.reviews.length === 0 && <p>No reviews yet. Be the first to share your experience.</p>}
       {p.reviews.map((r: any) => (
         <div class="review">
           <b>{r.name}</b>{" "}
@@ -206,7 +206,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
     {related.length > 0 && (
       <>
         <div class="sec">
-          <h2>{say("alsoLike")}</h2>
+          <h2>You may also like</h2>
         </div>
         <section class="grid">
           {related.map((x) => (
@@ -217,7 +217,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
     )}
     <section data-recent-wrap hidden>
       <div class="sec">
-        <h2>{say("recentlyViewed")}</h2>
+        <h2>Recently viewed</h2>
       </div>
       <div class="grid" data-recent></div>
     </section>

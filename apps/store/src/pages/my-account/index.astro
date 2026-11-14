@@ -1,11 +1,11 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { SITE, say } from "../../lib/shop";
+import { SITE } from "../../lib/shop";
 ---
 
-<Base title={say("accountHeading")} noindex>
+<Base title="My account" noindex>
   <div class="wrap">
-    <h1 class="title">{say("accountHeading")}</h1>
+    <h1 class="title">My account</h1>
     <div data-account></div>
     <div class="two even" data-auth hidden>
       <form class="panel" data-form="login">

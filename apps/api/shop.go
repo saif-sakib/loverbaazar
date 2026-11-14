@@ -87,7 +87,6 @@ func loadSettings(ctx context.Context) (Live, map[string]any, error) {
 	if err := json.Unmarshal(defaultsJSON, &d); err != nil {
 		return d.Live, nil, err
 	}
-	words, _ := d.Site["copy"].(map[string]any)
 	rows, err := db.Query(ctx, `SELECT key,data::text FROM settings`)
 	if err != nil {
 		return d.Live, nil, err
@@ -99,14 +98,6 @@ func loadSettings(ctx context.Context) (Live, map[string]any, error) {
 		}
 		return json.Unmarshal([]byte(data), &d.Site)
 	})
-	// Saved words replace the defaults as a whole, so a phrase added later would otherwise be blank.
-	if saved, isMap := d.Site["copy"].(map[string]any); isMap && err == nil {
-		for k, v := range words {
-			if _, has := saved[k]; !has {
-				saved[k] = v
-			}
-		}
-	}
 	return d.Live, d.Site, err
 }
 

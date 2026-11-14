@@ -1,12 +1,11 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { say } from "../../lib/shop";
 ---
 
-<Base title={say("cartHeading")} noindex>
+<Base title="Your cart" noindex>
   <div class="wrap">
     <div class="pagehead">
-      <h1 class="title">{say("cartHeading")}</h1>
+      <h1 class="title">Your cart</h1>
     </div>
     <div class="two">
       <div class="panel" data-cart>
@@ -18,7 +17,7 @@ import { say } from "../../lib/shop";
           <span data-sub>৳0</span>
         </div>
         <p class="meta" data-free>
-          {say("cartNote")}
+          Delivery is added at checkout.
         </p>
         <a class="btn small center" href="/checkout/" data-to-checkout hidden>
           Proceed to checkout

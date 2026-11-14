@@ -27,8 +27,10 @@
     t._t = setTimeout(() => t.classList.remove("on"), 2200);
   };
 
-  const WORDS = document.documentElement.dataset; // words the admin can change
-  const PHONE = WORDS.phone || "";
+  const PHONE = document.documentElement.dataset.phone || "";
+  const ORDER_PLACED = "Thank you! Your order is placed. We'll call you to confirm.";
+  const REVIEW_THANKS = "Thank you! Your review will appear after we check it.";
+  const MESSAGE_THANKS = "Message sent. Thank you!";
   const MAX_QTY = 20;
   const PAGE = 24;
   const STATUS = {
@@ -672,7 +674,7 @@
       try {
         const o = await api(`/track?order=${encodeURIComponent(f.order.value)}&phone=${encodeURIComponent(f.phone.value)}`);
         out.innerHTML =
-          (q.get("new") ? `<p class="note">${esc(WORDS.orderPlaced)}</p>` : "") + orderHtml(o);
+          (q.get("new") ? `<p class="note">${esc(ORDER_PLACED)}</p>` : "") + orderHtml(o);
       } catch (x) {
         err.textContent = x.message;
       }
@@ -812,9 +814,9 @@
   track();
   account();
   checkout();
-  $$("[data-contact]").forEach((f) => simpleForm(f, "/contact", WORDS.messageThanks));
+  $$("[data-contact]").forEach((f) => simpleForm(f, "/contact", MESSAGE_THANKS));
   $$("[data-review]").forEach((f) =>
-    simpleForm(f, "/reviews", WORDS.reviewThanks, { product: +f.dataset.review }),
+    simpleForm(f, "/reviews", REVIEW_THANKS, { product: +f.dataset.review }),
   );
   Promise.allSettled([renderCart(), renderWish(), search(), renderRecent()]);
   loadStock();

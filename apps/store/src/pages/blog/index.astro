@@ -1,13 +1,13 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { posts, say } from "../../lib/shop";
+import { posts } from "../../lib/shop";
 const when = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 ---
 
-<Base title={say("blogHeading")}>
+<Base title="Blog">
   <div class="wrap">
     <div class="pagehead">
-      <h1 class="title">{say("blogHeading")}</h1>
+      <h1 class="title">Blog</h1>
     </div>
     <section class="posts">
       {posts.map((p) => (

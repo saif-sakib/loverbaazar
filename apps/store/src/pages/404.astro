@@ -1,12 +1,11 @@
 ---
 import Base from "../layouts/Base.astro";
-import { say } from "../lib/shop";
 ---
 
 <Base title="Page not found" noindex>
   <div class="wrap empty big">
-    <h1>{say("notFoundHeading")}</h1>
-    <p>{say("notFoundText")}</p>
-    <a class="btn" href="/shop/">{say("shopAll")}</a>
+    <h1>We couldn't find that page</h1>
+    <p>It may have moved. Everything we sell is in the shop.</p>
+    <a class="btn" href="/shop/">Shop all</a>
   </div>
 </Base>
