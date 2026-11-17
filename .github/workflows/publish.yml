@@ -30,6 +30,9 @@ jobs:
       - name: Check JavaScript syntax # Astro copies public/ as it is, so the build can't catch a typo there
         working-directory: apps/store
         run: for f in public/*.js ../../edge/worker.js; do node --check "$f"; done
+      - name: Test deployment confirmation
+        working-directory: .
+        run: node --test scripts/release-verification.test.mjs
   deploy:
     needs: test
     if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
