@@ -67,3 +67,9 @@ export const MENU = SITE.menu
   .map((g: any) => ({ title: g.title, items: g.cats.map(cat).filter(Boolean) }))
   .filter((g: any) => g.items.length);
 export const rating = (p: any) => (p.reviews.length ? p.reviews.reduce((a: number, r: any) => a + r.rating, 0) / p.reviews.length : 0);
+
+// These are descriptive attributes, never selectable inventory variants.
+export const attributeValues = (p: any, key: string): string[] => {
+ const pattern=key==="brand" ? /^(brand|manufacturer|ব্র্যান্ড|ব্রান্ড)$/i : /^(color|colour|রং)$/i;
+ return [...new Set((p.attrs||[]).filter((a: any)=>pattern.test(a.name.trim())).flatMap((a: any)=>a.values).map((v: any)=>String(v).trim()).filter(Boolean))] as string[];
+};

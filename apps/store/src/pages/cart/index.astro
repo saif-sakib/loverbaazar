@@ -7,6 +7,7 @@ import Base from "../../layouts/Base.astro";
     <div class="pagehead">
       <h1 class="title">Your cart</h1>
     </div>
+    <p class="note" data-cart-notice role="status" hidden></p>
     <div class="two">
       <div class="panel" data-cart>
         Loading…
@@ -17,7 +18,7 @@ import Base from "../../layouts/Base.astro";
           <span data-sub>৳0</span>
         </div>
         <p class="meta" data-free>
-          Delivery is added at checkout.
+          Delivery and any discounts are confirmed at checkout.
         </p>
         <a class="btn small center" href="/checkout/" data-to-checkout hidden>
           Proceed to checkout

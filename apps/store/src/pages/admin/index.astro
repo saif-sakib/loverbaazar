@@ -2,13 +2,14 @@
 import "@fontsource-variable/plus-jakarta-sans";
 import "../../styles/site.css";
 import "../../styles/admin.css";
+import "../../styles/mobile.css";
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <meta name="robots" content="noindex" />
     <title>LoverBaazar Admin</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -33,7 +34,7 @@ import "../../styles/admin.css";
         <label class="check field">
           <input id="keep" type="checkbox" /> Keep me signed in on this device
         </label>
-        <p class="err" id="loginErr"></p>
+        <p class="err" id="loginErr" role="alert" tabindex="-1"></p>
         <button class="btn login-btn">Sign in</button>
       </form>
       <div id="app" hidden>
@@ -65,7 +66,7 @@ import "../../styles/admin.css";
           </div>
           <div id="head"></div>
           <p class="note" id="ok" hidden role="status"></p>
-          <p class="err" id="err" role="alert"></p>
+          <p class="err" id="err" role="alert" tabindex="-1"></p>
           <div id="view"></div>
         </main>
       </div>

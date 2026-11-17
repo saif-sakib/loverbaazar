@@ -129,6 +129,7 @@
   let catsPromise = null;
   let lowStock = 5;
 
+  let navigationGeneration = 0;
   const pendingReads = new Map();
   function api(path, opts = {}) {
     if (opts.body || opts.raw || (opts.method && opts.method !== "GET")) return apiRequest(path, opts);
@@ -136,7 +137,11 @@
     if (!pendingReads.has(key)) {
       pendingReads.set(key, apiRequest(path, opts).finally(() => pendingReads.delete(key)));
     }
-    return pendingReads.get(key);
+    const generation = navigationGeneration;
+    return pendingReads.get(key).then(result => {
+      if (path !== "/publish" && generation !== navigationGeneration) throw Object.assign(new Error("Section changed"), { stale: true });
+      return result;
+    });
   }
 
   async function apiRequest(path, opts = {}) {
@@ -176,20 +181,34 @@
     $("#app").hidden = true;
   };
   // Runs an action and shows any failure at the top of the page.
+  const pendingActions = new WeakSet();
   const run =
     (f) =>
     async (...a) => {
+      const event = a[0] instanceof Event ? a[0] : null;
+      const target = event?.currentTarget;
+      event?.preventDefault();
+      if (target && pendingActions.has(target)) return;
+      const button = target?.matches("form") ? $("button[type=submit], button:not([type])", target) : target?.matches("button, select") ? target : null;
+      const wasDisabled = button?.disabled;
+      if (target) pendingActions.add(target);
+      if (button) button.disabled = true;
       $("#err").textContent = "";
       try {
         return await f(...a);
       } catch (e) {
+        if (e.stale) return;
         if (e.auth) logout(e.message);
         else {
           say("");
           $("#err").textContent = e.message;
           unsaved = !!$("#view form");
+          $("#err").focus();
           scrollTo(0, 0);
         }
+      } finally {
+        if (target) pendingActions.delete(target);
+        if (button?.isConnected) button.disabled = wasDisabled;
       }
     };
   // Saved, but customers only see it after Publish.
@@ -299,30 +318,32 @@
   async function loadCategories(force = false) {
     if (categories.length && !force) return categories;
     if (catsPromise && !force) return catsPromise;
-    catsPromise = api("/content/cat")
+    const request = api("/content/cat")
       .then((c) => {
         categories = c;
         return categories;
       })
       .finally(() => {
-        catsPromise = null;
+        if (catsPromise === request) catsPromise = null;
       });
-    return catsPromise;
+    catsPromise = request;
+    return request;
   }
 
   async function ensureCatalog(force = false) {
     if (productsLoaded && !force) return;
     if (catalogPromise && !force) return catalogPromise;
-    catalogPromise = Promise.all([api("/products"), api("/content/tag"), loadCategories(force)])
+    const request = Promise.all([api("/products"), api("/content/tag"), loadCategories(force)])
       .then(([p, t]) => {
         allProducts = p;
         allTags = t;
         productsLoaded = true;
       })
       .finally(() => {
-        catalogPromise = null;
+        if (catalogPromise === request) catalogPromise = null;
       });
-    return catalogPromise;
+    catalogPromise = request;
+    return request;
   }
 
   // ---- Reusable form parts ----
@@ -637,6 +658,8 @@
   });
 
   const drawOrders = run(async () => {
+    if (unsaved && $("form[data-n]", view()) && !confirm(LEAVE)) return;
+    unsaved = false;
     const res = await api("/orders?" + query());
     const l = res.orders;
     const pages = Math.ceil(res.total / res.size);
@@ -646,17 +669,17 @@
       return "";
     };
     $("#olist").innerHTML = `<div class="summary-bar"><span><b>${res.total}</b> orders · <b>${money(res.sales)}</b> sales, excluding cancelled and returned</span><span>Use Confirm / Ship / Delivered for 1-click updates, or Details for courier &amp; notes.</span></div>
-    <div class="scroll"><table class="tbl"><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr>
+    <div class="scroll"><table class="tbl"><thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead><tbody>
     ${
       l
         .map(
-          (o) => `<tr>
-      <td class="nowrap"><b>${esc(o.number)}</b><br><small>${esc(when(o.created_at))}</small></td>
-      <td>${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}${o.bad_phone > 0 ? ` <span class="tag warn">${o.bad_phone} cancelled or returned</span>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a>${o.email ? `<br><a class="link" href="mailto:${esc(o.email)}">${esc(o.email)}</a>` : ""}<br>${esc(o.address)} (${esc(o.area)})${o.note ? `<br><i>${esc(o.note)}</i>` : ""}</td>
-      <td>${(o.items || []).map((i) => `${esc(i.name)} × ${i.qty}`).join("<br>")}</td>
-      <td>${money(o.total)}${o.discount ? `<br><small>${money(o.discount)} off, ${esc(o.coupon)}</small>` : ""}</td>
-      <td>${esc(o.payment)}<br><small>${esc(o.txn_id)}</small></td>
-      <td><select class="status" data-st="${esc(o.status)}" data-o="${esc(o.number)}" aria-label="Status of ${esc(o.number)}">${statusOptions(o.status)}</select></td>
+          (o) => `<tr data-order-row>
+      <td class="nowrap" data-l="Order"><b>${esc(o.number)}</b><br><small>${esc(when(o.created_at))}</small></td>
+      <td data-l="Customer">${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}${o.bad_phone > 0 ? ` <span class="tag warn">${o.bad_phone} cancelled or returned</span>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a>${o.email ? `<br><a class="link" href="mailto:${esc(o.email)}">${esc(o.email)}</a>` : ""}<br>${esc(o.address)} (${esc(o.area)})${o.note ? `<br><i>${esc(o.note)}</i>` : ""}</td>
+      <td data-l="Items">${(o.items || []).map((i) => `${esc(i.name)} × ${i.qty}`).join("<br>")}</td>
+      <td data-l="Total">${money(o.total)}${o.discount ? `<br><small>${money(o.discount)} off, ${esc(o.coupon)}</small>` : ""}</td>
+      <td data-l="Payment">${esc(o.payment)}<br><small>${esc(o.txn_id)}</small>${o.txn_id && o.status === "pending" ? '<small class="order-payment-note">Verify this transaction in your payment account before confirming.</small>' : ""}</td>
+      <td data-l="Status"><select class="status" data-st="${esc(o.status)}" data-o="${esc(o.number)}" aria-label="Status of ${esc(o.number)}">${statusOptions(o.status)}</select></td>
       <td class="actions">${quickBtn(o)}${o.status === "confirmed" ? `<button type="button" class="link primary-act" data-more="${esc(o.number)}" data-ship-focus>📦 Ship / Track</button>` : `<button type="button" class="link" data-more="${esc(o.number)}">Details</button>`} <button type="button" class="link" data-print="${esc(o.number)}">Invoice</button></td>
     </tr>
     <tr id="d-${esc(o.number)}" class="detail-row" hidden><td colspan="7"><form class="inlineform" data-n="${esc(o.number)}">
@@ -666,7 +689,7 @@
       <div class="inlineform-actions"><button class="btn">Save details</button>${o.status === "cancelled" || o.status === "returned" ? "" : ` <button type="button" class="btn pub-now" data-ship="${esc(o.number)}">Save & Mark Shipped</button>`} <button type="button" class="btn ghost small" data-copy="${esc(o.number)}">Copy address</button></div></form></td></tr>`,
         )
         .join("") || `<tr><td colspan="7" class="empty-cell">No orders match these filters.</td></tr>`
-    }</table></div>
+    }</tbody></table></div>
     ${pages > 1 ? `<div class="pager"><button class="btn ghost" id="prev" ${orderFilter.page ? "" : "disabled"}>Previous</button> Page ${orderFilter.page + 1} of ${pages} <button class="btn ghost" id="next" ${orderFilter.page + 1 < pages ? "" : "disabled"}>Next</button></div>` : ""}`;
     if ($("#prev")) {
       $("#prev").onclick = () => {
@@ -688,6 +711,8 @@
     });
     $$("[data-step]").forEach((b) => {
       b.onclick = run(async () => {
+        if (unsaved && !confirm(LEAVE)) return;
+        unsaved = false;
         await api("/orders/" + encodeURIComponent(b.dataset.num), { method: "PUT", body: { status: b.dataset.step } });
         say(`${b.dataset.num} is now ${b.dataset.step}.`);
         counts();
@@ -697,6 +722,8 @@
     $$("[data-o]").forEach((s) => {
       s.onchange = run(async () => {
         const previous = l.find((o) => o.number === s.dataset.o).status;
+        if (unsaved && !confirm(LEAVE)) { s.value = previous; return; }
+        unsaved = false;
         if (
           (s.value === "cancelled" || s.value === "returned") &&
           !confirm(`Mark ${s.dataset.o} as ${s.value}? The stock goes back on sale.`)
@@ -717,6 +744,7 @@
       b.onclick = () => {
         const r = $(`[id="d-${b.dataset.more}"]`);
         r.hidden = !r.hidden;
+        b.setAttribute("aria-expanded", String(!r.hidden));
         if (!r.hidden && b.hasAttribute("data-ship-focus")) $('[name="courier"]', r)?.focus();
       };
     });
@@ -724,6 +752,7 @@
       f.onsubmit = run(async (e) => {
         e.preventDefault();
         await api("/orders/" + encodeURIComponent(f.dataset.n), { method: "PUT", body: Object.fromEntries(new FormData(f)) });
+        unsaved = false;
         say("Order updated.");
         await drawOrders();
       });
@@ -735,6 +764,7 @@
           method: "PUT",
           body: { ...Object.fromEntries(new FormData(f)), status: "shipped" },
         });
+        unsaved = false;
         say(`${f.dataset.n} marked shipped.`);
         counts();
         await drawOrders();
@@ -840,9 +870,9 @@
           (p) => `<tr data-id="${p.id}" class="${p.active ? "" : "off"}">
       <td><img class="mini" src="${esc(p.images?.[0]?.thumb || p.images?.[0]?.src || "/placeholder.svg")}" alt="" loading="lazy" decoding="async" width="44" height="44"></td>
       <td><button type="button" class="link prod-title" data-e="${p.id}">${esc(p.name)}</button></td>
-      <td data-l="Price"><input class="num" type="number" min="0" data-q="price" value="${p.price}" aria-label="Price of ${esc(p.name)}"></td>
-      <td data-l="Old price"><input class="num" type="number" min="0" data-q="regular" value="${p.regular}" aria-label="Old price of ${esc(p.name)}"></td>
-      <td data-l="Stock"><input class="num" type="number" min="0" data-q="stock" value="${p.stock}" aria-label="Stock of ${esc(p.name)}"></td>
+      <td data-l="Price"><input class="num" type="number" min="0" step="1" inputmode="numeric" data-q="price" value="${p.price}" aria-label="Price of ${esc(p.name)}"></td>
+      <td data-l="Old price"><input class="num" type="number" min="0" step="1" inputmode="numeric" data-q="regular" value="${p.regular}" aria-label="Old price of ${esc(p.name)}"></td>
+      <td data-l="Stock"><input class="num" type="number" min="0" step="1" inputmode="numeric" data-q="stock" value="${p.stock}" aria-label="Stock of ${esc(p.name)}"></td>
       <td data-l="Visible"><input type="checkbox" data-q="active" ${p.active ? "checked" : ""} aria-label="${esc(p.name)} visible in shop"></td>
       <td class="actions"><button class="link" data-e="${p.id}">Edit</button> <button class="link" data-dup="${p.id}">Copy</button> <a class="link" href="/product/${esc(p.slug)}/" target="_blank" rel="noopener">View</a></td></tr>`,
         )
@@ -850,7 +880,7 @@
     $("#pmore").hidden = l.length <= limit;
     const find = (id) => allProducts.find((p) => p.id === +id);
     $$("[data-e]").forEach((b) => {
-      b.onclick = () => editProduct(find(b.dataset.e));
+      b.onclick = run(async () => { await ensureCatalog(true); editProduct(find(b.dataset.e)); });
     });
     $$("[data-dup]").forEach((b) => {
       b.onclick = () => {
@@ -860,6 +890,7 @@
     });
     $$("[data-q]").forEach((i) => {
       i.onchange = run(async () => {
+        if (i.disabled || !i.reportValidity()) return;
         const row = i.closest("tr"),
           p = find(row.dataset.id),
           key = i.dataset.q,
@@ -1847,7 +1878,7 @@
     menu: () => settings("menu"),
     settings: () => settings("delivery"), // old bookmarks
     product: async (id) => {
-      await ensureCatalog();
+      await ensureCatalog(true);
       const p = allProducts.find((x) => x.id === +id);
       if (p) editProduct(p);
       else await products();
@@ -1880,6 +1911,9 @@
       return;
     }
     unsaved = false;
+    navigationGeneration++;
+    catalogPromise = null;
+    catsPromise = null;
     cleanupUploads();
     const [first, arg] = location.hash.slice(1).split("/");
     const tab = routes[first] ? first : "dashboard";
@@ -1903,11 +1937,26 @@
         ? `<div class="subtabs">${Object.entries(parts)
             .map(([k, v]) => `<a href="#${k}" class="${k === nav ? "on" : ""}">${esc(v)}</a>`)
             .join("")}</div>`
-        : "") + `<div class="headrow"><h1>${esc(title)}</h1>${badges ? `<div class="headbadges">${badges}</div>` : ""}</div><p class="meta">${esc(help)}</p>`;
+        : "") + `<div class="headrow"><h1 tabindex="-1">${esc(title)}</h1>${badges ? `<div class="headbadges">${badges}</div>` : ""}</div><p class="meta">${esc(help)}</p>`;
     view().innerHTML = `<div class="panel empty-state">Loading…</div>`;
-    routes[tab](arg);
+    view().setAttribute("aria-busy", "true");
+    const generation = navigationGeneration;
+    Promise.resolve(run(() => routes[tab](arg))()).finally(() => { if (generation === navigationGeneration) view().removeAttribute("aria-busy"); });
+    $("#head h1")?.focus({ preventScroll: true });
     scrollTo(0, 0);
   }
+
+  new MutationObserver(() => {
+    $$("#view table.tbl").forEach(table => {
+      let region = table.closest(".scroll");
+      if (!region) { region = document.createElement("div"); region.className = "scroll"; table.before(region); region.append(table); }
+      if (!region.hasAttribute("role")) {
+        region.setAttribute("role", "region"); region.setAttribute("aria-label", "Scrollable table"); region.tabIndex = 0;
+        const hint = document.createElement("p"); hint.className = "scroll-hint"; hint.textContent = "Swipe across the table to see all columns.";
+        region.before(hint);
+      }
+    });
+  }).observe(view(), { childList: true, subtree: true });
 
   // The search box finds tasks by their everyday words, and products by name.
   function finder() {

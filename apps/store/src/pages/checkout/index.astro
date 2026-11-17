@@ -1,6 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { SITE, LIVE } from "../../lib/shop";
+import { SITE, LIVE, telOf } from "../../lib/shop";
 const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
 ---
 
@@ -31,7 +31,8 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
         closedNote: LIVE.closedNote,
       })}
     >
-      <div class="panel">
+      <fieldset class="panel" data-details-fields>
+        <legend class="sr-only">Delivery and payment details</legend>
         <h2 class="checkout-heading"><span>1</span> Delivery &amp; payment</h2>
         <label class="field">
           Full name
@@ -46,7 +47,7 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
           <input name="email" type="email" maxlength="100" placeholder="you@example.com" autocomplete="email" />
         </label>
         <label class="field">
-          Full address<textarea name="address" rows="3" required maxlength="500" autocomplete="street-address"></textarea>
+          Full address<textarea name="address" rows="3" required minlength="5" maxlength="500" autocomplete="street-address"></textarea>
         </label>
         <label class="field">
           Delivery area<select name="area" required></select>
@@ -55,7 +56,7 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
           Payment<select name="payment"></select>
         </label>
         <p class="meta" data-eta></p>
-        <p class="meta" data-pay></p>
+        <p class="note" data-pay hidden aria-live="polite"></p>
         <label class="field" data-txn hidden>
           Transaction ID
           <input name="txnid" maxlength="60" autocomplete="off" />
@@ -63,7 +64,7 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
         <label class="field">
           Order note (optional)<textarea name="note" rows="2" maxlength="500"></textarea>
         </label>
-      </div>
+      </fieldset>
       <aside class="panel">
         <h2 class="checkout-heading"><span>2</span> Review your order</h2>
         <a class="link checkout-edit" href="/cart/">Edit items or quantities</a>
@@ -74,13 +75,14 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
             Apply
           </button>
         </div>
-        <p class="meta" data-coupon-msg></p>
+        <p class="meta" data-coupon-msg role="status" aria-live="polite"></p>
         {site && <div class="cf-turnstile" data-sitekey={site}></div>}
-        <p class="err" data-err role="alert"></p>
+        <p class="err" data-err role="alert" tabindex="-1"></p>
         <button class="btn small" type="submit" disabled>
           Place order
         </button>
-        <p class="meta">Trouble ordering? Call {SITE.phone}.</p>
+        <p class="meta">By placing an order you accept the <a class="link" href="/terms-conditions/">terms</a>. See our <a class="link" href="/privacy-policy/">privacy policy</a> and <a class="link" href="/how-to-buy/">delivery and buying information</a>.</p>
+        <p class="meta">Trouble ordering? <a class="link" href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a>.</p>
       </aside>
     </form>
   </div>

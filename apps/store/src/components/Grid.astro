@@ -1,34 +1,30 @@
 ---
 import Card from "./Card.astro";
+import { attributeValues } from "../lib/shop";
 const { items } = Astro.props;
+const choices = (key: string) => [...new Set(items.flatMap((p: any) => attributeValues(p, key)))].sort((a: any,b: any)=>a.localeCompare(b));
+const brands = choices("brand"), colors = choices("color");
 ---
-
-<div class="tools">
-  <span>
-    <b data-count>{items.length}</b> products
-  </span>
-  <div class="filters">
-    <label class="check">
-      <input type="checkbox" data-instock /> In stock
-    </label>
-    <input type="number" min="0" inputmode="numeric" placeholder="Min ৳" aria-label="Lowest price" data-min />
-    <input type="number" min="0" inputmode="numeric" placeholder="Max ৳" aria-label="Highest price" data-max />
-    <select data-sort aria-label="Sort">
-      <option value="">Latest</option>
-      <option value="asc">Price: low to high</option>
-      <option value="desc">Price: high to low</option>
-      <option value="name">Name</option>
-    </select>
-  </div>
+<div class="tools" data-catalog-tools>
+  <span role="status" aria-live="polite"><b data-count>{items.length}</b> products</span>
+  <label class="sort-control">Sort
+    <select data-sort aria-label="Sort"><option value="">Latest</option><option value="asc">Price: low to high</option><option value="desc">Price: high to low</option><option value="name">Name</option></select>
+  </label>
+  <details class="filter-panel">
+    <summary>Filters <span data-filter-count></span></summary>
+    <div class="filters">
+      <label>Minimum price (৳)<input type="number" min="0" inputmode="numeric" placeholder="Any" data-min /></label>
+      <label>Maximum price (৳)<input type="number" min="0" inputmode="numeric" placeholder="Any" data-max /></label>
+      {brands.length > 1 && <label>Brand<select data-brand><option value="">All brands</option>{brands.map((v: any)=><option value={v}>{v}</option>)}</select></label>}
+      {colors.length > 1 && <label>Color<select data-color><option value="">All colors</option>{colors.map((v: any)=><option value={v}>{v}</option>)}</select></label>}
+      <label class="check"><input type="checkbox" data-instock /> In stock only</label>
+      <button class="btn ghost" type="button" data-reset-filters>Reset filters</button>
+    </div>
+  </details>
+  <p class="err" role="alert" data-filter-error hidden></p>
 </div>
 <div class="grid" data-grid>
-  {items.map((p: any, i: number) => (
-    <Card p={p} eager={i < 4} hidden={i >= 24} />
-  ))}
+  {items.map((p: any, i: number) => <Card p={p} eager={i < 4} hidden={i >= 24} />)}
 </div>
-<p data-nomatch hidden>
-  No products match these filters.
-</p>
-<button class="btn ghost more" data-more hidden={items.length <= 24}>
-  Show more
-</button>
+<p data-nomatch hidden role="status">No products match these filters. Change the filters or use Reset filters above.</p>
+<button class="btn ghost more" data-more hidden={items.length <= 24}>Show more products</button>

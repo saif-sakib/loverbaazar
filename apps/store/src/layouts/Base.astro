@@ -1,6 +1,7 @@
 ---
 import "@fontsource-variable/plus-jakarta-sans";
 import "../styles/site.css";
+import "../styles/mobile.css";
 import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl } from "../lib/shop";
 const { title, description = SITE.description, image, noindex, type = "website" } = Astro.props;
 const full = title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`;
@@ -53,7 +54,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
 <html lang="en" data-phone={SITE.phone}>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <title>{full}</title>
     <meta name="description" content={description} />
     <meta
@@ -94,8 +95,8 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     <div class="ticker">
       <div>
         <span>Wholesale prices on home appliances</span>
-        <span>Cash on delivery across Bangladesh</span>
-        <span>bKash, Nagad and Rocket accepted</span>
+        <span>Delivery charge shown before you order</span>
+        <span data-payment-summary>{payments.map((p: any) => p.label).join(" · ") || "Contact the shop for payment options"}</span>
         <span>Call {SITE.phone}</span>
       </div>
     </div>
@@ -115,7 +116,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
             placeholder="Search rice cooker, chair, wardrobe…"
             aria-label="Search products"
             autocomplete="off"
-            data-suggest
+            data-suggest role="combobox" aria-autocomplete="list" aria-controls="search-suggestions" aria-expanded="false"
           />
           <button aria-label="Search">
             <svg
@@ -132,7 +133,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
               <path d="m20 20-4-4" />
             </svg>
           </button>
-          <div class="suggest" data-suggestions hidden></div>
+          <div class="suggest" id="search-suggestions" data-suggestions role="listbox" aria-label="Suggested products" hidden></div>
         </form>
         <nav class="icons" aria-label="Your shopping">
           <a href="/wishlist/">
@@ -161,6 +162,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
         </nav>
       </div>
       <nav class="wrap nav" aria-label="Product categories and pages">
+        <button type="button" class="category-toggle" data-categories aria-controls="category-drawer" aria-expanded="false">Categories ▾</button>
         <a href="/shop/">Shop all</a>
         {MENU.map((g: any) => (
           <details class="mega">
@@ -180,6 +182,16 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
         <a href="/contact-us/">Contact</a>
       </nav>
     </header>
+    <dialog class="category-drawer" id="category-drawer" aria-labelledby="category-title">
+      <div class="drawer-head"><h2 id="category-title">Shop by category</h2><button type="button" class="btn ghost" data-close-categories>Close</button></div>
+      <a class="btn" href="/shop/">Browse all products</a>
+      <div class="drawer-help">
+        <a class="btn ghost" href={`tel:${telOf(SITE.phone)}`}>Call the shop</a>
+        {SITE.whatsapp && <a class="btn ghost" href={waOf(SITE.whatsapp)} rel="noopener">WhatsApp</a>}
+        <a class="link" href="/contact-us/">Contact us</a>
+      </div>
+      {MENU.map((group: any)=><section><h3>{group.title}</h3><div class="drawer-links">{group.items.map((c: any)=><a href={catUrl(c)}>{c.name}<span aria-hidden="true">→</span></a>)}</div></section>)}
+    </dialog>
     <main id="main">
       <slot />
     </main>

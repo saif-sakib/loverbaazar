@@ -118,10 +118,10 @@ test('live prices retain the selected catalogue sorting', () => shop(async (page
   assert.deepEqual(prices, [...prices].sort((a, b) => a - b));
 }));
 
-test('main pages fit small screens and desktop', { timeout: 90000 }, () => shop(async page => {
-  for (const width of [320, 375, 768, 1440]) {
+test('main pages fit small screens and desktop', { timeout: 180000 }, () => shop(async page => {
+  for (const width of [320, 360, 375, 390, 414, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const path of ['/', '/shop/', '/cart/', '/checkout/', '/search/?q=test', '/track/', '/admin/']) {
+    for (const path of ['/', '/shop/', '/cart/', '/checkout/', '/search/?q=test', '/track/', '/my-account/', '/contact-us/', '/wishlist/', '/admin/']) {
       await ready(page, path);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${path} at ${width}px overflows`);
       assert.equal(await page.locator('[data-toast]').isVisible(), false, 'Empty toast should be hidden');
@@ -136,9 +136,9 @@ test('product image opens and closes with the keyboard', () => shop(async page =
   await ready(page, href);
   await page.locator('[data-main]').focus();
   await page.keyboard.press('Enter');
-  assert.equal(await page.locator('dialog').isVisible(), true);
+  assert.equal(await page.locator('dialog.lightbox').isVisible(), true);
   await page.keyboard.press('Escape');
-  assert.equal(await page.locator('dialog').count(), 0);
+  assert.equal(await page.locator('dialog.lightbox').count(), 0);
   assert.equal(await page.locator('[data-main]').evaluate(e => e === document.activeElement), true);
 }));
 
@@ -153,14 +153,17 @@ test('admin remains usable when session storage is blocked', () => shop(async pa
   assert.equal(await page.locator('#app').isVisible(), true);
 }));
 
-test('admin sections fit a 375px screen', () => shop(async page => {
+test('admin sections fit 320, 375 and 414px screens', () => shop(async page => {
   await page.addInitScript(() => { if (location.protocol === 'http:' || location.protocol === 'https:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
   await ready(page, '/admin/');
+  for (const width of [320, 375, 414]) {
+   await page.setViewportSize({ width, height: 812 });
   for (const tab of ['dashboard', 'products', 'orders', 'categories', 'home', 'menu', 'shop', 'delivery', 'customers', 'coupons', 'pages', 'blog', 'reviews', 'messages']) {
     await page.locator('#admin-section').selectOption(tab);
     await page.waitForTimeout(150);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `Admin ${tab} overflows`);
     assert.equal(await page.locator('#err').textContent(), '', `Admin ${tab} failed`);
+  }
   }
 }));
 
@@ -292,4 +295,311 @@ test('a stale publication status response cannot clear newly saved edits',()=>sh
   await page.waitForLoadState('networkidle');
   assert.equal(await page.locator('#dirtybar').isVisible(),true);
  } finally {release();}
+}));
+
+test('phone categories are keyboard accessible and restore focus after closing', () => shop(async page => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await ready(page, '/');
+  const button = page.locator('[data-categories]');
+  await button.focus(); await page.keyboard.press('Enter');
+  assert.equal(await button.getAttribute('aria-expanded'), 'true');
+  assert.equal(await page.getByRole('dialog', { name: 'Shop by category' }).isVisible(), true);
+  assert.ok(await page.locator('.drawer-links a').count() > 0);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => document.querySelector('[data-categories]').getAttribute('aria-expanded') === 'false');
+  assert.equal(await button.getAttribute('aria-expanded'), 'false');
+  assert.equal(await button.evaluate(el => el === document.activeElement), true);
+}));
+
+test('search suggestions announce the active keyboard selection and Escape closes them', () => shop(async page => {
+  await ready(page, '/');
+  const input = page.locator('[data-suggest]');
+  await input.fill('test');
+  await page.waitForFunction(() => document.querySelector('[data-suggest]').getAttribute('aria-expanded') === 'true');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await input.getAttribute('aria-activedescendant'), 'suggestion-0');
+  assert.equal(await page.locator('#suggestion-0').getAttribute('aria-selected'), 'true');
+  await page.keyboard.press('Escape');
+  assert.equal(await input.getAttribute('aria-expanded'), 'false');
+  assert.equal(await page.locator('[data-suggestions]').isVisible(), false);
+}));
+
+test('catalog filters restore from URLs, reject reversed prices, and reset cleanly', () => shop(async page => {
+  await ready(page, '/shop/?min=99999999&sort=asc');
+  assert.equal(await page.locator('[data-min]').inputValue(), '99999999');
+  assert.equal(await page.locator('[data-nomatch]').isVisible(), true);
+  await page.locator('[data-max]').fill('1');
+  await page.locator('[data-max]').press('Tab');
+  assert.equal(await page.locator('[data-filter-error]').isVisible(), true);
+  await page.reload();
+  assert.equal(await page.locator('[data-max]').inputValue(), '1');
+  await page.locator('[data-reset-filters]').click();
+  assert.equal(new URL(page.url()).search, '');
+  assert.equal(await page.locator('[data-nomatch]').isVisible(), false);
+  assert.equal(await page.locator('[data-filter-error]').isVisible(), false);
+  assert.ok(await page.locator('[data-card]:visible').count() > 0);
+}));
+
+test('brand and color filters use actual catalog attributes', () => shop(async page => {
+  await ready(page, '/shop/');
+  await page.locator('.filter-panel summary').click();
+  let checked = 0;
+  for (const [field, key] of [['[data-brand]', 'brands'], ['[data-color]', 'colors']]) {
+    if (!await page.locator(field).count()) continue;
+    const value = await page.locator(`${field} option`).nth(1).getAttribute('value');
+    await page.locator(field).selectOption(value);
+    const values = await page.locator('[data-card]:visible').evaluateAll((els, key) => els.map(el => JSON.parse(el.dataset[key])), key);
+    assert.ok(values.length > 0);
+    assert.ok(values.every(list => list.includes(value)));
+    await page.locator(field).selectOption('');
+    checked++;
+  }
+  if (!checked) {
+    const counts = await page.locator('[data-card]').evaluateAll(els => ['brands', 'colors'].map(key => new Set(els.flatMap(el => JSON.parse(el.dataset[key] || '[]'))).size));
+    assert.ok(counts.every(n => n <= 1), 'Do not invent attribute filters without real choices');
+  }
+}));
+
+test('removed cart products and changed prices are explained', () => shop(async page => {
+  await page.addInitScript(() => localStorage.setItem('cartPrices', JSON.stringify({ 1: 900 })));
+  await ready(page, '/cart/');
+  assert.match(await page.locator('[data-cart-notice]').textContent(), /removed/);
+  assert.match(await page.locator('.price-change').textContent(), /changed from ৳900/);
+  assert.equal(await page.locator('[data-sub]').textContent(), '৳1,000');
+}, { cart: { 1: 1, 99999999: 1 } }));
+
+async function fillCheckout(page) {
+  await ready(page, '/checkout/');
+  await page.locator('[name="name"]').fill('Test buyer');
+  await page.locator('[name="phone"]').fill('+৮৮০ ১৭১০-০০০০০০');
+  await page.locator('[name="address"]').fill('Test address, Bangladesh');
+}
+
+test('uncertain checkout retries keep one request key and unchanged details with blocked session storage', () => shop(async (page, context) => {
+  await page.addInitScript(() => Object.defineProperty(window, 'sessionStorage', { get() { throw new DOMException('Blocked', 'SecurityError'); } }));
+  const sent = [];
+  await context.route('**/api/checkout', r => { sent.push(r.request().postDataJSON()); return r.abort('failed'); });
+  await fillCheckout(page);
+  await page.locator('button[type="submit"]').click();
+  await page.waitForFunction(() => document.querySelector('button[type="submit"]').textContent === 'Check order status');
+  assert.match(await page.locator('[data-err]').textContent(), /Do not send payment again/);
+  assert.equal(await page.locator('[name="name"]').isDisabled(), true);
+  assert.equal(await page.locator('[data-err]').evaluate(el => el === document.activeElement), true);
+  await page.locator('button[type="submit"]').click();
+  await page.waitForFunction(() => document.querySelector('button[type="submit"]').textContent === 'Check order status');
+  assert.equal(sent.length, 2);
+  assert.deepEqual(sent[0], sent[1]);
+  assert.equal(sent[0].phone, '01710000000');
+}, { cart: { 1: 1 } }));
+
+test('deterministic checkout errors preserve input and changed delivery details get a new key', () => shop(async (page, context) => {
+  const sent = [];
+  await context.route('**/api/checkout', r => { sent.push(r.request().postDataJSON()); return r.fulfill({ status: 400, json: { error: 'Please correct the address' } }); });
+  await fillCheckout(page);
+  await page.locator('button[type="submit"]').click();
+  await page.waitForFunction(() => document.querySelector('[data-err]').textContent === 'Please correct the address');
+  assert.equal(await page.locator('[name="name"]').inputValue(), 'Test buyer');
+  assert.equal(await page.locator('[name="address"]').isDisabled(), false);
+  await page.locator('[name="address"]').fill('Different test address, Bangladesh');
+  await page.locator('button[type="submit"]').click();
+  await page.waitForFunction(() => document.querySelector('[data-err]').textContent === 'Please correct the address');
+  assert.equal(sent.length, 2);
+  assert.notEqual(sent[0].key, sent[1].key);
+}, { cart: { 1: 1 } }));
+
+test('expired bot challenges show a focused error and allow a fresh challenge', () => shop(async (page, context) => {
+  let sent = 0;
+  await context.route('**/api/checkout', r => { sent++; return r.fulfill({ status: 403, json: { error: 'Please complete the security check again' } }); });
+  await fillCheckout(page);
+  await page.evaluate(() => {
+    const widget = document.createElement('div'); widget.className = 'cf-turnstile';
+    const input = document.createElement('input'); input.type = 'hidden'; input.name = 'cf-turnstile-response';
+    widget.append(input); document.querySelector('[data-checkout] aside').append(widget);
+    window.turnstile = { reset() { input.value = ''; } };
+  });
+  await page.locator('button[type="submit"]').click();
+  assert.equal(sent, 0);
+  assert.match(await page.locator('[data-err]').textContent(), /security check/);
+  await page.locator('[name="cf-turnstile-response"]').evaluate(el => { el.value = 'expired-test'; });
+  await page.locator('button[type="submit"]').click();
+  await page.waitForFunction(() => document.querySelector('[data-err]').textContent.includes('again'));
+  assert.equal(sent, 1);
+  assert.equal(await page.locator('[name="cf-turnstile-response"]').inputValue(), '');
+  assert.equal(await page.locator('[name="name"]').isDisabled(), false);
+}, { cart: { 1: 1 } }));
+
+test('support forms retain failed input and guard repeated taps', () => shop(async (page, context) => {
+  let sent = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await context.route('**/api/contact', async r => { sent++; await gate; return r.fulfill({ status: 429, json: { error: 'Please wait before sending another message' } }); });
+  await ready(page, '/contact-us/');
+  const form = page.locator('[data-contact]');
+  await form.locator('[name="name"]').fill('রহিম');
+  await form.locator('[name="contact"]').fill('০১৭১০০০০০০০');
+  await form.locator('[name="body"]').fill('Please help with my order');
+  await form.locator('button').click();
+  await form.evaluate(f => f.dispatchEvent(new Event('submit', { cancelable: true })));
+  release();
+  await page.waitForFunction(() => document.querySelector('[data-contact] .err').textContent.includes('wait'));
+  assert.equal(sent, 1);
+  assert.equal(await form.locator('[name="body"]').inputValue(), 'Please help with my order');
+  assert.equal(await form.locator('.err').evaluate(el => el === document.activeElement), true);
+}));
+
+test('tracking rejects a wrong phone without exposing an order and tolerates malformed saved orders', () => shop(async (page, context) => {
+  await page.addInitScript(() => localStorage.setItem('myOrders', JSON.stringify([null, {}, { number: 'LB-TEST', phone: '01710000000' }])));
+  let phone;
+  await context.route('**/api/track?*', r => { phone = new URL(r.request().url()).searchParams.get('phone'); return r.fulfill({ status: 404, json: { error: 'Order not found. Check your order number and phone.' } }); });
+  await ready(page, '/track/');
+  await page.locator('[name="order"]').fill('LB-TEST');
+  await page.locator('[name="phone"]').fill('০১৭১০০০০০০০');
+  await page.locator('[data-track] button').click();
+  await page.waitForFunction(() => document.querySelector('[data-err]').textContent.includes('not found'));
+  assert.equal(phone, '01710000000');
+  assert.equal(await page.locator('[data-order]').textContent(), '');
+  assert.equal(await page.locator('[data-mine-order]').count(), 1);
+}));
+
+test('account loading failures have a retry and expired sessions offer optional login', () => shop(async (page, context) => {
+  let fail = true;
+  await context.route('**/api/me', r => r.fulfill({ status: fail ? 503 : 401, json: { error: fail ? 'Shop is waking up' : 'Sign in' } }));
+  await ready(page, '/my-account/');
+  assert.equal(await page.locator('[data-auth]').isVisible(), false);
+  fail = false;
+  await page.locator('[data-retry-account]').click();
+  await page.waitForFunction(() => !document.querySelector('[data-auth]').hidden);
+  assert.equal(await page.locator('[data-form="login"]').isVisible(), true);
+}));
+
+test('phone forms yield fixed navigation while editing and controls meet touch sizes', () => shop(async page => {
+  await ready(page, '/checkout/');
+  await page.locator('[name="name"]').focus();
+  assert.equal(await page.locator('.mobile-nav').isVisible(), false);
+  const box = await page.locator('button[type="submit"]').boundingBox();
+  assert.ok(box.height >= 44);
+  await page.locator('h1').click();
+  await page.waitForFunction(() => !document.body.classList.contains('is-editing'));
+  assert.equal(await page.locator('.mobile-nav').isVisible(), true);
+}, { cart: { 1: 1 } }));
+
+test('reduced motion and 200 percent layout reflow remain usable', () => shop(async page => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  // A desktop viewport reduced to 720 CSS pixels represents 200% desktop zoom reflow.
+  await page.setViewportSize({ width: 720, height: 450 });
+  await ready(page, '/shop/');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.locator('.filter-panel summary').click();
+  assert.equal(await page.locator('[data-min]').isVisible(), true);
+  const duration = await page.locator('.btn').first().evaluate(el => getComputedStyle(el).transitionDuration);
+  assert.ok(duration.split(',').every(value => parseFloat(value) <= 0.001));
+}));
+
+test('blocked shopping storage explains its limits and keeps the current page usable', () => shop(async page => {
+  await page.addInitScript(() => Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('Blocked', 'SecurityError'); } }));
+  await ready(page, '/search/?q=test');
+  await page.locator('[data-add="1"]').click();
+  assert.equal(await page.locator('[data-storage-notice]').isVisible(), true);
+  assert.match(await page.locator('[data-storage-notice]').textContent(), /between pages/);
+  assert.ok(await page.locator('[data-cart-count]:visible').count() > 0);
+}));
+
+test('mobile order controls prevent duplicate updates and show payment verification guidance', () => shop(async (page, context) => {
+  await page.addInitScript(() => sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'));
+  const order = { number: 'LB-FIXTURE', name: 'Fixture buyer', phone: '01710000000', address: 'Fixture address', area: 'local', total: 1060, payment: 'Mobile payment', txn_id: 'FIXTURE123', status: 'pending', items: [{ name: 'Cooker', qty: 1, price: 1000 }] };
+  let updates = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await context.route('**/api/admin/orders?*', r => r.fulfill({ json: { orders: [order], total: 1, sales: 1060, size: 50 } }));
+  await context.route('**/api/admin/orders/LB-FIXTURE', async r => { updates++; await gate; order.status = 'confirmed'; return r.fulfill({ json: {} }); });
+  await ready(page, '/admin/#orders');
+  for (const width of [320, 360, 375, 390, 414]) {
+    await page.setViewportSize({ width, height: 812 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    assert.equal(await page.locator('[data-order-row]').isVisible(), true);
+  }
+  assert.match(await page.locator('.order-payment-note').textContent(), /Verify this transaction/);
+  const button = page.locator('[data-step="confirmed"]');
+  await button.click();
+  await button.evaluate(el => el.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  release();
+  await page.waitForSelector('[data-ship-focus]');
+  assert.equal(updates, 1);
+}));
+
+test('late admin reads cannot replace a newly selected section', () => shop(async (page, context) => {
+  await page.addInitScript(() => sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'));
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await context.route('**/api/admin/customers?*', async r => { await gate; await r.continue(); });
+  await ready(page, '/admin/');
+  await page.locator('#admin-section').selectOption('customers');
+  await page.waitForSelector('#clist');
+  await page.locator('#admin-section').selectOption('pages');
+  await page.waitForSelector('#view #newdoc');
+  release();
+  await page.waitForLoadState('networkidle');
+  assert.equal(await page.locator('#head h1').textContent(), 'Pages');
+  assert.equal(await page.locator('#clist').count(), 0);
+  assert.equal(await page.locator('#err').textContent(), '');
+}));
+
+test('long Bangla product names, image failures and purchase controls fit all target widths', () => shop(async page => {
+  await ready(page, '/shop/');
+  const href = await page.locator('.card .thumb').first().getAttribute('href');
+  await ready(page, href);
+  await page.locator('.pd h1').evaluate(el => { el.textContent = 'বাংলাদেশের রান্নাঘরের জন্য রাইস কুকার এবং দীর্ঘ নামের গৃহস্থালি পণ্য SuperLongModelWithoutSpaces1234567890'; });
+  await page.waitForFunction(() => document.querySelector('[data-main]').src.endsWith('/placeholder.svg'));
+  for (const width of [320, 360, 375, 390, 414, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `Product at ${width}px`);
+    const buttons = await page.locator('.buy button').evaluateAll(els => els.map(el => ({ width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height })));
+    assert.ok(buttons.every(box => box.width >= 44 && box.height >= 44));
+  }
+}));
+
+test('phone image uploads preserve failed edits, allow reordering, and clean only abandoned uploads', () => shop(async (page, context) => {
+  await page.addInitScript(() => { if (location.protocol === 'http:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
+  let fail = true, number = 0;
+  const cleaned = [];
+  await context.route('**/api/admin/image?*', r => fail ? r.fulfill({ status: 400, json: { error: 'Fixture upload failed' } }) : r.fulfill({ json: { url: `/uploads/fixture-${++number}.png` } }));
+  await context.route('**/api/admin/image/cleanup', r => { cleaned.push(...r.request().postDataJSON().urls); return r.fulfill({ json: {} }); });
+  await ready(page, '/admin/#new-product');
+  await page.locator('#pf [name="name"]').fill('Unsaved photo fixture');
+  const file = { name: 'fixture.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=', 'base64') };
+  await page.locator('#up').setInputFiles(file);
+  await page.waitForFunction(() => document.querySelector('#err').textContent.includes('Fixture upload failed'));
+  assert.equal(await page.locator('#pf [name="name"]').inputValue(), 'Unsaved photo fixture');
+  fail = false;
+  await page.locator('#up').setInputFiles({ ...file, name: 'fixture-again.png' });
+  await page.waitForSelector('#imgs figure');
+  await page.locator('#up').setInputFiles({ ...file, name: 'fixture-next.png' });
+  await page.waitForFunction(() => document.querySelectorAll('#imgs figure').length === 2);
+  await page.locator('#imgs [data-r]').first().click();
+  assert.match(await page.locator('#imgs img').first().getAttribute('src'), /fixture-2/);
+  const touch = await page.locator('#imgs [data-x]').first().boundingBox();
+  assert.ok(touch.width >= 44 && touch.height >= 44);
+  await page.locator('#imgs [data-x]').first().click();
+  await page.waitForFunction(() => document.querySelectorAll('#imgs figure').length === 1);
+  page.once('dialog', d => d.accept());
+  await page.locator('#back').click();
+  await page.waitForSelector('#rows');
+  assert.deepEqual([...new Set(cleaned)].sort(), ['/uploads/fixture-1.png', '/uploads/fixture-2.png']);
+}));
+
+test('returning to products during a slow catalog read finishes the latest navigation', () => shop(async (page, context) => {
+  await page.addInitScript(() => { if (location.protocol === 'http:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await context.route('**/api/admin/products', async r => { await gate; await r.continue(); });
+  await ready(page, '/admin/');
+  const requested = page.waitForRequest(r => new URL(r.url()).pathname === '/api/admin/products');
+  await page.locator('#admin-section').selectOption('products');
+  await requested;
+  await page.locator('#admin-section').selectOption('pages');
+  await page.waitForSelector('#newdoc');
+  await page.locator('#admin-section').selectOption('products');
+  release();
+  await page.waitForSelector('#rows');
+  assert.equal(await page.locator('#head h1').textContent(), 'Products');
+  assert.equal(await page.locator('#err').textContent(), '');
 }));

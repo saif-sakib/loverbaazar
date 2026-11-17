@@ -16,9 +16,9 @@ import Base from "../../layouts/Base.astro";
       </label>
       <label class="field">
         Mobile number
-        <input name="phone" required />
+        <input name="phone" type="tel" maxlength="30" autocomplete="tel" required />
       </label>
-      <p class="err" data-err></p>
+      <p class="err" data-err role="alert" tabindex="-1"></p>
       <button class="btn small">Track</button>
     </form>
     <div data-order></div>
