@@ -11,6 +11,7 @@ const heroShots = heroPics.map((p: any, i: number) => ({
   href: `/product/${p.slug}/`,
   src: img(i === 0 ? p.images[0]?.src : p.images[0]?.thumb),
   alt: p.name,
+  name: p.name,
 }));
 const tiles = MENU.flatMap((g: any) => g.items)
   .filter((c: any, i: number, all: any[]) => inCat(c.slug).length && all.findIndex((x) => x.slug === c.slug) === i)
@@ -27,16 +28,21 @@ const heroEnd = heroWords.pop();
         <p class="eyebrow">{SITE.tagline}</p>
         <h1>{heroWords.join(" ")} <em>{heroEnd}</em></h1>
         <p>{hero.text}</p>
-        {hero.button && (
-          <a class="btn" href={hero.link || "/shop/"}>
-            {hero.button.replace("{count}", products.length)}
-          </a>
-        )}
+        <div class="hero-actions">
+          {hero.button && (
+            <a class="btn" href={hero.link || "/shop/"}>
+              {hero.button.replace("{count}", String(products.length))} <span aria-hidden="true">↗</span>
+            </a>
+          )}
+          <a class="hero-offers" href="/offers/">Explore offers <span aria-hidden="true">→</span></a>
+        </div>
+        <p class="hero-caption">Browse. Choose. Order. No account needed.</p>
       </div>
       <div class="pics">
         {heroShots.map((h: any) => (
           <a href={h.href}>
-            <img src={h.src} alt={h.alt} width="600" height="600" />
+            <img src={h.src} alt={h.alt} width="600" height="600" fetchpriority={h === heroShots[0] ? "high" : "auto"} />
+            <span class="hero-product">{h.name} <span aria-hidden="true">↗</span></span>
           </a>
         ))}
       </div>

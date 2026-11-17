@@ -120,7 +120,15 @@
       return "";
     }
   };
-  let token = sessionStorage.getItem("t") || remembered();
+  const session = (key, value) => {
+    try {
+      if (value === undefined) return sessionStorage.getItem(key) || "";
+      if (value === null) sessionStorage.removeItem(key);
+      else sessionStorage.setItem(key, value);
+    } catch {}
+    return "";
+  };
+  let token = session("t") || remembered();
   let unsaved = false;
   const LEAVE = "You have changes you haven't saved. Leave without saving?";
   const pendingUploads = new Set();
@@ -172,7 +180,7 @@
   };
   const logout = (msg) => {
     cleanupUploads();
-    sessionStorage.removeItem("t");
+    session("t", null);
     try {
       localStorage.removeItem("keep");
     } catch {}
@@ -832,7 +840,18 @@
           body.stockDelta = (+i.value || 0) - p.stock; // never an absolute number: orders may have come in
         else if (key === "active") body.active = i.checked;
         else body[key] = Math.max(0, Math.floor(+i.value) || 0);
-        const r = await api("/products/" + p.id, { method: "PATCH", body });
+        // Lock this field while saving: two changes based on the same stock value would add twice.
+        i.disabled = true;
+        let r;
+        try {
+          r = await api("/products/" + p.id, { method: "PATCH", body });
+        } catch (error) {
+          if (key === "active") i.checked = p.active;
+          else i.value = p[key];
+          throw error;
+        } finally {
+          i.disabled = false;
+        }
         if (key === "stock") {
           p.stock = r.stock;
           i.value = r.stock;
@@ -1812,7 +1831,12 @@
     $("#err").textContent = "";
     const [title, help, mode] = HEADS[nav] || ["", "", ""];
     const parts = SUBGROUPS.find((g) => g[nav]);
-    $$("#tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + nav));
+    $$("#tabs a").forEach((a) => {
+      const current = a.getAttribute("href") === "#" + nav;
+      a.classList.toggle("on", current);
+      if (current) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
     const badges = effectBadges(mode);
     $("#head").innerHTML =
       (parts
@@ -1905,7 +1929,7 @@
   $("#login").onsubmit = (e) => {
     e.preventDefault();
     token = $("#tok").value.trim();
-    sessionStorage.setItem("t", token);
+    session("t", token);
     if ($("#keep").checked)
       try {
         localStorage.setItem("keep", token);

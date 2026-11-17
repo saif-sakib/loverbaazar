@@ -104,21 +104,29 @@ func loadSettings(ctx context.Context) (Live, map[string]any, error) {
 // refresh rebuilds the snapshots after a write. It takes no request context: a customer closing
 // the page must not leave the shop showing old stock.
 func refresh() {
-	catalogSnap.Store(nil)
-	storefrontSnap.Store(nil)
+	snapMu.Lock() // serialise the entire refresh so an older catalogue cannot replace a newer one
+	defer snapMu.Unlock()
 	adminProductsSnap.Store(nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := publishStock(ctx); err != nil {
 		log.Print("stock snapshot: ", err)
 	}
+	for _, job := range []struct {
+		snap *atomic.Pointer[[]byte]
+		load func(context.Context) ([]byte, error)
+	}{{&catalogSnap, buildCatalog}, {&storefrontSnap, buildStorefront}} {
+		if b, err := job.load(ctx); err != nil {
+			log.Print("public snapshot: ", err) // keep the last good snapshot on failure
+		} else {
+			job.snap.Store(&b)
+		}
+	}
 }
 
 // publishStock refreshes what browsers read: {products:{id:[price,regular,stock]},settings:{...}}.
 // Stock is capped at 99 so the shop's real quantities stay private.
 func publishStock(ctx context.Context) error {
-	snapMu.Lock() // one at a time, so an older snapshot can never replace a newer one
-	defer snapMu.Unlock()
 	var products []byte
 	if err := db.QueryRow(ctx, `SELECT coalesce(jsonb_object_agg(id,jsonb_build_array(price,regular,LEAST(stock,99))),'{}')::text FROM products WHERE active`).Scan(&products); err != nil {
 		return err
@@ -135,62 +143,58 @@ func publishStock(ctx context.Context) error {
 }
 
 func stockFile(w http.ResponseWriter, r *http.Request) {
-	if stockSnap.Load() == nil {
-		if err := publishStock(r.Context()); err != nil {
-			oops(w, err)
-			return
-		}
-	}
-	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=60")
-	w.Write(*stockSnap.Load())
+	serveSnap(w, r, &stockSnap)
 }
 
-// serveSnap answers from memory, so nobody can wake the database by reloading a public URL.
-func serveSnap(w http.ResponseWriter, r *http.Request, snap *atomic.Pointer[[]byte], load func(context.Context) ([]byte, error)) {
+// Public reads never acquire a database connection, including during startup.
+func serveSnap(w http.ResponseWriter, r *http.Request, snap *atomic.Pointer[[]byte]) {
 	b := snap.Load()
 	if b == nil {
-		fresh, err := load(r.Context())
-		if err != nil {
-			oops(w, err)
-			return
-		}
-		snap.Store(&fresh)
-		b = &fresh
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Retry-After", "5")
+		fail(w, http.StatusServiceUnavailable, "The shop is starting. Please try again in a moment.")
+		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
+	if w.Header().Get("Cache-Control") == "" {
+		w.Header().Set("Cache-Control", "no-store")
+	}
 	w.Write(*b)
 }
 
 func catalog(w http.ResponseWriter, r *http.Request) {
-	serveSnap(w, r, &catalogSnap, func(ctx context.Context) ([]byte, error) {
-		list, err := jsonRows(ctx, `SELECT p.data||jsonb_build_object('price',p.price,'regular',p.regular,'inStock',p.stock>0,
-			'reviews',coalesce((SELECT jsonb_agg(jsonb_build_object('name',r.name,'rating',r.rating,'body',r.body,'date',r.created_at::date) ORDER BY r.id DESC)
-				FROM reviews r WHERE r.product_id=p.id AND r.approved),'[]'::jsonb))
-			FROM products p WHERE p.active ORDER BY p.id DESC`)
-		if err != nil {
-			return nil, err
-		}
-		return json.Marshal(list)
-	})
+	serveSnap(w, r, &catalogSnap)
+}
+
+func buildCatalog(ctx context.Context) ([]byte, error) {
+	list, err := jsonRows(ctx, `SELECT p.data||jsonb_build_object('price',p.price,'regular',p.regular,'inStock',p.stock>0,
+		'reviews',coalesce((SELECT jsonb_agg(jsonb_build_object('name',r.name,'rating',r.rating,'body',r.body,'date',r.created_at::date) ORDER BY r.id DESC)
+			FROM reviews r WHERE r.product_id=p.id AND r.approved),'[]'::jsonb))
+		FROM products p WHERE p.active ORDER BY p.id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(list)
 }
 
 // storefront is everything else the static build needs: site settings, categories, pages and posts.
 func storefront(w http.ResponseWriter, r *http.Request) {
-	serveSnap(w, r, &storefrontSnap, func(ctx context.Context) ([]byte, error) {
-		live, site, err := loadSettings(ctx)
-		if err != nil {
+	serveSnap(w, r, &storefrontSnap)
+}
+
+func buildStorefront(ctx context.Context) ([]byte, error) {
+	live, site, err := loadSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]any{"site": site, "live": live}
+	for key, kind := range map[string]string{"cats": "cat", "tags": "tag", "pages": "page", "posts": "post"} {
+		if out[key], err = jsonRows(ctx, `SELECT data FROM content WHERE kind=$1 AND coalesce(data->>'draft','')<>'true' ORDER BY coalesce(data->>'date','') DESC,slug`, kind); err != nil {
 			return nil, err
 		}
-		out := map[string]any{"site": site, "live": live}
-		for key, kind := range map[string]string{"cats": "cat", "tags": "tag", "pages": "page", "posts": "post"} {
-			if out[key], err = jsonRows(ctx, `SELECT data FROM content WHERE kind=$1 AND coalesce(data->>'draft','')<>'true' ORDER BY coalesce(data->>'date','') DESC,slug`, kind); err != nil {
-				return nil, err
-			}
-		}
-		return json.Marshal(out)
-	})
+	}
+	return json.Marshal(out)
 }
 
 type item struct {
@@ -205,6 +209,9 @@ func mergeItems(in []item) ([]item, error) {
 	for _, it := range in {
 		if it.Qty < 1 {
 			return nil, userErr{400, "please check the quantities in your cart"}
+		}
+		if it.Qty > maxQty {
+			return nil, userErr{400, fmt.Sprintf("you can order up to %d of one item online. Please call us for more", maxQty)}
 		}
 		qty[it.ID] += it.Qty
 	}
@@ -358,10 +365,6 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "please enter your transaction ID")
 		return
 	}
-	if err = fraudCheck(ctx, live, in.Phone, pay.Number != "", in.TxnID); err != nil {
-		oops(w, err)
-		return
-	}
 	if !human(r, in.Turnstile) {
 		fail(w, 403, "bot check failed, please try again")
 		return
@@ -382,6 +385,16 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 	repeat := false
 	err = pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
 		bill = receipt{}
+		// Serialise guest checks with the order write. Concurrent requests must not reuse
+		// a payment reference or all pass the same pending-order limit.
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1,hashtext($1))`, in.Phone); err != nil {
+			return err
+		}
+		if pay.Number != "" {
+			if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(2,hashtext(upper($1)))`, in.TxnID); err != nil {
+				return err
+			}
+		}
 		var oid int64
 		err := tx.QueryRow(ctx, `INSERT INTO orders(number,user_id,name,phone,email,address,area,payment,txn_id,note,subtotal,shipping,total,idem)
 			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,0,0,$11) ON CONFLICT(idem) DO NOTHING RETURNING id`,
@@ -390,6 +403,9 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 			repeat = true
 			return tx.QueryRow(ctx, `SELECT number,total FROM orders WHERE idem=$1`, in.Key).Scan(&number, &total)
 		} else if err != nil {
+			return err
+		}
+		if err := fraudCheck(ctx, tx, live, in.Phone, pay.Number != "", in.TxnID, oid); err != nil {
 			return err
 		}
 		var sub, discount int64
@@ -455,10 +471,10 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 // fraudCheck covers what guest checkout leaves open. Anyone can type any number, so one number can
 // only hold a few unconfirmed orders, which stops fake orders tying up the stock. A mobile payment
 // is only a typed-in ID until the admin checks it, so one ID can't pay for two orders.
-func fraudCheck(ctx context.Context, live Live, phone string, manual bool, txn string) error {
+func fraudCheck(ctx context.Context, tx pgx.Tx, live Live, phone string, manual bool, txn string, current int64) error {
 	if live.MaxPending > 0 {
 		var n int
-		if err := db.QueryRow(ctx, `SELECT count(*) FROM orders WHERE phone=$1 AND status='pending'`, phone).Scan(&n); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM orders WHERE phone=$1 AND id<>$2 AND status='pending'`, phone, current).Scan(&n); err != nil {
 			return err
 		}
 		if n >= live.MaxPending {
@@ -467,7 +483,7 @@ func fraudCheck(ctx context.Context, live Live, phone string, manual bool, txn s
 	}
 	if manual {
 		var used bool
-		err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM orders WHERE upper(txn_id)=upper($1) AND status NOT IN `+outStatuses+`)`, txn).Scan(&used)
+		err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM orders WHERE upper(txn_id)=upper($1) AND id<>$2 AND status NOT IN `+outStatuses+`)`, txn, current).Scan(&used)
 		if err != nil {
 			return err
 		}

@@ -1,4 +1,4 @@
-.admin { background: #f4f4f6; color: #18181b; --line: #e4e4e7; --ink: #18181b; --mute: #52525b; }
+.admin { background: #f5f6f8; color: #18181b; --line: #e4e4e7; --ink: #18181b; --mute: #52525b; }
 .admin .wrap { max-width: 1380px; padding: 0 20px; }
 .login { max-width: 400px; margin: 12vh auto; padding: 32px !important; border-radius: 16px !important; box-shadow: 0 12px 32px rgba(24, 24, 27, 0.08) !important; }
 .login-badge { display: flex; align-items: center; gap: 11px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
@@ -20,7 +20,7 @@
   flex-direction: column;
   gap: 10px;
   max-height: calc(100vh - 32px);
-  overflow: hidden;
+  overflow: auto;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -355,4 +355,27 @@ figcaption { display: flex; justify-content: space-between; margin-top: 6px; }
   .rep > label, .rep > div.wide { min-width: 100%; }
   .rep > label.check { min-width: auto; }
   .toolbar-count { margin-left: 0; width: 100%; }
+}
+
+/* Keep actions and form controls comfortable on small screens. */
+.admin .headrow { align-items: flex-start; }
+.admin .headrow h1 { letter-spacing: -0.04em; }
+.admin .tile { border-top: 3px solid #e9ccd3; }
+.admin .tile.primary { border-top-color: var(--brand); }
+.admin .login { border-top: 4px solid var(--brand); }
+.admin .adminbar { border-top: 3px solid var(--brand); }
+.admin :focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+@media (max-width: 900px) {
+  .admin #tabs a { min-height: 42px; padding: 10px 12px; }
+  .admin .adminactions .link { min-height: 40px; }
+  .admin .toolbar input, .admin .toolbar select { max-width: 100%; min-width: 0; }
+}
+@media (max-width: 760px) {
+  .admin .wrap { padding: 0 12px; }
+  .admin .panel { padding: 16px; }
+  .admin .headrow { gap: 10px; flex-wrap: wrap; }
+  .admin .headbadges { flex-wrap: wrap; }
+  .admin .toolbar > input[type="search"] { flex-basis: 100%; }
+  .admin input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .admin select, .admin textarea { font-size: 16px; }
+  .admin .tbl td.actions .link { min-height: 36px; align-items: center; }
 }

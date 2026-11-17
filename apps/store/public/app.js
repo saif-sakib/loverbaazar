@@ -6,7 +6,10 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const get = (k, d) => {
     try {
-      return JSON.parse(localStorage.getItem(k)) ?? d;
+      const v = JSON.parse(localStorage.getItem(k));
+      if (Array.isArray(d)) return Array.isArray(v) ? v : d;
+      if (d && typeof d === "object") return v && typeof v === "object" && !Array.isArray(v) ? v : d;
+      return v ?? d;
     } catch {
       return d;
     }
@@ -42,10 +45,15 @@
     returned: "Returned",
   };
 
-  let cart = get("cart", {});
-  let wish = get("wish", []);
+  const readCart = () => Object.fromEntries(Object.entries(get("cart", {}))
+    .filter(([id, qty]) => /^[1-9]\d*$/.test(id) && Number.isSafeInteger(qty) && qty > 0)
+    .map(([id, qty]) => [id, Math.min(qty, MAX_QTY)]));
+  const readWish = () => [...new Set(get("wish", []).filter((id) => Number.isSafeInteger(id) && id > 0))];
+  let cart = readCart();
+  let wish = readWish();
   let index = null; // the search index, with live prices merged in
   let rawIndex = null;
+  let stockLoaded = false;
   let stock = {}; // id: [price, regular, units], units capped at 99
   let live = null; // settings that take effect without a rebuild
   let repaintCheckout = () => {};
@@ -67,7 +75,7 @@
     return j;
   };
 
-  const maxFor = (id) => Math.min(MAX_QTY, stock[id] ? stock[id][2] || 1 : MAX_QTY);
+  const maxFor = (id) => Math.min(MAX_QTY, stockLoaded ? (stock[id]?.[2] || 0) : MAX_QTY);
 
   async function items() {
     if (index) return index;
@@ -81,7 +89,7 @@
         throw e;
       });
     const list = (await rawIndex).map((p) => ({ ...p }));
-    const known = Object.keys(stock).length > 0;
+    const known = stockLoaded;
     list.forEach((p) => {
       const s = stock[p.id];
       if (s) [p.price, p.regular, p.inStock] = [s[0], s[1], s[2] > 0];
@@ -100,7 +108,11 @@
       e.textContent = wish.length;
       e.hidden = !wish.length;
     });
-    $$("[data-wish]").forEach((b) => b.classList.toggle("on", wish.includes(+b.dataset.wish)));
+    $$("[data-wish]").forEach((b) => {
+      const saved = wish.includes(+b.dataset.wish);
+      b.classList.toggle("on", saved);
+      b.setAttribute("aria-pressed", String(saved));
+    });
   }
 
   const saveCart = () => {
@@ -111,7 +123,7 @@
 
   // Makes a static page match the latest prices and stock.
   function applyStock() {
-    if (!Object.keys(stock).length) return;
+    if (!stockLoaded) return;
     $$("[data-price-for]").forEach((e) => {
       const s = stock[e.dataset.priceFor];
       if (s) e.innerHTML = priceHtml(s[0], s[1]);
@@ -177,6 +189,7 @@
       // The quantity box belongs to the main product, not to the cards under it.
       const box = (t.closest(".buy") || t.closest(".buybar")) && $("[data-qty]");
       const want = (cart[id] || 0) + Math.max(1, Math.floor(+box?.value) || 1);
+      if (!maxFor(id)) return toast("This product is sold out. Please choose another item.");
       cart[id] = Math.min(want, maxFor(id));
       saveCart();
       toast(cart[id] < want ? `You can order ${cart[id]} of this online` : "Added to cart");
@@ -184,7 +197,8 @@
     }
     if (t.dataset.again) {
       JSON.parse(t.dataset.again).forEach((l) => {
-        cart[l.id] = Math.min((cart[l.id] || 0) + l.qty, maxFor(l.id));
+        const qty = Math.min((cart[l.id] || 0) + l.qty, maxFor(l.id));
+        if (qty > 0) cart[l.id] = qty;
       });
       saveCart();
       location.href = "/cart/";
@@ -249,7 +263,7 @@
           .forEach((c) => g.append(c));
         update();
       };
-      g._update = update;
+      g._update = sort;
       if (more)
         more.onclick = () => {
           shown += PAGE;
@@ -262,15 +276,15 @@
           update();
         }),
       );
-      update();
+      sort();
     });
   }
 
-  const card = (p) => `<article class="card">
+  const card = (p) => `<article class="card" data-card data-id="${p.id}" data-name="${esc(p.name.toLowerCase())}" data-price="${p.price}" data-stocked="${p.inStock ? "1" : "0"}">
     <a class="thumb" href="/product/${esc(p.slug)}/"><img loading="lazy" src="${esc(p.thumb || "/placeholder.svg")}" alt="${esc(p.name)}" width="300" height="300"></a>
     <button class="heart" data-wish="${p.id}" aria-label="Add ${esc(p.name)} to wishlist">♥</button>
     <div class="body"><a class="name" href="/product/${esc(p.slug)}/">${esc(p.name)}</a>
-    <div class="price">${priceHtml(p.price, p.regular)}</div>
+    <div class="price" data-price-for="${p.id}">${priceHtml(p.price, p.regular)}</div>
     <button class="btn small" data-add="${p.id}" data-label="Add to cart" ${p.inStock ? "" : "disabled"}>${p.inStock ? "Add to cart" : "Sold out"}</button></div></article>`;
 
   async function renderWish() {
@@ -342,6 +356,7 @@
         const q = input.value.trim();
         if (q.length < 2) return close();
         const l = matches(await items().catch(() => []), q).slice(0, 6);
+        if (input.value.trim() !== q) return;
         box.innerHTML = l
           .map(
             (p) =>
@@ -396,7 +411,7 @@
       free.textContent = sub >= live.freeOver ? "You get free delivery." : `Add ${taka(live.freeOver - sub)} more for free delivery.`;
     $$("[data-line]").forEach((i) => {
       i.onchange = () => {
-        cart[i.dataset.line] = Math.min(maxFor(i.dataset.line), Math.max(1, Math.floor(+i.value) || 1));
+        cart[i.dataset.line] = Math.min(Math.max(1, maxFor(i.dataset.line)), Math.max(1, Math.floor(+i.value) || 1));
         saveCart();
         renderCart();
       };
@@ -431,6 +446,8 @@
       discount = 0,
       code = "",
       agreed = 0;
+    let placing = false;
+    let failure = "";
 
     const options = (select, list, hint) => {
       const keep = select.value;
@@ -463,7 +480,7 @@
       // The charge is per piece, as the server counts it: the goods are heavy to carry.
       const pieces = lines.reduce((a, l) => a + l.qty, 0);
       const fee = !zone || (s.freeOver > 0 && goods >= s.freeOver) ? 0 : zone.fee * pieces;
-      total = goods + fee;
+      total = agreed || goods + fee;
       $("[data-sum]").innerHTML =
         lines
           .map(
@@ -475,29 +492,42 @@
         `<div class="row"><span>Delivery charge${fee && pieces > 1 ? ` (${taka(zone.fee)} × ${pieces})` : ""}</span><b>${!zone ? "Choose your area" : fee ? taka(fee) : "Free"}</b></div><div class="row total"><span>Total</span><span>${taka(total)}</span></div>`;
       $("[data-eta]").textContent = zone?.days ? `Usually arrives in ${zone.days}.` : "";
       $("[data-txn]").hidden = !pay?.number;
+      f.txnid.required = !!pay?.number;
+      f.txnid.minLength = pay?.number ? 6 : 0;
       $("[data-pay]").textContent = !pay?.number
         ? ""
         : zone
           ? `Send ${taka(total)} to ${pay.number}, then enter the transaction ID.`
           : "Choose your area to see the amount to send.";
       const sold = lines.find((l) => !l.p.inStock);
+      const over = lines.find((l) => l.qty > maxFor(l.p.id));
       const short = data.sub < s.minOrder;
       const closed = $("[data-closed]");
       closed.hidden = s.ordersOpen;
       closed.textContent = s.ordersOpen ? "" : s.closedNote;
-      submit.disabled = !s.ordersOpen || !!sold || short;
+      submit.disabled = placing || !s.ordersOpen || !!sold || !!over || short || !pay;
+      $("[data-apply]").disabled = placing;
       err.textContent = sold
         ? `${sold.p.name} is sold out. Please remove it from your cart.`
+        : over
+          ? `Only ${maxFor(over.p.id)} of ${over.p.name} can be ordered. Please update your cart.`
+        : !pay
+          ? "No payment method is available. Please contact the shop."
         : short
           ? `The minimum online order is ${taka(s.minOrder)}.`
-          : err.textContent;
+          : failure;
     };
 
-    repaintCheckout = paint;
+    const repaint = () => paint().catch((x) => {
+      err.textContent = x.message || "Could not load your order. Please refresh and try again.";
+      submit.disabled = true;
+    });
+    repaintCheckout = repaint;
     f.onchange = (e) => {
       if (e.target.name === "coupon") return;
+      failure = "";
       agreed = 0; // the customer changed the order, so an earlier agreed total no longer applies
-      paint();
+      repaint();
     };
     $("[data-apply]").onclick = async () => {
       code = f.coupon.value.trim().toUpperCase();
@@ -514,7 +544,7 @@
           msg.textContent = x.message;
         }
       }
-      paint();
+      repaint();
     };
     f.coupon.onkeydown = (e) => {
       if (e.key === "Enter") {
@@ -534,16 +564,19 @@
 
     f.onsubmit = async (e) => {
       e.preventDefault();
-      if (!f.reportValidity()) return;
+      if (placing || submit.disabled || !f.reportValidity()) return;
       // The bot check takes a moment. Pressing the button early shouldn't count as failing it.
       if ($(".cf-turnstile", f) && !new FormData(f).get("cf-turnstile-response")) {
         err.textContent = "The security check isn't finished. Wait a moment, tick the box if you see one, then press Place order again.";
         return;
       }
       const label = submit.textContent;
+      placing = true;
       submit.disabled = true;
+      $("[data-apply]").disabled = true;
       submit.textContent = "Placing your order…";
       err.textContent = "";
+      failure = "";
       try {
         const d = Object.fromEntries(new FormData(f));
         const r = await api("/checkout", {
@@ -571,16 +604,19 @@
         put("myOrders", [{ number: r.number, phone: d.phone }, ...get("myOrders", [])].slice(0, 5));
         location.href = `/track/?order=${encodeURIComponent(r.number)}&new=1`;
       } catch (x) {
-        err.textContent = x.message;
+        failure = x.message;
+        err.textContent = failure;
+        placing = false;
         submit.textContent = label;
         submit.disabled = false;
+        $("[data-apply]").disabled = false;
         // The customer has now seen the new total, so pressing the button again accepts it.
         agreed = +(x.message.match(/total changed to ৳(\d+)/)?.[1] || 0);
         window.turnstile?.reset();
         if (x.status === 409) loadStock(true);
       }
     };
-    paint();
+    repaint();
   }
 
   const orderHtml = (o) => {
@@ -589,7 +625,7 @@
     const reached = steps.indexOf(o.status);
     const when = (s) => {
       const ev = (o.events || []).filter((x) => x.status === s).pop();
-      return ev ? new Date(ev.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "";
+      return ev ? new Date(ev.at).toLocaleDateString("en-GB", { timeZone: "Asia/Dhaka", day: "numeric", month: "short" }) : "";
     };
     return `<div class="panel order"><h3>${esc(o.number)}</h3>
       <ol class="steps">${steps.map((s, i) => `<li class="${i <= reached ? "on" : ""}"><b>${esc(STATUS[s] || s)}</b><small>${esc(when(s))}</small></li>`).join("")}</ol>
@@ -669,17 +705,30 @@
       pane.hidden = true;
     });
     pic.addEventListener("click", () => {
-      const box = document.createElement("div");
+      const box = document.createElement("dialog");
       box.className = "lightbox";
+      box.setAttribute("aria-label", "Product image");
       box.innerHTML = `<img src="${esc(pic.currentSrc || pic.src)}" alt="${esc(pic.alt)}"><button class="x" aria-label="Close">×</button>`;
       const close = () => {
+        box.close();
         box.remove();
+        pic.focus();
         removeEventListener("keydown", key);
       };
       const key = (e) => e.key === "Escape" && close();
       box.onclick = close;
       addEventListener("keydown", key);
       document.body.append(box);
+      box.showModal();
+    });
+    pic.tabIndex = 0;
+    pic.setAttribute("role", "button");
+    pic.setAttribute("aria-label", "Enlarge product image");
+    pic.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        pic.click();
+      }
     });
   }
 
@@ -691,6 +740,7 @@
       err = $("[data-err]");
     const go = async () => {
       err.textContent = "";
+      out.innerHTML = "";
       try {
         const o = await api(`/track?order=${encodeURIComponent(f.order.value)}&phone=${encodeURIComponent(f.phone.value)}`);
         out.innerHTML =
@@ -801,6 +851,7 @@
       if (!r.ok) throw new Error();
       const snap = await r.json();
       stock = snap.products || {};
+      stockLoaded = true;
       live = snap.settings || null;
       index = null;
       applyStock();
@@ -814,12 +865,26 @@
     }
   }
 
-  // Coming back with the browser's Back button restores the old page: bring the counts up to date.
-  addEventListener("pageshow", (e) => {
-    if (!e.persisted) return;
-    cart = get("cart", {});
-    wish = get("wish", []);
+  const renderDynamic = () => Promise.allSettled([
+    [renderCart, "[data-cart]"], [renderWish, "[data-wishlist]"], [search, "[data-results]"], [renderRecent, "[data-recent]"],
+  ].map(async ([render, selector]) => {
+    try { await render(); }
+    catch {
+      const el = $(selector);
+      if (el) el.innerHTML = '<p role="alert">Could not load products. Please refresh the page to try again.</p>';
+    }
+  }));
+  const syncCart = () => {
+    cart = readCart();
+    wish = readWish();
     badges();
+    renderDynamic();
+    repaintCheckout();
+  };
+  addEventListener("pageshow", (e) => { if (e.persisted) syncCart(); });
+  addEventListener("storage", (e) => { if (!e.key || e.key === "cart" || e.key === "wish") syncCart(); });
+  $$(".mobile-nav a, .nav > a, .icons a").forEach((a) => {
+    if (a.pathname === location.pathname) a.setAttribute("aria-current", "page");
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") $$("details.mega[open]").forEach((d) => (d.open = false));
@@ -838,6 +903,6 @@
   $$("[data-review]").forEach((f) =>
     simpleForm(f, "/reviews", REVIEW_THANKS, { product: +f.dataset.review }),
   );
-  Promise.allSettled([renderCart(), renderWish(), search(), renderRecent()]);
+  renderDynamic();
   loadStock();
 })();

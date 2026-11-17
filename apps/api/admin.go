@@ -247,13 +247,22 @@ func adminResetPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func adminProducts(w http.ResponseWriter, r *http.Request) {
-	serveSnap(w, r, &adminProductsSnap, func(ctx context.Context) ([]byte, error) {
-		list, err := jsonRows(ctx, `SELECT data||jsonb_build_object('price',price,'regular',regular,'stock',stock,'active',active) FROM products ORDER BY id DESC`)
+	snapMu.Lock() // do not repopulate this cache across a concurrent refresh
+	defer snapMu.Unlock()
+	if adminProductsSnap.Load() == nil {
+		list, err := jsonRows(r.Context(), `SELECT data||jsonb_build_object('price',price,'regular',regular,'stock',stock,'active',active) FROM products ORDER BY id DESC`)
 		if err != nil {
-			return nil, err
+			oops(w, err)
+			return
 		}
-		return json.Marshal(list)
-	})
+		b, err := json.Marshal(list)
+		if err != nil {
+			oops(w, err)
+			return
+		}
+		adminProductsSnap.Store(&b)
+	}
+	serveSnap(w, r, &adminProductsSnap)
 }
 
 func wholeNumber(v any) (int64, bool) {

@@ -160,7 +160,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
           </a>
         </nav>
       </div>
-      <div class="wrap nav">
+      <nav class="wrap nav" aria-label="Product categories and pages">
         <a href="/shop/">Shop all</a>
         {MENU.map((g: any) => (
           <details class="mega">
@@ -178,7 +178,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
         <a href="/blog/">Blog</a>
         <a href="/track/">Track order</a>
         <a href="/contact-us/">Contact</a>
-      </div>
+      </nav>
     </header>
     <main id="main">
       <slot />
@@ -261,6 +261,12 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
         </svg>
       </a>
     </div>
-    <div class="toast" role="status" data-toast></div>
+    <nav class="mobile-nav" aria-label="Quick shopping links">
+      <a href="/shop/"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Shop</span></a>
+      <a href="/wishlist/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20S3 15 3 9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6-9 11-9 11Z"/></svg><span>Wishlist</span><i data-wish-count hidden></i></a>
+      <a href="/track/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5v9l-9 5-9-5V8l9-5Zm0 10v9M3 8l9 5 9-5M7.5 5.5l9 5v5"/></svg><span>Track order</span></a>
+      <a href="/cart/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h2l3 12h11l2-9H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg><span>Cart</span><i data-cart-count hidden></i></a>
+    </nav>
+    <div class="toast" role="status" aria-live="polite" data-toast></div>
   </body>
 </html>

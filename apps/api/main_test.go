@@ -165,6 +165,7 @@ func reset(t *testing.T) {
 	adminProductsSnap.Store(nil)
 	product(t, 1, 1000, 50)
 	product(t, 2, 500, 50)
+	refresh()
 }
 
 func product(t *testing.T, id, price int64, stock int) {
@@ -508,8 +509,8 @@ func TestLiveSettings(t *testing.T) {
 
 func TestPublicSnapshotsSkipTheDatabase(t *testing.T) {
 	reset(t)
+	call(t, nil, "PATCH", "/api/admin/products/1", M{"price": 1200}, true)
 	for _, p := range []string{"/api/catalog", "/api/storefront", "/api/stock"} {
-		call(t, nil, "GET", p, nil, false)
 		before := db.Stat().AcquireCount()
 		res, err := http.Get(api.URL + p)
 		if err != nil || res.StatusCode != 200 {
@@ -636,7 +637,7 @@ func TestDashboardAndExports(t *testing.T) {
 }
 
 // The server is already answering while these run, so a snapshot built meanwhile must not outlive them.
-func TestContentUpdateClearsSnapshots(t *testing.T) {
+func TestContentUpdateRefreshesSnapshots(t *testing.T) {
 	reset(t)
 	defer func(saved []byte) { contentUpdates = saved }(contentUpdates)
 	contentUpdates = []byte(`[{"id":"snapshot-test"}]`)
@@ -649,8 +650,8 @@ func TestContentUpdateClearsSnapshots(t *testing.T) {
 		if err := applyContentUpdates(bg); err != nil {
 			t.Fatal(err)
 		}
-		if cleared := catalogSnap.Load() == nil; cleared != want {
-			t.Errorf("snapshot cleared=%v, want %v", cleared, want)
+		if updated := catalogSnap.Load() != &old; updated != want {
+			t.Errorf("snapshot refreshed=%v, want %v", updated, want)
 		}
 	}
 	catalogSnap.Store(nil)
@@ -885,5 +886,77 @@ func TestImageCleanupAndSafeUploadPlace(t *testing.T) {
 	_, nextID := safeUploadPlace(bg, "site", "logo")
 	if nextID == "loverbaazar/site/logo" {
 		t.Errorf("safeUploadPlace reused existing public_id %q", nextID)
+	}
+}
+
+func TestPublicReadsDuringStartupSkipDatabase(t *testing.T) {
+	reset(t)
+	stockSnap.Store(nil)
+	catalogSnap.Store(nil)
+	storefrontSnap.Store(nil)
+	for _, p := range []string{"/api/stock", "/api/catalog", "/api/storefront", "/api/health"} {
+		before := db.Stat().AcquireCount()
+		res, err := http.Get(api.URL + p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		want := http.StatusServiceUnavailable
+		if p == "/api/health" {
+			want = http.StatusOK
+		}
+		if res.StatusCode != want {
+			t.Errorf("%s: got %d, want %d", p, res.StatusCode, want)
+		}
+		if db.Stat().AcquireCount() != before {
+			t.Errorf("%s used the database", p)
+		}
+	}
+}
+
+func TestMergeItemsRejectsOverflow(t *testing.T) {
+	largest := int(^uint(0) >> 1)
+	if _, err := mergeItems([]item{{1, largest}, {1, largest}}); err == nil {
+		t.Fatal("oversized quantities must never wrap into a negative stock change")
+	}
+}
+
+func TestConcurrentGuestFraudChecks(t *testing.T) {
+	for _, manual := range []bool{false, true} {
+		t.Run(fmt.Sprint("manual=", manual), func(t *testing.T) {
+			reset(t)
+			clearLimits()
+			var wg sync.WaitGroup
+			codes := make(chan int, 8)
+			for i := 0; i < 8; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+					extra := M{}
+					if manual {
+						extra = M{"payment": "bkash", "txnid": "SAME12345", "phone": fmt.Sprintf("017100760%02d", i)}
+					}
+					code, _ := call(t, nil, "POST", "/api/checkout", order(extra, M{"id": 1, "qty": 1}), false)
+					codes <- code
+				}(i)
+			}
+			wg.Wait()
+			close(codes)
+			success := 0
+			want, rejected := 3, 429
+			if manual {
+				want, rejected = 1, 409
+			}
+			for code := range codes {
+				if code == 200 {
+					success++
+				} else if code != rejected {
+					t.Errorf("unexpected status: %d", code)
+				}
+			}
+			if success != want || stockOf(t, 1) != 50-want {
+				t.Fatalf("accepted %d orders, want %d; stock %d", success, want, stockOf(t, 1))
+			}
+		})
 	}
 }
