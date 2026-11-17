@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Card from "../../components/Card.astro";
-import { products, cats, img, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, siteUrl } from "../../lib/shop";
+import { products, cats, img, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, siteUrl, attributeValues } from "../../lib/shop";
 export const getStaticPaths = () => products.map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
 const d = off(p);
@@ -16,14 +16,14 @@ const absImg = (u = "") => {
 const cleanDesc = (p.short || p.desc || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 const seoDesc =
   p.short ||
-  `${p.name} price in Bangladesh is ${taka(p.price)} at ${SITE.name}. ${cleanDesc ? cleanDesc.slice(0, 110) : `Buy genuine ${myCats[0]?.name || "home appliances"} online with cash on delivery across Bangladesh.`}`;
-const brandName = p.attrs?.find((a: any) => /brand/i.test(a.name))?.values?.[0] || SITE.name;
+  `${p.name} price in Bangladesh is ${taka(p.price)} at ${SITE.name}. ${cleanDesc ? cleanDesc.slice(0, 110) : `Buy ${myCats[0]?.name || "home appliances"} online. See available delivery and payment methods before ordering.`}`;
+const brandName = attributeValues(p, "brand")[0];
 const ld = {
   "@context": "https://schema.org",
   "@type": "Product",
   name: p.name,
   sku: p.sku || undefined,
-  brand: { "@type": "Brand", name: brandName },
+  brand: brandName ? { "@type": "Brand", name: brandName } : undefined,
   image: p.images.length ? p.images.map((i: any) => absImg(i.src)) : [siteUrl("/og-image.jpg")],
   description: cleanDesc || p.name,
   offers: {
@@ -83,7 +83,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
       )}
       {p.name}
     </p>
-    <section class="pd" data-product={p.id}>
+    <section class="pd" data-product={p.id} data-price={p.price}>
       <div>
         <div class="stage">
           <img class="main" data-main src={img(p.images[0]?.src)} alt={p.images[0]?.alt || p.name} width="600" height="600" />
@@ -131,11 +131,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
             ♥ Wishlist
           </button>
         </div>
-        {p.attrs.map((a: any) => (
-          <p class="meta">
-            <b>{a.name}:</b> {a.values.join(", ")}
-          </p>
-        ))}
+        {p.attrs.length > 0 && <section class="specifications" aria-labelledby="specifications-title"><h2 id="specifications-title">Specifications</h2><dl>{p.attrs.map((a: any)=><div><dt>{a.name}</dt><dd>{a.values.join(", ")}</dd></div>)}</dl></section>}
         {p.sku && <p class="meta">SKU: {p.sku}</p>}
         <p class="meta">
           {myCats.map((c: any, i: number) => (
@@ -153,7 +149,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
             </li>
           ))}
         </ul>
-        <p class="meta">Cash on delivery. No account needed to order.</p>
+        <p class="meta">No account needed to order. <a class="link" href="/how-to-buy/">Delivery and payment information</a></p>
         {SITE.returns && (
           <p class="meta">
             <b>Returns:</b> {SITE.returns}
@@ -215,7 +211,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
             Your review<textarea name="body" rows="3" required minlength="5" maxlength="1000"></textarea>
           </label>
           <input class="trap" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
-          <p class="err"></p>
+          <p class="err" role="alert" tabindex="-1"></p>
           <button class="btn">Send review</button>
         </form>
       </details>

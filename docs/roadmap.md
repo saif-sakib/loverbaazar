@@ -140,7 +140,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 9 — Establish the mobile design system
 
-**Status:** Planned · **Depends on:** 1
+**Status:** Done — implemented and locally verified · **Depends on:** 1
+
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
 
 - Document and implement shared spacing, type, colors, controls, page widths, focus and loading/error/empty states. Start at 320–414 px, then enhance with tablet/desktop breakpoints.
 - Prefer `min-width` for new/substantially rewritten layout rules and consolidate competing overrides where the change requires it. Preserve existing brand assets and useful mobile controls.
@@ -148,7 +150,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 10 — Improve mobile home, navigation and search entry
 
-**Status:** Planned · **Depends on:** 9
+**Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 9
+
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
 
 - Make categories, product discovery, search, offers, cart and contact easy to reach with one hand. Reduce unnecessary first-screen hero height and competing sticky/floating controls while keeping the current visual identity.
 - Support touch/keyboard category navigation, clear active states, useful search suggestions and honest delivery/payment messages driven by settings.
@@ -156,7 +160,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 11 — Improve catalog, filtering and search results
 
-**Status:** Planned · **Depends on:** 9, 10
+**Status:** Done — implemented and locally verified · **Depends on:** 9, 10
+
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
 
 - Refine cards, stock/price clarity, sorting, price/stock filters and accessible mobile filter controls. Add brand/color filters only where task 2's real attributes support them; do not invent unavailable variants.
 - Preserve useful filter state on navigation, provide clear reset/no-result/error states and ensure live price updates preserve sorting. Keep every sellable product reachable with crawlable links; use static pagination when catalog size warrants it.
@@ -164,7 +170,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 12 — Improve product details and purchase decisions
 
-**Status:** Planned · **Depends on:** 9, 11
+**Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 9, 11
+
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
 
 - Refine gallery/zoom, real specifications, model/SKU, brand, included items, warranty/returns, availability, quantity and delivery information. Identify seller and manufacturer accurately; show no fabricated ratings, warranty or stock promises.
 - Keep Add to cart/Buy now understandable and reachable on phones. Resolve buy-bar/navigation/chat overlap and include accessible image/option controls. Unsupported selectable product options block that product's launch until represented correctly.
@@ -172,7 +180,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 13 — Refine cart, wishlist and saved shopping state
 
-**Status:** Planned · **Depends on:** 9, 11
+**Status:** Done — implemented and locally verified · **Depends on:** 9, 11
+
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
 
 - Make quantity editing, removal, price changes, stock limits and the route to checkout clear on phones. Keep wishlist/recent products useful without making an account mandatory.
 - Preserve valid state across reloads/tabs and tolerate malformed or blocked browser storage. Explain removed products and price/availability changes without implying the browser's total is authoritative.
@@ -180,7 +190,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 14 — Finish the Bangladesh guest checkout journey
 
-**Status:** Planned · **Depends on:** 6, 12, 13
+**Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 6, 12, 13
+
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
 
 - Refine labels, Bangladeshi phone normalization, address/delivery selection, optional email, coupons, per-piece delivery charges, payment instructions and final server-confirmed totals. Keep guest ordering the default path.
 - Clearly label manual mobile payments as requiring verification. Handle Turnstile expiry, duplicate taps, total/stock changes, slow API wake-up and an uncertain response without encouraging a second payment or duplicate order.
@@ -188,7 +200,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 15 — Finish account, tracking, contact and policy journeys
 
-**Status:** Planned · **Depends on:** 5, 9, 14
+**Status:** Done — implemented and locally verified · **Depends on:** 5, 9, 14
+
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
 
 - Refine optional registration/login/logout/password changes, phone-based order tracking and contact/review forms. Explain that historical WordPress passwords/sessions may not transfer; keep the agreed account recovery method safe and understandable.
 - Link actual delivery, returns, warranty, privacy and terms content at decision points. Keep public tracking responses limited to the matched customer and keep admin notes private.
@@ -196,7 +210,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 16 — Finish mobile admin workflows
 
-**Status:** Planned · **Depends on:** 8, 9
+**Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 8, 9
+
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
 
 - Make products, images, stock deltas, prices, categories, pages, site/live settings, coupons, orders, tracking, messages and customer support usable from a phone. Use contained table scrolling or readable row layouts as appropriate.
 - Preserve unsaved edits, prevent duplicate saves, distinguish live effects from Publish-required effects and display task 8's real publication status. Provide clear order/payment verification and safe CSV export behavior.

@@ -1,26 +1,27 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { SITE } from "../../lib/shop";
+import { SITE, telOf } from "../../lib/shop";
 ---
 
 <Base title="My account" noindex>
   <div class="wrap">
     <h1 class="title">My account</h1>
+    <p class="note">An account is optional. <a class="link" href="/shop/">Shop and check out as a guest</a>. If you used our previous website, contact the shop if your old password no longer works.</p>
     <div data-account></div>
     <div class="two even" data-auth hidden>
       <form class="panel" data-form="login">
         <h3>Log in</h3>
         <label class="field">
           Mobile number
-          <input name="phone" required inputmode="tel" autocomplete="tel" />
+          <input name="phone" type="tel" maxlength="30" autocomplete="tel" required inputmode="tel" />
         </label>
         <label class="field">
           Password
           <input name="password" type="password" required autocomplete="current-password" />
         </label>
-        <p class="err"></p>
+        <p class="err" role="alert" tabindex="-1"></p>
         <button class="btn small">Log in</button>
-        <p class="meta">Forgot your password? Call {SITE.phone} and we'll set a new one.</p>
+        <p class="meta">Forgot your password? <a class="link" href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a> for help verifying your identity and recovering access.</p>
       </form>
       <form class="panel" data-form="register">
         <h3>Sign up</h3>
@@ -30,13 +31,13 @@ import { SITE } from "../../lib/shop";
         </label>
         <label class="field">
           Mobile number
-          <input name="phone" required inputmode="tel" autocomplete="tel" />
+          <input name="phone" type="tel" maxlength="30" autocomplete="tel" required inputmode="tel" />
         </label>
         <label class="field">
           Password (8+ characters)
           <input name="password" type="password" minlength="8" maxlength="72" required autocomplete="new-password" />
         </label>
-        <p class="err"></p>
+        <p class="err" role="alert" tabindex="-1"></p>
         <p class="meta">
           By signing up you accept the{" "}
           <a class="link" href="/terms-conditions/">

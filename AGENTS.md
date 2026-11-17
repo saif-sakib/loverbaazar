@@ -23,6 +23,8 @@ Bangladesh home-appliance shop. Replaces WordPress at loverbaazar.com.
 - Verify sticky navigation, product buy bars, chat buttons, safe areas and the software keyboard never cover form fields, errors, prices or primary actions. Guest checkout stays the shortest purchase path.
 - Prioritize real Android/iPhone usability and slow mobile networks. Desktop screenshots and mocked browser tests alone do not establish mobile readiness.
 
+Mobile implementation and acceptance evidence: [docs/mobile-ui.md](docs/mobile-ui.md). Never claim Chromium emulation as real-phone acceptance.
+
 Foundation contracts, environment setup and release protocol: [docs/foundation.md](docs/foundation.md).
 
 ## Run and check

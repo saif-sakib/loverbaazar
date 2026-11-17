@@ -1,7 +1,7 @@
 ---
 import Base from "../layouts/Base.astro";
 import Card from "../components/Card.astro";
-import { products, inCat, homeItems, MENU, catUrl, img, SITE, cats } from "../lib/shop";
+import { products, inCat, homeItems, MENU, catUrl, img, SITE, cats, LIVE } from "../lib/shop";
 const withPhoto = (l: any[]) => l.filter((p) => p.images[0]);
 const heroPics = withPhoto(SITE.home.flatMap((h: any) => homeItems(h.cat)))
   .filter((p: any, i: number, all: any[]) => all.findIndex((x) => x.id === p.id) === i)
@@ -23,7 +23,7 @@ const heroEnd = heroWords.pop();
 
 <Base type="website">
   <div class="wrap">
-    <section class="hero">
+    <section class="hero home-hero">
       <div>
         <p class="eyebrow">{SITE.tagline}</p>
         <h1>{heroWords.join(" ")} <em>{heroEnd}</em></h1>
@@ -41,7 +41,7 @@ const heroEnd = heroWords.pop();
       <div class="pics">
         {heroShots.map((h: any) => (
           <a href={h.href}>
-            <img src={h.src} alt={h.alt} width="600" height="600" fetchpriority={h === heroShots[0] ? "high" : "auto"} />
+            <img src={h.src} alt={h.alt} width="600" height="600" loading="lazy" />
             <span class="hero-product">{h.name} <span aria-hidden="true">↗</span></span>
           </a>
         ))}
@@ -56,24 +56,6 @@ const heroEnd = heroWords.pop();
         ))}
       </section>
     )}
-    <section class="perks">
-      <div>
-        <b>Cash on delivery</b>
-        <span>Pay when it arrives</span>
-      </div>
-      <div>
-        <b>Mobile payment</b>
-        <span>bKash, Nagad, Rocket</span>
-      </div>
-      <div>
-        <b>Wholesale prices</b>
-        <span>Trusted brands</span>
-      </div>
-      <div>
-        <b>Need help?</b>
-        <span>Call {SITE.phone}</span>
-      </div>
-    </section>
     {tiles.length > 0 && (
       <>
         <div class="sec">
@@ -91,6 +73,24 @@ const heroEnd = heroWords.pop();
         </section>
       </>
     )}
+    <section class="perks" aria-label="Shopping information">
+      <div>
+        <b data-payment-feature>{LIVE.payments.find((p: any)=>p.enabled)?.label || "Payment options"}</b>
+        <span>See available methods at checkout</span>
+      </div>
+      <div>
+        <b>Delivery</b>
+        <span>Choose your area for the exact charge</span>
+      </div>
+      <div>
+        <b>Wholesale prices</b>
+        <span>Trusted brands</span>
+      </div>
+      <div>
+        <b>Need help?</b>
+        <span>Call {SITE.phone}</span>
+      </div>
+    </section>
     {SITE.home.map(
       (h: any) =>
         homeItems(h.cat).length > 0 && (
