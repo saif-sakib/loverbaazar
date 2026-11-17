@@ -17,29 +17,56 @@ const forward = (request, env, url, init = {}) => {
 // Kept for a day: if the API is asleep or down, browsers still get recent prices straight away.
 const staleKey = (url) => new Request(url.origin + "/api/stock-stale");
 
-async function stock(request, env, url, ctx) {
-  const cache = caches.default;
-  const hit = await cache.match(request); // one API call a minute at most, however busy the shop is
-  if (hit) return hit;
-  let res;
-  try {
-    res = await forward(request, env, url, { signal: AbortSignal.timeout(5000) });
-    if (res.ok) {
-      const stale = new Response(res.clone().body, res);
-      stale.headers.set("Cache-Control", "public, max-age=86400");
-      ctx.waitUntil(Promise.all([cache.put(request, res.clone()), cache.put(staleKey(url), stale)]));
-      return res;
+// Share an origin request while it is in flight, including across background refreshes.
+const pendingStock = new Map();
+function refreshStock(request, env, url, cache, key) {
+  if (pendingStock.has(key.url)) return pendingStock.get(key.url);
+  const pending = (async () => {
+    let res;
+    try {
+      res = await forward(request, env, url, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const stale = new Response(res.clone().body, res);
+        stale.headers.set("Cache-Control", "public, max-age=86400");
+        await Promise.all([cache.put(key, res.clone()), cache.put(staleKey(url), stale)]).catch(() => {});
+        return res;
+      }
+    } catch {
+      // An asleep or unavailable origin must not interrupt cached browsing.
     }
-  } catch {
-    // Timed out or unreachable: treated the same as an error answer below.
-  }
-  const saved = await cache.match(staleKey(url));
+    const saved = await cache.match(staleKey(url)).catch(() => undefined);
+    if (saved) {
+      const fallback = new Response(saved.body, saved);
+      // Briefly cache the fallback too, so a sleeping API is not retried on every visit.
+      // Do not extend the day-long stale copy's lifetime.
+      fallback.headers.set("Cache-Control", "public, max-age=15");
+      fallback.headers.set("X-Stock-Stale", "1");
+      await cache.put(key, fallback.clone()).catch(() => {});
+      return fallback;
+    }
+    return res || new Response('{"error":"unavailable"}', { status: 503, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  })().finally(() => pendingStock.delete(key.url));
+  pendingStock.set(key.url, pending);
+  return pending;
+}
+
+async function stock(request, env, url, ctx) {
+  // Stock is public and independent of query strings, cookies and user identity.
+  // Use one cache entry so arbitrary query strings cannot bypass the cache.
+  const originURL = new URL("/api/stock", url.origin);
+  const key = new Request(originURL);
+  const cache = caches.default;
+  const hit = await cache.match(key).catch(() => undefined);
+  if (hit) return hit;
+  const saved = await cache.match(staleKey(originURL)).catch(() => undefined);
   if (saved) {
+    ctx.waitUntil(refreshStock(request, env, originURL, cache, key));
     const copy = new Response(saved.body, saved);
-    copy.headers.set("Cache-Control", "no-store"); // the day-long life is for this cache, not for browsers
-    return copy;
+    copy.headers.set("Cache-Control", "no-store");
+    copy.headers.set("X-Stock-Stale", "1");
+    return copy; // do not make the customer wait for the API to wake up
   }
-  return res || new Response('{"error":"unavailable"}', { status: 503, headers: { "Content-Type": "application/json" } });
+  return (await refreshStock(request, env, originURL, cache, key)).clone();
 }
 
 export default {

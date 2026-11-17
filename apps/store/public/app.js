@@ -54,6 +54,7 @@
   let index = null; // the search index, with live prices merged in
   let rawIndex = null;
   let stockLoaded = false;
+  let retriedStaleStock = false;
   let stock = {}; // id: [price, regular, units], units capped at 99
   let live = null; // settings that take effect without a rebuild
   let repaintCheckout = () => {};
@@ -88,7 +89,9 @@
         rawIndex = null;
         throw e;
       });
-    const list = (await rawIndex).map((p) => ({ ...p }));
+    const raw = await rawIndex;
+    if (index) return index; // simultaneous cart, search and recent-item renders share one merge
+    const list = raw.map((p) => ({ ...p }));
     const known = stockLoaded;
     list.forEach((p) => {
       const s = stock[p.id];
@@ -850,6 +853,12 @@
       const r = await fetch("/api/stock", { signal: timeout.signal, cache: reload ? "reload" : "default" });
       if (!r.ok) throw new Error();
       const snap = await r.json();
+      // A saved snapshot renders immediately. Check once after the Worker's five-second
+      // refresh window so newly published products do not stay disabled on this page.
+      if (r.headers.get("X-Stock-Stale") === "1" && !retriedStaleStock) {
+        retriedStaleStock = true;
+        setTimeout(() => loadStock(true), 5500);
+      }
       stock = snap.products || {};
       stockLoaded = true;
       live = snap.settings || null;

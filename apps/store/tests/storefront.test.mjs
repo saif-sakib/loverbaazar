@@ -179,15 +179,15 @@ test('a changed server total is visible before retrying checkout', () => shop(as
 test('admin settings have one save bar and preserve hidden and unrelated settings', () => shop(async (page, context) => {
   await page.addInitScript(() => { if (location.protocol === 'http:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
   const original = await (await context.request.get('/api/admin/settings', { headers: { 'X-Admin-Token': 'local-admin-token-for-this-computer-only' } })).json();
-  let reads = 0, saved;
+  let concurrentChange = false, saved;
   await context.route('**/api/admin/settings', async r => {
     if (r.request().method() === 'PUT') { saved = r.request().postDataJSON(); return r.fulfill({ json: {} }); }
-    reads++;
-    return r.fulfill({ json: { live: { ...original.live, maxPending: 7 }, site: { ...original.site, name: reads > 2 ? 'Updated in another tab' : original.site.name } } });
+    return r.fulfill({ json: { live: { ...original.live, maxPending: 7 }, site: { ...original.site, name: concurrentChange ? 'Updated in another tab' : original.site.name } } });
   });
   await ready(page, '/admin/#home');
   assert.equal(await page.locator('[data-save]').count(), 0);
   assert.equal(await page.locator('#sf .stick').count(), 1);
+  concurrentChange = true;
   await page.locator('[name="heroTitle"]').fill('Updated welcome');
   assert.match(await page.locator('.save-status').textContent(), /Unsaved/);
   await page.locator('#sf .stick button').first().click();
@@ -238,4 +238,30 @@ test('invalid settings cannot publish and a later Save does not publish unexpect
   await page.locator('#sf .stick button').first().click();
   await page.waitForFunction(() => document.querySelector('.save-status')?.textContent === 'All changes saved');
   assert.equal(writes, 1); assert.equal(publishes, 0);
+}));
+
+
+test('admin overview loads dashboard once and defers product data until needed', () => shop(async (page, context) => {
+  await page.addInitScript(() => { if (location.protocol === 'http:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
+  const requests = [];
+  context.on('request', r => { if (r.url().includes('/api/admin/')) requests.push(new URL(r.url()).pathname); });
+  await ready(page, '/admin/');
+  assert.equal(requests.filter(p => p === '/api/admin/dashboard').length, 1);
+  assert.equal(requests.filter(p => p === '/api/admin/products' || p.startsWith('/api/admin/content/')).length, 0);
+  await page.locator('#admin-section').selectOption('products');
+  await page.waitForSelector('#rows tr');
+  assert.equal(requests.filter(p => p === '/api/admin/products').length, 1);
+}));
+
+
+test('saved stock is retried once so a newly published product becomes available', () => shop(async (page, context) => {
+  let requests = 0;
+  await context.route('**/api/stock', r => {
+    requests++;
+    return r.fulfill({ headers: requests === 1 ? { 'X-Stock-Stale': '1' } : {}, json: { products: requests === 1 ? {} : { 1: [1000, 1200, 3] }, settings } });
+  });
+  await ready(page, '/search/?q=test');
+  assert.equal(await page.locator('[data-add="1"]').isDisabled(), true);
+  await page.waitForFunction(() => !document.querySelector('[data-add="1"]').disabled, null, { timeout: 10000 });
+  assert.equal(requests, 2);
 }));

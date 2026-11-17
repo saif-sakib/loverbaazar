@@ -129,7 +129,17 @@
   let catsPromise = null;
   let lowStock = 5;
 
-  async function api(path, opts = {}) {
+  const pendingReads = new Map();
+  function api(path, opts = {}) {
+    if (opts.body || opts.raw || (opts.method && opts.method !== "GET")) return apiRequest(path, opts);
+    const key = token + ":" + path;
+    if (!pendingReads.has(key)) {
+      pendingReads.set(key, apiRequest(path, opts).finally(() => pendingReads.delete(key)));
+    }
+    return pendingReads.get(key);
+  }
+
+  async function apiRequest(path, opts = {}) {
     const headers = { "X-Admin-Token": token, ...(opts.headers || {}) };
     let body = opts.body;
     if (body && !(body instanceof Blob)) {
@@ -1893,9 +1903,10 @@
       res.hidden = true;
     };
     box.oninput = run(async () => {
-      if (!productsLoaded) await ensureCatalog();
       const q = box.value.trim().toLowerCase();
       if (!q) return close();
+      if (!productsLoaded) await ensureCatalog();
+      if (box.value.trim().toLowerCase() !== q) return;
       const jobs = JOBS.filter(([label, , words]) => (label + " " + words).toLowerCase().includes(q)).slice(0, 5);
       const items = allProducts.filter((p) => (p.name + " " + (p.sku || "")).toLowerCase().includes(q)).slice(0, 6);
       res.innerHTML =
@@ -1943,11 +1954,10 @@
     } catch {}
     finder();
     go();
-    ensureCatalog().catch(() => {});
+    counts();
     const s = await api("/settings").catch(() => ({}));
     site = s.site || null;
     lowStock = s.live?.lowStock ?? lowStock;
-    counts();
   }
 
   addEventListener("hashchange", go);

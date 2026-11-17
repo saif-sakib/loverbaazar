@@ -328,7 +328,7 @@ func adminSaveProduct(w http.ResponseWriter, r *http.Request) {
 		oops(w, err)
 		return
 	}
-	refresh()
+	refreshProducts()
 	go dropImages(oldImages, p["images"].([]any))
 	ok(w, map[string]any{"ok": true, "id": id})
 }
@@ -357,7 +357,7 @@ func adminQuickEdit(w http.ResponseWriter, r *http.Request) {
 		oops(w, err)
 		return
 	}
-	refresh()
+	refreshProducts()
 	ok(w, map[string]any{"stock": stock})
 }
 
@@ -381,7 +381,7 @@ func adminDeleteProduct(w http.ResponseWriter, r *http.Request) {
 		oops(w, err)
 		return
 	}
-	refresh()
+	refreshProducts()
 	deleted := tag.RowsAffected() > 0
 	if deleted {
 		go dropImages(images, nil)

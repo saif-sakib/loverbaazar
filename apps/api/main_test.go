@@ -960,3 +960,57 @@ func TestConcurrentGuestFraudChecks(t *testing.T) {
 		})
 	}
 }
+
+func TestInventoryWritesPreserveContentSnapshot(t *testing.T) {
+	reset(t)
+	content := storefrontSnap.Load()
+	if code, _ := call(t, nil, "PATCH", "/api/admin/products/1", M{"price": 1200}, true); code != 200 {
+		t.Fatal("price edit failed")
+	}
+	if storefrontSnap.Load() != content {
+		t.Fatal("an inventory edit rebuilt unrelated content")
+	}
+	_, stock := call(t, nil, "GET", "/api/stock", nil, false)
+	if stock["products"].(M)["1"].([]any)[0] != float64(1200) {
+		t.Fatal("live price was not refreshed")
+	}
+	if code, _ := call(t, nil, "POST", "/api/checkout", order(nil, M{"id": 1, "qty": 1}), false); code != 200 {
+		t.Fatal("checkout failed")
+	}
+	if storefrontSnap.Load() != content {
+		t.Fatal("checkout rebuilt unrelated content")
+	}
+	_, stock = call(t, nil, "GET", "/api/stock", nil, false)
+	if stock["products"].(M)["1"].([]any)[2] != float64(49) {
+		t.Fatal("stock was not refreshed")
+	}
+}
+
+// Run only with TEST_DATABASE_URL pointing at the throwaway test database.
+func BenchmarkSnapshotRefresh(b *testing.B) {
+	if api == nil {
+		b.Skip("needs TEST_DATABASE_URL")
+	}
+	for _, mode := range []string{"full", "inventory"} {
+		b.Run(mode, func(b *testing.B) {
+			if _, err := db.Exec(bg, `TRUNCATE products CASCADE;
+				INSERT INTO products(id,slug,price,regular,stock,data)
+				SELECT g,'p'||g,1000,1200,50,jsonb_build_object('id',g,'name','Product '||g,'slug','p'||g,'images','[]'::jsonb)
+				FROM generate_series(1,300) g`); err != nil {
+				b.Fatal(err)
+			}
+			refresh()
+			b.ResetTimer()
+			before := db.Stat().AcquireCount()
+			for i := 0; i < b.N; i++ {
+				if mode == "full" {
+					refresh()
+				} else {
+					refreshProducts()
+				}
+			}
+			b.StopTimer()
+			b.ReportMetric(float64(db.Stat().AcquireCount()-before)/float64(b.N), "db-queries/op")
+		})
+	}
+}

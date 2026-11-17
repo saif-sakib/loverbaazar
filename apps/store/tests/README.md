@@ -12,3 +12,5 @@ The tests use the local shop at `http://127.0.0.1:8787`. `SHOP_URL` can override
 Shopping tests mock the catalogue, stock, account lookup, and checkout writes. Admin checks use the documented local admin token and read existing sections. They do not change settings or place real orders. Layout checks cover 320, 375, 768, and 1440 pixels; admin sections are checked at 375 pixels.
 
 Backend tests still need their own throwaway database; see `AGENTS.md`. Never run those against the local shop database or production.
+
+Worker cache regression tests run from the repository root with `node --test edge/worker.test.mjs`. Snapshot benchmark measurements and their scope are in `docs/performance.md`.

@@ -103,7 +103,12 @@ func loadSettings(ctx context.Context) (Live, map[string]any, error) {
 
 // refresh rebuilds the snapshots after a write. It takes no request context: a customer closing
 // the page must not leave the shop showing old stock.
-func refresh() {
+func refresh() { refreshSnapshots(true) }
+
+// Inventory writes do not change pages, categories or site settings.
+func refreshProducts() { refreshSnapshots(false) }
+
+func refreshSnapshots(content bool) {
 	snapMu.Lock() // serialise the entire refresh so an older catalogue cannot replace a newer one
 	defer snapMu.Unlock()
 	adminProductsSnap.Store(nil)
@@ -112,14 +117,16 @@ func refresh() {
 	if err := publishStock(ctx); err != nil {
 		log.Print("stock snapshot: ", err)
 	}
-	for _, job := range []struct {
-		snap *atomic.Pointer[[]byte]
-		load func(context.Context) ([]byte, error)
-	}{{&catalogSnap, buildCatalog}, {&storefrontSnap, buildStorefront}} {
-		if b, err := job.load(ctx); err != nil {
-			log.Print("public snapshot: ", err) // keep the last good snapshot on failure
+	if b, err := buildCatalog(ctx); err != nil {
+		log.Print("catalog snapshot: ", err)
+	} else {
+		catalogSnap.Store(&b)
+	}
+	if content {
+		if b, err := buildStorefront(ctx); err != nil {
+			log.Print("storefront snapshot: ", err) // keep the last good snapshot on failure
 		} else {
-			job.snap.Store(&b)
+			storefrontSnap.Store(&b)
 		}
 	}
 }
@@ -455,7 +462,7 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 		ok(w, map[string]any{"number": number, "total": total})
 		return
 	}
-	refresh()
+	refreshProducts()
 	bill.number, bill.total, bill.area, bill.payment = number, total, zone.Label, pay.Label
 	details := bill.text()
 	go notify(fmt.Sprintf("New order %s: ৳%d", number, total),
