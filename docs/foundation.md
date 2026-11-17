@@ -30,6 +30,18 @@ Then run UI checks with `SHOP_URL=http://127.0.0.1:18787`. The isolated process 
 
 `BUILD_ENV=local|preview|production` controls the static artifact. The default is preview. Non-production output adds a site-wide `X-Robots-Tag: noindex, nofollow`, robots disallow and HTML noindex. Production builds require `CATALOG_URL`, `BUILD_ID`, `BUILD_KEY` and `PUBLIC_TURNSTILE_SITE`, preventing seed fallback or botless production output. `SITE_ORIGIN` controls canonical URLs; set the intended preview or production origin explicitly. Indexing controls are not authentication.
 
+## First publication through an older deployed Worker
+
+If the API was updated before the Worker, browser writes can return `cross-site request refused`: the old Worker does not yet send `X-Shop-Host`. Bootstrap explicitly from a terminal, with the existing live admin password entered privately:
+
+```sh
+python3 scripts/bootstrap-publish.py https://YOUR-PREVIEW.workers.dev
+```
+
+This helper sends a descriptive application User-Agent, which avoids the Cloudflare `1010` rejection reproduced with Python's default urllib client on workers.dev. It never sets a browser Origin or forwards the credential through redirects. It requests an ordinary authenticated admin Publish; the resulting full deployment installs the updated Worker and its trusted host header. After a successful deployment, use the browser Publish button normally. Keep origin/CSRF checks enabled. Source: [Cloudflare error 1010 guidance](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1010/).
+
+Use the existing `ADMIN_TOKEN` here, not `PUBLISH_TOKEN`. If a publishing credential is pasted into chat or another shared location, replace `PUBLISH_TOKEN` in both Render and GitHub before proceeding; never put either value in a committed file or a command argument.
+
 ## Schema and startup
 
 The migration runner holds a PostgreSQL transaction advisory lock, applies baseline schema and foundation migration atomically, and records SHA-256 checksums in `schema_migrations`. It adopts an existing schema using its idempotent baseline, then adds the new fields/tables/triggers. Repeat starts do not repeat migrations. To change a deployed schema, append another migration entry/file; do not edit an applied migration, whose changed checksum stops readiness. Content updates retain their existing once-only IDs and owner-rewrite protection.
@@ -46,7 +58,9 @@ The migration runner holds a PostgreSQL transaction advisory lock, applies basel
 
 New routes: scoped-token POST `/api/publish/prepare`; build-key GET `/api/build/{id}`; build-key POST `/api/build/{id}/result` with state/commit; admin GET `/api/admin/publish`. None accepts a callback based only on a guessed release ID. Build credentials expire after one day and cannot access customer/account/admin data. Never place the build key in a URL or committed file.
 
-A successfully deployed artifact with a failed/unreachable acknowledgment remains pending rather than claiming success. Inspect the visible `release.json`, then retry the authenticated callback via the workflow once connectivity returns; do not blindly redeploy an older artifact. Restoring the API from an old database also requires reconciling the visible artifact/release state before publication.
+The confirmation script retries unavailable, stale or malformed `release.json` responses up to twelve times, checking both release ID and code commit on every attempt. The metadata response is not cached and requests carry a release-specific query parameter. HTML error pages are summarized as HTTP/content-type errors rather than dumped into workflow logs. Only a matching artifact permits the publication callback.
+
+If a past workflow has already recorded the release as failed, trigger a **new** Publish from admin after installing the fix. Do not re-run that old job: terminal failed releases are intentionally not converted into successful releases by a late callback. An artifact may be deployed even when its acknowledgment failed; inspect the visible metadata when diagnosing it. Restoring the API from an old database also requires reconciling the visible artifact/release state before publication.
 
 Image replacements/deletions queue retired URLs instead of destroying old assets on Save. Cleanup always checks current data, the last two confirmed publications and current queued/running publications. Explicit cleanup of abandoned uploads remains available; empty cleanup requests sweep queued retirements older than 30 days. Retired originals protected by a rollback release remain retained beyond the grace period. Keep at least those two known working releases and their assets. Release payload retention keeps the newest ten records plus the two latest published records and records under one day old. Quota monitoring is still needed; this policy is not an unlimited Cloudinary budget.
 
@@ -65,6 +79,6 @@ Use a scoped Cloudflare Workers token, a selected-repository dispatch token with
 1. Review and push these changes through your normal code-review process when ready to install them; pushing main may deploy under the existing workflow. No domain change is required.
 2. In Render, set `APP_ENV` deliberately. For production set `TURNSTILE_SITE` to the same public key used by the build, with its existing matching secret. Configure production only after its widget is present. Use an isolated preview environment for initial verification.
 3. Generate a separate random `PUBLISH_TOKEN` (32+ characters). Save it in Render and as the GitHub Actions secret `PUBLISH_TOKEN`; never copy your admin password into GitHub. Set `CATALOG_URL`, `STORE_URL`, `SITE_ORIGIN` and `STORE_ENV=preview` to the intended preview deployment. Keep the Cloudflare deployment credentials in their existing Actions secrets.
-4. Deploy the API changes first. Then use admin Publish to bootstrap a confirmed frozen catalog through the new workflow. Verify a failed build retains pending edits, a successful build clears only its revision, another admin device sees status, and replaced images stay available.
+4. Deploy the API changes first. Then use the first-publication helper above if the older Worker refuses browser Publish, to bootstrap a confirmed frozen catalog through the new workflow. Verify a failed build retains pending edits, a successful build clears only its revision, another admin device sees status, and replaced images stay available.
 5. Enable main-branch protection once the security workflow is installed; verify 2FA/recovery ownership on the other service accounts. These account-level acceptance steps and the real cloud publication/callback checks remain pending.
 6. Restart your ordinary `./scripts/dev.sh` when you want to use the new API locally. Existing data is migrated in place; do not erase `lbpg`. Test an upgrade on a copied/throwaway database first before applying it to business data.

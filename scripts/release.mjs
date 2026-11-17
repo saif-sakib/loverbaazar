@@ -1,8 +1,9 @@
 // All credentials arrive via environment/event files, never command arguments or logs.
 import {readFile,appendFile} from 'node:fs/promises';
+import {verifyDeployment} from './release-verification.mjs';
 const mode=process.argv[2], origin=new URL(process.env.CATALOG_URL).origin;
 async function request(path,body,headers={}) {
- const r=await fetch(origin+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...headers},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(90000)});
+ const r=await fetch(origin+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','User-Agent':'loverbaazar-release/1.0',...headers},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(90000)});
  if(!r.ok) throw new Error(`Release API returned ${r.status}`);
  return r.json();
 }
@@ -16,8 +17,7 @@ if(mode==='init') {
 } else {
  if(!process.env.BUILD_ID)process.exit(0);
  if(mode==='published'){
-  const r=await fetch(new URL('/release.json',process.env.STORE_URL||origin),{cache:'no-store',signal:AbortSignal.timeout(30000)});
-  const visible=await r.json();if(!r.ok||visible.id!==process.env.BUILD_ID||visible.commit!==process.env.GITHUB_SHA)throw new Error('Deployed release did not match');
+  await verifyDeployment({storeURL:process.env.STORE_URL||origin,id:process.env.BUILD_ID,commit:process.env.GITHUB_SHA,report:message=>console.log(message)});
  }
  await request(`/api/build/${process.env.BUILD_ID}/result`,{State:mode,Commit:process.env.GITHUB_SHA},{'X-Build-Key':process.env.BUILD_KEY});
 }
