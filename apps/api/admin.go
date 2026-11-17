@@ -16,7 +16,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -266,8 +265,7 @@ func adminProducts(w http.ResponseWriter, r *http.Request) {
 }
 
 func wholeNumber(v any) (int64, bool) {
-	f, isNum := v.(float64)
-	return int64(f), isNum && f >= 0 && f == float64(int64(f))
+	return integer(v, 0, maxMoney)
 }
 
 // adminSaveProduct creates (POST) or replaces (PUT) a product. Stock is never written as a number:
@@ -282,13 +280,33 @@ func adminSaveProduct(w http.ResponseWriter, r *http.Request) {
 	name, _ := p["name"].(string)
 	price, a := wholeNumber(p["price"])
 	regular, b := wholeNumber(p["regular"])
-	if !a || !b || strings.TrimSpace(name) == "" || !slugRe.MatchString(slug) {
+	if !a || !b || strings.TrimSpace(name) == "" || !safeSlug(slug, false) {
 		fail(w, 400, "name, a URL slug without spaces, and whole-taka prices are required")
 		return
 	}
 	regular = max(regular, price)
-	delta, _ := p["stockDelta"].(float64)
-	stock, _ := wholeNumber(p["stock"])
+	delta := int64(0)
+	if v, ok := p["stockDelta"]; ok {
+		var valid bool
+		delta, valid = integer(v, -maxStock, maxStock)
+		if !valid {
+			fail(w, 400, "stockDelta must be a bounded whole number")
+			return
+		}
+	}
+	stock := int64(0)
+	if v, ok := p["stock"]; ok {
+		var valid bool
+		stock, valid = integer(v, 0, maxStock)
+		if !valid {
+			fail(w, 400, "invalid initial stock")
+			return
+		}
+	}
+	if err := checkProduct(p); err != nil {
+		fail(w, 400, err.Error())
+		return
+	}
 	active, isSet := p["active"].(bool)
 	if !isSet {
 		active = true
@@ -302,6 +320,19 @@ func adminSaveProduct(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ctx := r.Context()
+	for key, kind := range map[string]string{"cats": "cat", "tags": "tag"} {
+		for _, v := range p[key].([]any) {
+			var exists bool
+			if e := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM content WHERE kind=$1 AND slug=$2)`, kind, v.(string)).Scan(&exists); e != nil {
+				oops(w, e)
+				return
+			}
+			if !exists {
+				fail(w, 400, "unknown category or tag")
+				return
+			}
+		}
+	}
 	var err error
 	var oldImages []any
 	if r.Method == http.MethodPost {
@@ -315,7 +346,7 @@ func adminSaveProduct(w http.ResponseWriter, r *http.Request) {
 		j, _ := json.Marshal(p)
 		var tag pgconn.CommandTag
 		db.QueryRow(ctx, `SELECT data->'images' FROM products WHERE id=$1`, id).Scan(&oldImages)
-		tag, err = db.Exec(ctx, `UPDATE products SET slug=$2,price=$3,regular=$4,stock=GREATEST(stock+$5,0),active=$6,data=$7::jsonb WHERE id=$1`, id, slug, price, regular, int64(delta), active, string(j))
+		tag, err = db.Exec(ctx, `UPDATE products SET slug=$2,price=$3,regular=$4,stock=GREATEST(stock+$5,0),active=$6,data=$7::jsonb WHERE id=$1`, id, slug, price, regular, delta, active, string(j))
 		if err == nil && tag.RowsAffected() == 0 {
 			fail(w, 404, "product not found")
 			return
@@ -343,7 +374,7 @@ func adminQuickEdit(w http.ResponseWriter, r *http.Request) {
 	if !read(w, r, &in) {
 		return
 	}
-	if (in.Price != nil && *in.Price < 0) || (in.Regular != nil && *in.Regular < 0) {
+	if (in.Price != nil && (*in.Price < 0 || *in.Price > maxMoney)) || (in.Regular != nil && (*in.Regular < 0 || *in.Regular > maxMoney)) || in.StockDelta < -maxStock || in.StockDelta > maxStock {
 		fail(w, 400, "prices cannot be negative")
 		return
 	}
@@ -414,11 +445,14 @@ func adminSaveContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slug := chi.URLParam(r, "slug")
-	if !slugRe.MatchString(slug) {
+	if !safeSlug(slug, false) {
 		fail(w, 400, "the URL slug can only use letters, numbers and dashes")
 		return
 	}
 	d["slug"] = slug
+	if raw, ok := d["html"].(string); ok {
+		d["html"] = cleanHTML(raw)
+	}
 	label, field := "title", "title"
 	if kind == "cat" || kind == "tag" {
 		label, field = "name", "name"
@@ -435,7 +469,7 @@ func adminSaveContent(w http.ResponseWriter, r *http.Request) {
 			path = slug
 			d["path"] = path
 		}
-		if !pathRe.MatchString(path) || (path != slug && !strings.HasSuffix(path, "/"+slug)) {
+		if !safeSlug(path, true) || (path != slug && !strings.HasSuffix(path, "/"+slug)) {
 			fail(w, 400, "that category path is not valid")
 			return
 		}
@@ -523,7 +557,7 @@ func adminSaveCoupon(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "use 2 to 40 letters and numbers for the code")
 		return
 	}
-	if (in.Kind != "percent" && in.Kind != "amount") || in.Value < 1 || (in.Kind == "percent" && in.Value > 100) || in.MinOrder < 0 || in.MaxUses < 0 {
+	if (in.Kind != "percent" && in.Kind != "amount") || in.Value < 1 || (in.Kind == "percent" && in.Value > 100) || in.MinOrder < 0 || in.MinOrder > maxMoney || in.Value > maxMoney || in.MaxUses < 0 {
 		fail(w, 400, "please check the discount: a percent must be 1 to 100")
 		return
 	}
@@ -610,7 +644,7 @@ func validLive(l Live) error {
 	}
 	seen := map[string]bool{}
 	for _, z := range l.Delivery {
-		if !idRe.MatchString(z.ID) || z.Label == "" || z.Fee < 0 || seen[z.ID] {
+		if !idRe.MatchString(z.ID) || z.Label == "" || z.Fee < 0 || z.Fee > maxMoney || seen[z.ID] {
 			return userErr{400, "each delivery area needs its own name and a charge of 0 or more"}
 		}
 		seen[z.ID] = true
@@ -627,7 +661,7 @@ func validLive(l Live) error {
 	if !open {
 		return userErr{400, "keep at least one payment method turned on"}
 	}
-	if l.FreeOver < 0 || l.MinOrder < 0 || l.LowStock < 0 || l.MaxPending < 0 {
+	if l.FreeOver < 0 || l.MinOrder < 0 || l.MinOrder > maxMoney || l.FreeOver > maxMoney || l.LowStock < 0 || l.MaxPending < 0 {
 		return userErr{400, "amounts cannot be negative"}
 	}
 	return nil
@@ -658,6 +692,10 @@ func adminSaveSettings(w http.ResponseWriter, r *http.Request) {
 			fail(w, 400, "please choose valid colours")
 			return
 		}
+	}
+	if !validateURLs(in.Site) {
+		fail(w, 400, "invalid website link or image URL")
+		return
 	}
 	live, _ := json.Marshal(in.Live)
 	site, _ := json.Marshal(in.Site)
@@ -735,6 +773,20 @@ func adminCleanupImages(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
+	if len(in.URLs) == 0 {
+		rows, e := db.Query(ctx, `SELECT url FROM retired_images WHERE retired_at<now()-interval '30 days'`)
+		if e != nil {
+			oops(w, e)
+			return
+		}
+		for rows.Next() {
+			var u string
+			if rows.Scan(&u) == nil {
+				in.URLs = append(in.URLs, u)
+			}
+		}
+		rows.Close()
+	}
 	dropURLs(ctx, in.URLs)
 	done(w)
 }
@@ -862,6 +914,14 @@ func extractImageRefs(raw string) []string {
 }
 
 func isImageRefUsed(ctx context.Context, needle string) bool {
+	var retired bool
+	if e := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM retired_images WHERE strpos(url,$1)>0 AND retired_at>now()-interval '30 days')`, needle).Scan(&retired); e != nil || retired {
+		return true
+	}
+	var protected bool
+	if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM releases WHERE (id IN (SELECT id FROM releases WHERE state='published' ORDER BY created_at DESC LIMIT 2) OR (state IN ('queued','running') AND created_at>now()-interval '1 day')) AND strpos(payload::text,$1)>0)`, needle).Scan(&protected); err != nil || protected {
+		return true
+	}
 	if needle == "" {
 		return false
 	}
@@ -869,7 +929,7 @@ func isImageRefUsed(ctx context.Context, needle string) bool {
 	err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM products WHERE position($1 in data::text)>0)
 		OR EXISTS(SELECT 1 FROM content WHERE position($1 in data::text)>0)
 		OR EXISTS(SELECT 1 FROM settings WHERE position($1 in data::text)>0)`, needle).Scan(&used)
-	return err == nil && used
+	return err != nil || used
 }
 
 func imageURLs(list []any) []string {
@@ -948,7 +1008,7 @@ func dropURLs(ctx context.Context, urls []string) {
 func dropOldURLs(urls []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	dropURLs(ctx, urls)
+	queueImages(ctx, urls)
 }
 
 // dropImages frees Cloudinary (and local dev) space. Call it with `go`: a failure here must never hold up a save.
@@ -992,37 +1052,4 @@ func cloudinaryDelete(id string) error {
 }
 
 // adminPublish rebuilds the static storefront from the database.
-func adminPublish(w http.ResponseWriter, r *http.Request) {
-	if dir := os.Getenv("DEV_BUILD_DIR"); dir != "" {
-		go func() { // the rebuild restarts the local dev server, so it cannot finish inside this request
-			cmd := exec.Command("npx", "astro", "build")
-			cmd.Dir = dir
-			cmd.Env = append(os.Environ(), "CATALOG_URL=http://127.0.0.1:"+os.Getenv("PORT")+"/api/catalog")
-			if out, err := cmd.CombinedOutput(); err != nil {
-				log.Printf("build: %s", out)
-			}
-		}()
-		ok(w, map[string]string{"message": "Rebuilding the storefront. Refresh the shop in about 20 seconds."})
-		return
-	}
-	repo, tok := os.Getenv("GITHUB_REPO"), os.Getenv("GITHUB_TOKEN")
-	if repo == "" || tok == "" {
-		fail(w, 501, "publishing is not configured")
-		return
-	}
-	req, _ := http.NewRequestWithContext(r.Context(), "POST", "https://api.github.com/repos/"+repo+"/dispatches", strings.NewReader(`{"event_type":"publish"}`))
-	req.Header.Set("Authorization", "Bearer "+tok)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	res, err := httpClient.Do(req)
-	if err != nil {
-		oops(w, err)
-		return
-	}
-	res.Body.Close()
-	if res.StatusCode >= 300 {
-		log.Print("github dispatch: status ", res.StatusCode)
-		fail(w, 502, "GitHub refused the publish request. Check GITHUB_TOKEN on Render")
-		return
-	}
-	ok(w, map[string]string{"message": "Rebuild started. The shop updates in about 3 minutes."})
-}
+func adminPublish(w http.ResponseWriter, r *http.Request) { startPublish(w, r) }

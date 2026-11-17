@@ -29,6 +29,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -57,7 +58,7 @@ var (
 func main() {
 	ctx := context.Background()
 	if err := connect(ctx); err != nil {
-		log.Fatal(err)
+		log.Fatal("invalid database configuration")
 	}
 	if len(os.Args) >= 3 && os.Args[1] == "seed" {
 		content := ""
@@ -69,22 +70,28 @@ func main() {
 		}
 		return
 	}
+	if err := checkRuntime(); err != nil {
+		log.Fatal(err)
+	}
 	if !dev {
 		if err := checkConfig(os.Getenv("DATABASE_URL"), os.Getenv("ADMIN_TOKEN"), os.Getenv("ORIGIN_SECRET")); err != nil {
-			log.Fatal("STARTUP STOPPED: ", err, ". Fix it in Render, under Environment, then redeploy")
+			log.Fatal(err)
 		}
 	}
+
 	go func() { // in the background, so /api/health answers even while the database wakes up
 		c, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		if _, err := db.Exec(c, schema); err != nil {
+		if err := migrate(c); err != nil {
 			log.Print("schema: ", err)
 			return
 		}
 		if err := applyContentUpdates(c); err != nil {
-			log.Print("content updates: ", err)
+			log.Print("content updates failed")
+			return
 		}
 		refresh()
+		loadBuilds(c)
 	}()
 	addr := "127.0.0.1:8080"
 	if p := os.Getenv("PORT"); p != "" {
@@ -134,7 +141,7 @@ func connect(ctx context.Context) error {
 // seed loads the imported catalogue. It is safe to re-run: existing products are left alone, and
 // content of a kind the shop already has is skipped, so anything the admin deleted stays deleted.
 func seed(ctx context.Context, productsFile, contentFile string) error {
-	if _, err := db.Exec(ctx, schema); err != nil {
+	if err := migrate(ctx); err != nil {
 		return err
 	}
 	b, err := os.ReadFile(productsFile)
@@ -258,11 +265,15 @@ func applyContentUpdates(ctx context.Context) error {
 
 func router() http.Handler {
 	r := chi.NewRouter()
-	r.Use(middleware.Recoverer, middleware.Timeout(45*time.Second), originGuard)
+	r.Use(middleware.Recoverer, middleware.Timeout(45*time.Second), originGuard, requestGuard)
 	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	r.With(middleware.Compress(5)).Get("/api/catalog", catalog)
 	r.With(middleware.Compress(5)).Get("/api/storefront", storefront)
 	r.Get("/api/stock", stockFile)
+	r.Get("/api/ready", readyFile)
+	r.Get("/api/build/{id}", buildFile)
+	r.Post("/api/publish/prepare", prepareRelease)
+	r.Post("/api/build/{id}/result", buildResult)
 	r.With(limit(30, 10*time.Minute)).Post("/api/checkout", checkout)
 	r.With(limit(30, 10*time.Minute)).Post("/api/coupon", couponPreview)
 	r.With(limit(30, 5*time.Minute)).Get("/api/track", track)
@@ -303,6 +314,7 @@ func router() http.Handler {
 		a.Post("/image", adminImage)
 		a.Post("/image/cleanup", adminCleanupImages)
 		a.Post("/publish", adminPublish)
+		a.Get("/publish", publishStatus)
 	})
 	return r
 }
@@ -410,11 +422,7 @@ func fail(w http.ResponseWriter, code int, msg string) {
 }
 
 func read(w http.ResponseWriter, r *http.Request, v any) bool {
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(v); err != nil {
-		fail(w, 400, "invalid request")
-		return false
-	}
-	return true
+	return decodeJSON(w, r, v)
 }
 
 func oops(w http.ResponseWriter, err error) {
@@ -423,7 +431,12 @@ func oops(w http.ResponseWriter, err error) {
 		fail(w, ue.code, ue.msg)
 		return
 	}
-	log.Print(err)
+	var pgerr *pgconn.PgError
+	if errors.As(err, &pgerr) {
+		log.Print("database error code: ", pgerr.Code)
+	} else {
+		log.Printf("internal error type: %T", err)
+	}
 	fail(w, 500, "something went wrong, please call us")
 }
 

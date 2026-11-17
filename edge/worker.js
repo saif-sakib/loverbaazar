@@ -1,6 +1,7 @@
 // Forwards /api/* to the Go API. Static pages never run this code.
 const forward = (request, env, url, init = {}) => {
   const headers = new Headers(request.headers);
+  headers.set("X-Shop-Host", new URL(request.url).host);
   headers.delete("Host"); // Render routes by host name, so it must see its own
   headers.set("X-Origin-Secret", env.ORIGIN_SECRET);
   // Set here, not read from the browser, so nobody can dodge the API's rate limits.
@@ -78,7 +79,7 @@ export default {
     } catch {
       return new Response('{"error":"The shop is busy right now. Please try again in a minute."}', {
         status: 503,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
       });
     }
   },

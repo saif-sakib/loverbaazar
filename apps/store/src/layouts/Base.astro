@@ -58,7 +58,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     <meta name="description" content={description} />
     <meta
       name="robots"
-      content={noindex
+      content={noindex || import.meta.env.BUILD_ENV!=="production"
         ? "noindex, nofollow"
         : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}
     />

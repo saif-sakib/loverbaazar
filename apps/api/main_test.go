@@ -129,7 +129,7 @@ const adminKey = "test-admin-token-test-admin-token-1234"
 func TestMain(m *testing.M) {
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url != "" {
-		if !strings.Contains(url, "127.0.0.1") && !strings.Contains(url, "localhost") {
+		if !safeTestDatabase(url) {
 			panic("TEST_DATABASE_URL must be a local database: these tests erase every table")
 		}
 		dev = true
@@ -138,7 +138,7 @@ func TestMain(m *testing.M) {
 		if err := connect(bg); err != nil {
 			panic(err)
 		}
-		if _, err := db.Exec(bg, schema); err != nil {
+		if err := migrate(bg); err != nil {
 			panic(err)
 		}
 		api = httptest.NewServer(router())
@@ -152,7 +152,7 @@ func reset(t *testing.T) {
 	if api == nil {
 		t.Skip("needs TEST_DATABASE_URL")
 	}
-	if _, err := db.Exec(bg, `TRUNCATE applied,products,users,sessions,orders,order_items,order_events,messages,settings,content,coupons,reviews RESTART IDENTITY CASCADE`); err != nil {
+	if _, err := db.Exec(bg, `TRUNCATE releases,retired_images,applied,products,users,sessions,orders,order_items,order_events,messages,settings,content,coupons,reviews RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	// Fixed charges here, so the tests don't depend on what the shop happens to charge today.
@@ -195,6 +195,7 @@ func call(t *testing.T, c *http.Client, method, path string, body any, admin boo
 		r = bytes.NewReader(b)
 	}
 	req, _ := http.NewRequest(method, api.URL+path, r)
+	req.Header.Set("Content-Type", "application/json")
 	if admin {
 		req.Header.Set("X-Admin-Token", adminKey)
 	}
@@ -864,15 +865,8 @@ func TestImageCleanupAndSafeUploadPlace(t *testing.T) {
 	}, true); code != 200 {
 		t.Fatalf("update settings failed %d: %s", code, body)
 	}
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if _, err := os.Stat(savedFile); os.IsNotExist(err) {
-			break
-		}
-		time.Sleep(25 * time.Millisecond)
-	}
-	if _, err := os.Stat(savedFile); !os.IsNotExist(err) {
-		t.Errorf("old settings logo was not removed after saving settings: %v", err)
+	if _, err := os.Stat(savedFile); err != nil {
+		t.Errorf("previous release image must survive save: %v", err)
 	}
 
 	// 3. safeUploadPlace avoids overwriting a Cloudinary public_id already referenced in DB.

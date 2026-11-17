@@ -1,27 +1,58 @@
 #!/usr/bin/env bash
-# Starts everything locally. Run from anywhere: ./scripts/dev.sh  (Ctrl+C stops it)
+# Full local stack. LB_ISOLATED=1 creates and removes task-owned fixtures.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-# Optional services for local testing. The local values below always win, so a .env can't reach production.
-if [ -f "$ROOT/.env" ]; then set -a; . "$ROOT/.env"; set +a; fi
-docker start lbpg >/dev/null 2>&1 || docker run -d --name lbpg -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb -p 55432:5432 postgres:17-alpine >/dev/null
-until docker exec lbpg pg_isready -U postgres -d lb -q; do sleep 0.5; done; sleep 1
-export DATABASE_URL='postgres://postgres:dev@127.0.0.1:55432/lb?sslmode=disable' DEV=1 PORT=8080
+if [[ -f "$ROOT/.env" ]]; then set -a; source "$ROOT/.env"; set +a; fi
+for tool in docker go node npm curl python3 setsid; do command -v "$tool" >/dev/null || { echo "Install $tool first" >&2; exit 1; }; done
+api_port=${LB_API_PORT:-8080}; store_port=${LB_STORE_PORT:-8787}; db_port=${LB_DB_PORT:-55432}
+python3 - "$api_port" "$store_port" "$db_port" <<'PY'
+import socket,sys
+ports=[int(p) for p in sys.argv[1:]]
+if len(set(ports))!=3 or any(p<1024 or p>65535 for p in ports): raise SystemExit('Choose three distinct local ports above 1023')
+for port in ports[:2]:
+    with socket.socket() as s:
+        try:s.bind(('127.0.0.1',port))
+        except OSError:raise SystemExit(f'Port {port} is in use; leave the existing process running or stop its owner first.')
+PY
+task_dir=$(mktemp -d); API=''; EDGE=''; db_name=lbpg
+cleanup() {
+ [[ -z "$EDGE" ]] || kill -- "-$EDGE" 2>/dev/null || true
+ [[ -z "$API" ]] || kill "$API" 2>/dev/null || true
+ if [[ ${LB_ISOLATED:-0} == 1 ]]; then docker rm -f "$db_name" >/dev/null 2>&1 || true; fi
+ rm -rf "$task_dir"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+if [[ ${LB_ISOLATED:-0} == 1 ]]; then
+ db_name="lb-dev-test-$$"
+ docker run -d --rm --name "$db_name" -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb -p "127.0.0.1:$db_port:5432" postgres:17-alpine >/dev/null
+else
+ docker start lbpg >/dev/null 2>&1 || docker run -d --name lbpg -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb -p "127.0.0.1:$db_port:5432" postgres:17-alpine >/dev/null
+fi
+for attempt in {1..60}; do
+ if docker exec "$db_name" pg_isready -U postgres -d lb -q; then break; fi
+ [[ $attempt != 60 ]] || { echo 'Local database startup timed out' >&2; exit 1; }; sleep 0.5
+done
+export APP_ENV=local DEV=1 PORT="$api_port"
+export DATABASE_URL="postgres://postgres:dev@127.0.0.1:$db_port/lb?sslmode=disable"
 export ADMIN_TOKEN=local-admin-token-for-this-computer-only
-# Local tests must not use production bot checks or send real order emails.
-unset ORIGIN_SECRET TURNSTILE_SECRET PUBLIC_TURNSTILE_SITE BREVO_KEY
+unset ORIGIN_SECRET TURNSTILE_SECRET TURNSTILE_SITE PUBLIC_TURNSTILE_SITE BREVO_KEY GITHUB_TOKEN GITHUB_REPO PUBLISH_TOKEN
 export LOCAL_UPLOADS="$ROOT/apps/store/public/uploads" DEV_BUILD_DIR="$ROOT/apps/store"
 cd "$ROOT/apps/store"
-[ -d node_modules ] || npm i --no-audit --no-fund
-BIN="$(mktemp -d)/api"
+[[ -d node_modules ]] || npm ci --no-audit --no-fund
+BIN="$task_dir/api"
 (cd "$ROOT/apps/api" && go build -o "$BIN" . && "$BIN" seed seed/products.json ../store/src/data/content.json)
+export BUILD_OUTPUT="$ROOT/apps/store/dist"
+if [[ ${LB_ISOLATED:-0} == 1 ]]; then export BUILD_OUTPUT="$task_dir/store"; fi
 "$BIN" & API=$!
-trap 'kill $API 2>/dev/null' EXIT
-# Health answers before snapshots are ready; the build needs the catalogue in memory.
-until curl -sf http://127.0.0.1:8080/api/catalog >/dev/null; do
-  kill -0 "$API" 2>/dev/null || exit 1
-  sleep 0.2
+for attempt in {1..150}; do
+ if curl --max-time 2 -sf "http://127.0.0.1:$api_port/api/ready" >/dev/null; then break; fi
+ [[ $attempt != 150 ]] || { echo 'API readiness timed out' >&2; exit 1; }
+ kill -0 "$API" 2>/dev/null || exit 1; sleep 0.2
 done
-CATALOG_URL=http://127.0.0.1:8080/api/catalog npx astro build >/dev/null
-echo; echo "  Shop:  http://127.0.0.1:8787/"; echo "  Admin: http://127.0.0.1:8787/admin/"; echo "  Admin token: $ADMIN_TOKEN (local only)"; echo
-WRANGLER_SEND_METRICS=false npx wrangler dev --port 8787 --ip 127.0.0.1 --var API_ORIGIN:http://127.0.0.1:8080 --var ORIGIN_SECRET:dev
+export BUILD_ENV=local CATALOG_URL="http://127.0.0.1:$api_port/api/catalog"
+node node_modules/astro/astro.js build --outDir "$BUILD_OUTPUT" >/dev/null
+printf '\nShop: http://127.0.0.1:%s/\nAdmin: http://127.0.0.1:%s/admin/\n' "$store_port" "$store_port"
+WRANGLER_SEND_METRICS=false setsid npx wrangler dev --assets "$BUILD_OUTPUT" --port "$store_port" --ip 127.0.0.1 --var "API_ORIGIN:http://127.0.0.1:$api_port" --var ORIGIN_SECRET:dev & EDGE=$!
+wait "$EDGE"

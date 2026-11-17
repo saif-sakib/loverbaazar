@@ -4,11 +4,11 @@ description: Check LoverBaazar still works after a change to checkout, stock, ad
 ---
 First run the API tests against a throwaway database, never `lbpg` (they erase every table):
 
-    docker run -d --rm --name lbtest -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb -p 55433:5432 postgres:17-alpine
-    cd apps/api && TEST_DATABASE_URL='postgres://postgres:dev@127.0.0.1:55433/lb?sslmode=disable' go test -count=1 .
-    docker rm -f lbtest
+    ./scripts/test-api.sh
 
-Then start with the `run-local` skill and check by hand with `curl`, using `A=127.0.0.1:8787/api`:
+The script owns a disposable loopback PostgreSQL container named `lb-test-*` and database `lb_test`; it removes that container afterward. Manual URLs must use a disposable database named `lb_test`; `lb`/`lbpg` and remote/host-override URLs are refused.
+
+Then start an isolated full-stack fixture with `LB_ISOLATED=1 ./scripts/dev.sh` (or the alternate ports in docs/foundation.md). Never change ordinary local-shop data for these checks. Check by hand with `curl`, using `A=127.0.0.1:8787/api`:
 
 1. POST `$A/checkout` with an extra `"price":1`. The total must use the database price.
 2. Set one product to `stock=1` and send 20 parallel checkouts. Expect one 200 and nineteen 409.

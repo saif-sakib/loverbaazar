@@ -2,6 +2,7 @@ name: Nightly backup
 on:
   schedule: [{ cron: "0 20 * * *" }] # 02:00 Bangladesh time
   workflow_dispatch:
+permissions: { contents: read }
 jobs:
   backup:
     runs-on: ubuntu-latest
@@ -13,5 +14,5 @@ jobs:
           set -o pipefail
           docker run --rm postgres:17-alpine pg_dump "$DB" -Fc | gpg --batch --yes --pinentry-mode loopback --passphrase "$PASS" --symmetric -o backup.dump.gpg
           test -s backup.dump.gpg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with: { name: "backup-${{ github.run_number }}", path: backup.dump.gpg, retention-days: 30 }

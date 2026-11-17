@@ -206,7 +206,7 @@ test('admin failed saves retain edits and never publish; double submit sends onc
     writes++; await gate;
     return r.fulfill({ status: 503, json: { error: 'Try saving again' } });
   });
-  await context.route('**/api/admin/publish', r => { publishes++; return r.fulfill({ json: {} }); });
+  await context.route('**/api/admin/publish', r => { if(r.request().method()==='GET') return r.continue(); publishes++; return r.fulfill({ json: {} }); });
   await ready(page, '/admin/#shop');
   await page.locator('[name="name"]').fill('Unsaved shop name');
   await page.locator('#savepub').click();
@@ -229,7 +229,7 @@ test('invalid settings cannot publish and a later Save does not publish unexpect
     if (r.request().method() !== 'PUT') return r.continue();
     writes++; return r.fulfill({ json: {} });
   });
-  await context.route('**/api/admin/publish', r => { publishes++; return r.fulfill({ json: {} }); });
+  await context.route('**/api/admin/publish', r => { if(r.request().method()==='GET') return r.continue(); publishes++; return r.fulfill({ json: {} }); });
   await ready(page, '/admin/#shop');
   await page.locator('[name="email"]').fill('invalid-email');
   await page.locator('#savepub').click();
@@ -264,4 +264,32 @@ test('saved stock is retried once so a newly published product becomes available
   assert.equal(await page.locator('[data-add="1"]').isDisabled(), true);
   await page.waitForFunction(() => !document.querySelector('[data-add="1"]').disabled, null, { timeout: 10000 });
   assert.equal(requests, 2);
+}));
+
+test('queued publication keeps pending changes until deployment is confirmed',()=>shop(async(page,context)=>{
+ await page.addInitScript(()=>sessionStorage.setItem('t','local-admin-token-for-this-computer-only'));
+ let state='queued';
+ await context.route('**/api/admin/publish',r=>r.fulfill({json:r.request().method()==='POST'?{message:'Queued'}:{dirty:state!=='published',latest:{state}}}));
+ await ready(page,'/admin/');
+ await page.locator('#pub2').click();
+ assert.equal(await page.locator('#dirtybar').isVisible(),true);
+ state='published';
+ await page.waitForFunction(()=>document.querySelector('#dirtybar').hidden,null,{timeout:10000});
+}));
+
+test('a stale publication status response cannot clear newly saved edits',()=>shop(async(page,context)=>{
+ await page.addInitScript(()=>sessionStorage.setItem('t','local-admin-token-for-this-computer-only'));
+ let release;
+ const gate=new Promise(resolve=>{release=resolve;});
+ await context.route('**/api/admin/publish',async r=>{await gate;return r.fulfill({json:{dirty:false,latest:{state:'published'}}});});
+ await context.route('**/api/admin/settings',r=>r.request().method()==='PUT'?r.fulfill({json:{}}):r.continue());
+ try {
+  await page.goto('/admin/#shop');
+  await page.locator('[name="name"]').fill('Newly saved shop');
+  await page.locator('#sf .stick button').first().click();
+  await page.waitForFunction(()=>document.querySelector('.save-status')?.textContent==='All changes saved');
+  release();
+  await page.waitForLoadState('networkidle');
+  assert.equal(await page.locator('#dirtybar').isVisible(),true);
+ } finally {release();}
 }));

@@ -1,5 +1,7 @@
 # Go Live for $0
 
+> The current release and domain sequence is defined by [roadmap tasks 33 and 42–48](roadmap.md). The [architecture audit](architecture-audit.md) identifies assumptions in this older guide that task 33 must update, including fixed product counts, customer emails and rollback instructions. Finish the roadmap's readiness/data checks and prepare the exact current DNS/mail changes before using the switch steps below. Domain registration stays at Namecheap; canceling WordPress hosting is a later, separately confirmed step.
+
 Follow the steps in order, and finish each **Check** before moving on. It takes 1–2 days, mostly waiting.
 
 Your current WordPress site stays online until Step 11, so nothing customers see changes before then.

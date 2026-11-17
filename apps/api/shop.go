@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -79,7 +78,8 @@ type Live struct {
 }
 
 // loadSettings overlays what the admin saved on defaults.json, so a new setting works without a migration.
-func loadSettings(ctx context.Context) (Live, map[string]any, error) {
+func loadSettings(ctx context.Context) (Live, map[string]any, error) { return settingsFrom(ctx, db) }
+func settingsFrom(ctx context.Context, q querier) (Live, map[string]any, error) {
 	var d struct {
 		Live Live           `json:"live"`
 		Site map[string]any `json:"site"`
@@ -87,7 +87,7 @@ func loadSettings(ctx context.Context) (Live, map[string]any, error) {
 	if err := json.Unmarshal(defaultsJSON, &d); err != nil {
 		return d.Live, nil, err
 	}
-	rows, err := db.Query(ctx, `SELECT key,data::text FROM settings`)
+	rows, err := q.Query(ctx, `SELECT key,data::text FROM settings`)
 	if err != nil {
 		return d.Live, nil, err
 	}
@@ -174,13 +174,24 @@ func catalog(w http.ResponseWriter, r *http.Request) {
 	serveSnap(w, r, &catalogSnap)
 }
 
-func buildCatalog(ctx context.Context) ([]byte, error) {
-	list, err := jsonRows(ctx, `SELECT p.data||jsonb_build_object('price',p.price,'regular',p.regular,'inStock',p.stock>0,
+func buildCatalog(ctx context.Context) ([]byte, error) { return catalogFrom(ctx, db) }
+func catalogFrom(ctx context.Context, q querier) ([]byte, error) {
+	list, err := rowsFrom(ctx, q, `SELECT p.data||jsonb_build_object('price',p.price,'regular',p.regular,'inStock',p.stock>0,
 		'reviews',coalesce((SELECT jsonb_agg(jsonb_build_object('name',r.name,'rating',r.rating,'body',r.body,'date',r.created_at::date) ORDER BY r.id DESC)
 			FROM reviews r WHERE r.product_id=p.id AND r.approved),'[]'::jsonb))
 		FROM products p WHERE p.active ORDER BY p.id DESC`)
 	if err != nil {
 		return nil, err
+	}
+	for i, raw := range list {
+		var p map[string]any
+		if e := json.Unmarshal(raw, &p); e != nil {
+			return nil, e
+		}
+		if d, ok := p["desc"].(string); ok {
+			p["desc"] = cleanHTML(d)
+		}
+		list[i], _ = json.Marshal(p)
 	}
 	return json.Marshal(list)
 }
@@ -190,16 +201,31 @@ func storefront(w http.ResponseWriter, r *http.Request) {
 	serveSnap(w, r, &storefrontSnap)
 }
 
-func buildStorefront(ctx context.Context) ([]byte, error) {
-	live, site, err := loadSettings(ctx)
+func buildStorefront(ctx context.Context) ([]byte, error) { return storefrontFrom(ctx, db) }
+func storefrontFrom(ctx context.Context, q querier) ([]byte, error) {
+	live, site, err := settingsFrom(ctx, q)
 	if err != nil {
 		return nil, err
 	}
 	out := map[string]any{"site": site, "live": live}
 	for key, kind := range map[string]string{"cats": "cat", "tags": "tag", "pages": "page", "posts": "post"} {
-		if out[key], err = jsonRows(ctx, `SELECT data FROM content WHERE kind=$1 AND coalesce(data->>'draft','')<>'true' ORDER BY coalesce(data->>'date','') DESC,slug`, kind); err != nil {
+		if out[key], err = rowsFrom(ctx, q, `SELECT data FROM content WHERE kind=$1 AND coalesce(data->>'draft','')<>'true' ORDER BY coalesce(data->>'date','') DESC,slug`, kind); err != nil {
 			return nil, err
 		}
+	}
+	for _, key := range []string{"pages", "posts"} {
+		list := out[key].([]json.RawMessage)
+		for i, raw := range list {
+			var d map[string]any
+			if e := json.Unmarshal(raw, &d); e != nil {
+				return nil, e
+			}
+			if h, ok := d["html"].(string); ok {
+				d["html"] = cleanHTML(h)
+			}
+			list[i], _ = json.Marshal(d)
+		}
+		out[key] = list
 	}
 	return json.Marshal(out)
 }
@@ -214,7 +240,7 @@ type item struct {
 func mergeItems(in []item) ([]item, error) {
 	qty := map[int64]int{}
 	for _, it := range in {
-		if it.Qty < 1 {
+		if it.ID < 1 || it.Qty < 1 {
 			return nil, userErr{400, "please check the quantities in your cart"}
 		}
 		if it.Qty > maxQty {
@@ -236,7 +262,10 @@ func mergeItems(in []item) ([]item, error) {
 func discountOf(kind string, value, sub int64) int64 {
 	d := value
 	if kind == "percent" {
-		d = sub * value / 100
+		if value < 1 || value > 100 {
+			return 0
+		}
+		d = (sub/100)*value + (sub%100)*value/100
 	}
 	return min(d, sub)
 }
@@ -284,6 +313,10 @@ func couponPreview(w http.ResponseWriter, r *http.Request) {
 	for _, it := range items {
 		var price int64
 		if err := db.QueryRow(ctx, `SELECT price FROM products WHERE id=$1 AND active`, it.ID).Scan(&price); err == nil {
+			if price < 0 || price > maxMoney {
+				fail(w, 400, "product price is outside supported limits")
+				return
+			}
 			sub += price * int64(it.Qty)
 		}
 	}
@@ -335,7 +368,12 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 	if in.Key != "" {
 		var number string
 		var total int64
-		if db.QueryRow(ctx, `SELECT number,total FROM orders WHERE idem=$1`, in.Key).Scan(&number, &total) == nil {
+		var fingerprint string
+		if db.QueryRow(ctx, `SELECT number,total,request_hash FROM orders WHERE idem=$1`, in.Key).Scan(&number, &total, &fingerprint) == nil {
+			if fingerprint != orderFingerprint(in) {
+				fail(w, 409, "this order key belongs to a different request")
+				return
+			}
 			ok(w, map[string]any{"number": number, "total": total})
 			return
 		}
@@ -403,12 +441,19 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		var oid int64
-		err := tx.QueryRow(ctx, `INSERT INTO orders(number,user_id,name,phone,email,address,area,payment,txn_id,note,subtotal,shipping,total,idem)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,0,0,$11) ON CONFLICT(idem) DO NOTHING RETURNING id`,
-			number, uid, in.Name, in.Phone, in.Email, in.Address, zone.Label, pay.Label, in.TxnID, in.Note, idem).Scan(&oid)
+		err := tx.QueryRow(ctx, `INSERT INTO orders(number,user_id,name,phone,email,address,area,payment,txn_id,note,subtotal,shipping,total,idem,request_hash)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,0,0,$11,$12) ON CONFLICT(idem) DO NOTHING RETURNING id`,
+			number, uid, in.Name, in.Phone, in.Email, in.Address, zone.Label, pay.Label, in.TxnID, in.Note, idem, orderFingerprint(in)).Scan(&oid)
 		if errors.Is(err, pgx.ErrNoRows) { // the same order arrived twice at once
 			repeat = true
-			return tx.QueryRow(ctx, `SELECT number,total FROM orders WHERE idem=$1`, in.Key).Scan(&number, &total)
+			var fingerprint string
+			if e := tx.QueryRow(ctx, `SELECT number,total,request_hash FROM orders WHERE idem=$1`, in.Key).Scan(&number, &total, &fingerprint); e != nil {
+				return e
+			}
+			if fingerprint != orderFingerprint(in) {
+				return userErr{409, "this order key belongs to a different request"}
+			}
+			return nil
 		} else if err != nil {
 			return err
 		}
@@ -427,6 +472,9 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 			} else if err != nil {
 				return err
 			}
+			if price < 0 || price > maxMoney {
+				return userErr{400, "product price is outside supported limits"}
+			}
 			sub += price * int64(it.Qty)
 			pieces += it.Qty
 			bill.lines = append(bill.lines, fmt.Sprintf("%s × %d: ৳%d", name, it.Qty, price*int64(it.Qty)))
@@ -441,6 +489,9 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 			if discount, err = useCoupon(ctx, tx, in.Coupon, sub); err != nil {
 				return err
 			}
+		}
+		if zone.Fee < 0 || zone.Fee > maxMoney {
+			return userErr{400, "invalid delivery charge"}
 		}
 		fee := deliveryFee(*zone, live, sub-discount, pieces)
 		total = sub - discount + fee
@@ -517,7 +568,7 @@ func soldOut(ctx context.Context, tx pgx.Tx, id int64) error {
 func human(r *http.Request, tok string) bool {
 	secret := os.Getenv("TURNSTILE_SECRET")
 	if secret == "" {
-		return true
+		return dev || os.Getenv("APP_ENV") == "preview"
 	}
 	body, _ := json.Marshal(map[string]string{"secret": secret, "response": tok, "remoteip": clientIP(r)})
 	res, err := httpClient.Post("https://challenges.cloudflare.com/turnstile/v0/siteverify", "application/json", bytes.NewReader(body))
@@ -527,14 +578,15 @@ func human(r *http.Request, tok string) bool {
 	}
 	defer res.Body.Close()
 	var out struct {
-		Success bool
-		Codes   []string `json:"error-codes"`
+		Success  bool
+		Hostname string
+		Codes    []string `json:"error-codes"`
 	}
 	json.NewDecoder(res.Body).Decode(&out)
 	if !out.Success {
 		log.Print("turnstile: refused ", out.Codes)
 	}
-	return out.Success
+	return out.Success && (dev || strings.EqualFold(out.Hostname, strings.Split(requestHost(r), ":")[0]))
 }
 
 // receipt is an order written out for the emails.
@@ -605,6 +657,9 @@ func notify(subject, text string) {
 
 // sendMail sends a plain text email from SHOP_EMAIL, the sender confirmed in Brevo.
 func sendMail(to []string, subject, text string) {
+	if mode := os.Getenv("APP_ENV"); mode == "local" || mode == "preview" {
+		return
+	}
 	key, from := os.Getenv("BREVO_KEY"), strings.TrimSpace(os.Getenv("SHOP_EMAIL"))
 	seen := map[string]bool{}
 	var list []map[string]string
@@ -628,8 +683,7 @@ func sendMail(to []string, subject, text string) {
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		why, _ := io.ReadAll(io.LimitReader(res.Body, 300))
-		log.Printf("brevo: status %d: %s", res.StatusCode, why)
+		log.Printf("brevo: status %d (inspect provider dashboard for details)", res.StatusCode)
 	}
 }
 

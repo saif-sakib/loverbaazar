@@ -6,11 +6,30 @@ Bangladesh home-appliance shop. Replaces WordPress at loverbaazar.com.
 
 **Stack:** Astro static store and admin (`apps/store`) · Go API, chi + pgx (`apps/api`: `main.go` core, `shop.go` customers, `admin.go` admin) · Cloudflare Worker (`edge/worker.js`) · Neon Postgres · Render Free · Cloudinary · Brevo.
 
+## Roadmap and task execution
+
+- The owner's numbered A-to-Z plan is [docs/roadmap.md](docs/roadmap.md). The architectural audit and verification baseline are in [docs/architecture-audit.md](docs/architecture-audit.md).
+- When the owner says "do task N", use that exact task number, check its dependencies and current implementation, then complete its implementation, relevant tests and documentation. Preserve task numbers; append new tasks instead of renumbering them.
+- Track each task in the roadmap as Planned, In progress, Blocked or Done. Mark Done only with its acceptance checks and evidence recorded. If account access, owner data or an owner-operated step is missing, finish independent work and record the exact remaining action; do not describe the whole task as complete.
+- Planning is not permission to deploy, change DNS, cancel hosting or buy services. The owner will move the domain after readiness and product-data checks pass. Follow the `go-live` skill for the eventual switch; prepare and test the concrete change before requesting any confirmation that skill requires.
+- Keep Namecheap WordPress available through preparation and the agreed rollback period. Keep domain registration at Namecheap. Retire Stellar Plus only after the new store, order handling, backups, assets and replacement email arrangements pass their checks, and the owner authorizes cancellation. Do not incur a hosting renewal to create the overlap.
+- Keep the current free stack until measured limits or business needs justify a migration and the owner explicitly approves a budget. A future Namecheap or other VPS is an option to evaluate then, not a dependency for this launch.
+
+## Mobile-first UI
+
+- Design and implement the storefront and admin for phones first. Start with the narrow layout and progressively enhance it for larger screens; prefer `min-width` breakpoints for new or substantially rewritten styles.
+- Check 320, 360, 375, 390 and 414 px phone widths, then tablet and desktop. No page-level sideways scrolling; wide admin data may use a clearly contained scroll area.
+- Use touch controls at least 44 × 44 CSS px where practical, readable text, visible keyboard focus, labeled fields, useful error/loading/empty states, and accessible contrast. Preserve zoom and reduced-motion preferences.
+- Verify sticky navigation, product buy bars, chat buttons, safe areas and the software keyboard never cover form fields, errors, prices or primary actions. Guest checkout stays the shortest purchase path.
+- Prioritize real Android/iPhone usability and slow mobile networks. Desktop screenshots and mocked browser tests alone do not establish mobile readiness.
+
+Foundation contracts, environment setup and release protocol: [docs/foundation.md](docs/foundation.md).
+
 ## Run and check
 
     ./scripts/dev.sh                     # shop on :8787, API on :8080, Ctrl+C stops
-    cd apps/api && gofmt -l . && go vet .
-    TEST_DATABASE_URL=... go test -count=1 .   # throwaway database only, it erases every table
+    (cd apps/api && gofmt -l . && go vet .)
+    ./scripts/test-api.sh                # isolated lb_test database; race checks and cleanup
 
 `astro dev` cannot reach `/api`. Always test through `dev.sh`. Local admin token: `local-admin-token-for-this-computer-only`. Every setting is listed in `.env.example`; real secrets live in the hosting dashboards, never in the repo.
 

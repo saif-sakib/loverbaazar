@@ -1,33 +1,35 @@
-# LoverBaazar Plan
+# LoverBaazar architecture and delivery plan
 
-**Goal:** a modern, fast shop at $0 running cost, ready to move to a VPS or AWS later without a rewrite.
+**Goal:** a fast, mobile-first Bangladesh store at $0 application running cost, replacing WordPress only after the data and release checks pass.
 
-| Part | Choice | At its free limit |
-|---|---|---|
-| Store and CDN | Astro static pages on Cloudflare | Static traffic is unlimited |
-| API routing | Cloudflare Worker | `/api` pauses until 06:00 BD time; browsing continues |
-| API | Go on Render Free, Singapore | Service stops or sleeps |
-| Database | PostgreSQL on Neon Free, Singapore | Database stops until next month |
-| Images, old and new | Cloudinary Free | Uploads or delivery stop |
-| Order email | Brevo Free | Emails stop; orders still save |
-| Deploys, backups | GitHub Actions, private repo | Runs stop until next month |
+The complete implementation plan is [docs/roadmap.md](docs/roadmap.md). Its 50 stable task numbers are the source of truth for requests such as **"Do task 1"**. The [architecture audit](docs/architecture-audit.md) records the source findings, local test results and verified provider constraints behind that plan.
 
-**Why no card anywhere:** AWS and R2 bill past their limits, with no hard cap. With no card and no paid plan, a limit means a pause, never a bill.
+## Architecture decisions
 
-**Why these:** static pages keep browsing up when the API fails. Postgres gives real transactions and runs everywhere. Go has the lowest memory use and fastest start of those tested, so it suits free servers and keeps later bills low.
+| Part | Current choice | Reason |
+| --- | --- | --- |
+| Store and admin | Astro static output | Fast mobile pages; browsing does not depend on a database query |
+| CDN and API routing | Cloudflare static assets and Worker | Static assets and `/api/*` have separate execution paths |
+| Application | One Go API on Render Free | Small portable service; existing Docker image supports a later VPS |
+| Database | Neon PostgreSQL | Transactions, relative stock updates and a portable data model |
+| Public prices/content | In-memory snapshots | Browsing and builds do not acquire database connections |
+| Images | Cloudinary Free | Existing product/site asset workflow and constrained delivery transforms |
+| Notifications | Brevo Free | Optional delivery must not determine whether an order saves |
+| Checks, publishing, backups | GitHub Actions | Existing workflow foundation, to be strengthened by tasks 31–36 |
+| Registration | Existing Namecheap domain | Keep registration and renewal; hosting is a separate service |
 
-**Rejected:** Vercel Hobby (terms ban commercial use), Supabase Free (pauses after a week), D1 (forces a database migration later), AWS and R2 (can bill).
+No payment method, paid plan, paid add-on or automatic overage is permitted on the application stack. Domain renewal remains the owner's existing expense. Provider limits and exhaustion behavior vary; verify the actual accounts rather than treating every free limit as the same kind of monthly pause. See the [official-source constraints](docs/architecture-audit.md#free-hosting-facts-checked-against-official-documentation).
 
-**Main compromise:** Render says Free isn't for production. If it sleeps or restarts, checkout may take about a minute. Browsing isn't affected.
+Render Free can sleep and is not an availability guarantee. Static browsing should survive API failure, but checkout needs a working API/database. The application must explain outages, prevent duplicate orders/payments and provide operational recovery. A health cron does not remove those limits.
 
-## Later
+## Release and domain strategy
 
-Move only when free limits are really reached:
+Build and verify locally/through isolated previews, reconcile real products and outstanding WordPress orders, prove backups/restores and finish mobile/SEO/integration checks. Keep WordPress serving the existing domain throughout preparation.
 
-1. Neon paid plan, for storage and longer restore history.
-2. API to a Singapore VPS with Docker (`apps/api/Dockerfile`). Keep Neon.
-3. AWS: ECS, RDS, S3 + CloudFront. The Go code stays the same.
+After release approval, prepare DNS/mail records, activate Cloudflare DNS while WordPress remains live, freeze old writes for final reconciliation, then attach the tested shop to `loverbaazar.com`. Preserve old URLs and a tested rollback path. Retire Stellar Plus only after observation, mailbox/other-site checks and owner confirmation, within the already-paid term. These are roadmap tasks 42–48.
 
-## Still to build
+## Future work
 
-Colour filter, popups, phone orders typed into admin, moving customers, old orders and Rank Math SEO text from the WordPress database, and a real payment gateway (SSLCommerz or bKash). Self-service password reset needs SMS or email, so for now the admin sets a new password from Customers.
+Do not buy infrastructure in anticipation of growth. Task 49 establishes measured upgrade triggers; task 50 compares a Namecheap or other VPS at the time the owner approves a budget. The Go application and PostgreSQL model remain portable. Multiple API replicas require coordinated snapshot/rate-limit behavior before horizontal scaling.
+
+Real payment gateways, paid SMS, promotions and optional back-office features are future backlog decisions. Color/brand filters depend on valid product attributes. Customer/old-order preservation and Rank Math SEO migration are required decisions in tasks 17–25, not assumptions that the current seed has already solved them. Account recovery must match the actual verified identity and available free channels.

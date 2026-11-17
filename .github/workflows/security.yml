@@ -1,0 +1,11 @@
+name: Repository security
+on: [pull_request, push, workflow_dispatch]
+permissions: { contents: read }
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { fetch-depth: 0 }
+      - run: python3 scripts/security-check.py --history

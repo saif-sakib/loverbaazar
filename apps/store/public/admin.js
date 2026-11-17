@@ -193,7 +193,9 @@
       }
     };
   // Saved, but customers only see it after Publish.
+  let publicationGeneration=0;
   const needsPublish = (m) => {
+    publicationGeneration++;
     say(m);
     try {
       localStorage.setItem("dirty", "1");
@@ -201,6 +203,21 @@
     $("#dirtybar").hidden = false;
   };
 
+  let publicationTimer;
+  async function publicationStatus() {
+    try {
+      const generation=publicationGeneration;
+      const p=await api("/publish");
+      if(generation!==publicationGeneration)return;
+      $("#dirtybar").hidden=!p.dirty;
+      if(!p.dirty) {try{localStorage.removeItem("dirty");}catch{}}
+      if(p.latest && ["queued","running"].includes(p.latest.state)) {
+        say(`Publication ${p.latest.state}. Saved changes stay pending until deployment finishes.`);
+        clearTimeout(publicationTimer);publicationTimer=setTimeout(publicationStatus,5000);
+      } else if(p.latest?.state==="failed") say("Publication failed. Your saved changes still need Publish. Retry after checking the build.");
+      else if(p.latest?.state==="published") say(p.dirty?"Published. Newer edits still need Publish.":"Publication confirmed.");
+    }catch { /* Retain the existing pending marker on network failure. */ }
+  }
   const publish = run(async () => {
     if (savingChanges) return say("Please wait for your changes to finish saving.");
     $("#pub").disabled = true;
@@ -209,10 +226,7 @@
     try {
       const r = await api("/publish", { method: "POST" });
       say(r.message);
-      try {
-        localStorage.removeItem("dirty");
-      } catch {}
-      $("#dirtybar").hidden = true;
+      await publicationStatus();
     } finally {
       $("#pub").disabled = false;
       $("#pub2").disabled = false;
@@ -1940,6 +1954,7 @@
   };
 
   async function enter() {
+ publicationStatus();
     $("#login").hidden = true;
     $("#app").hidden = false;
     $("#admin-section").innerHTML = Object.entries(HEADS).map(([key, [label]]) => `<option value="${key}">${esc(label)}</option>`).join("");

@@ -1,5 +1,6 @@
 import localProducts from "../data/products.json";
 import localContent from "../data/content.json";
+import { validateBundle } from "./contracts.mjs";
 import defaults from "../../../api/defaults.json";
 
 const remote = import.meta.env.CATALOG_URL;
@@ -8,7 +9,7 @@ const remote = import.meta.env.CATALOG_URL;
 async function fetchJson(url: string) {
   for (let attempt = 1; ; attempt++) {
     try {
-      const res = await fetch(url);
+      const res = await fetch(url,{headers: import.meta.env.BUILD_KEY ? {"X-Build-Key":import.meta.env.BUILD_KEY} : {}, signal:AbortSignal.timeout(20000)});
       if (res.ok) return await res.json();
       throw new Error(`${url} answered ${res.status}`);
     } catch (e) {
@@ -18,8 +19,12 @@ async function fetchJson(url: string) {
   }
 }
 
-const list: any[] = remote ? await fetchJson(remote) : localProducts;
-const store: any = remote ? await fetchJson(remote.replace(/catalog\/?$/, "storefront")) : {};
+const buildId=import.meta.env.BUILD_ID;
+if(import.meta.env.BUILD_ENV==="production" && (!remote||!buildId||!import.meta.env.BUILD_KEY||!import.meta.env.PUBLIC_TURNSTILE_SITE)) throw new Error("Production needs a frozen build and Turnstile site key");
+const bundle=buildId && remote ? await fetchJson(new URL(`/api/build/${buildId}`,remote).href) : null;
+const list: any[] = bundle ? bundle.products : remote ? await fetchJson(remote) : localProducts;
+const store: any = bundle ? bundle.store : remote ? await fetchJson(remote.replace(/catalog\/?$/, "storefront")) : {};
+if(bundle) validateBundle(list,store);
 // An empty answer must stop the deploy, never publish an empty shop.
 if (!Array.isArray(list) || list.length === 0) throw new Error("The catalogue came back empty. Not publishing.");
 
@@ -32,8 +37,9 @@ export const cats = pick("cats"),
 export const posts = [...pick("posts")].sort((a, b) => String(b.date).localeCompare(String(a.date)));
 export const SITE: any = { ...defaults.site, ...store.site };
 // {phone}, {email} and {name} let the admin write text on Pages that stays right when those details change.
+const escapeHTML=(s: string)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
 export const fill = (text = "") =>
-  text.replaceAll("{phone}", SITE.phone).replaceAll("{email}", SITE.email).replaceAll("{name}", SITE.name);
+  text.replaceAll("{phone}", escapeHTML(SITE.phone)).replaceAll("{email}", escapeHTML(SITE.email)).replaceAll("{name}", escapeHTML(SITE.name));
 export const siteUrl = (path: string) => new URL(path, import.meta.env.SITE).href;
 export const LIVE: any = { ...defaults.live, ...store.live }; // only a fallback: the browser reads /api/stock
 
