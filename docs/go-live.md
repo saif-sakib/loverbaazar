@@ -1,3 +1,5 @@
+> Migration update, 18 November 2026: complete [tasks 17–23](migration.md) with a fresh private export and owner-approved catalog before launch. Historical seed files are not verified inventory. Use the current [environment/release contracts](foundation.md) and numbered roadmap acceptance gates for deployment. The migration examples below now refer to the reviewed process.
+
 # Go Live for $0
 
 > The current release and domain sequence is defined by [roadmap tasks 33 and 42–48](roadmap.md). The [architecture audit](architecture-audit.md) identifies assumptions in this older guide that task 33 must update, including fixed product counts, customer emails and rollback instructions. Finish the roadmap's readiness/data checks and prepare the exact current DNS/mail changes before using the switch steps below. Domain registration stays at Namecheap; canceling WordPress hosting is a later, separately confirmed step.
@@ -72,13 +74,7 @@ Your code is already at `github.com/saif-sakib/loverbaazar`, so just confirm the
 4. On the project dashboard, click **Connect**. You'll see a connection string starting with `postgresql://`.
 5. Turn **Connection pooling** on and copy the string. Save it as **Neon pooled string**. It contains `-pooler` in its address.
 6. Turn **Connection pooling** off and copy the string. Save it as **Neon direct string**.
-7. Load your products, categories, pages and blog posts. Use the **direct** string, and keep the single quotes:
-
-       cd apps/api
-       DATABASE_URL='PASTE-DIRECT-STRING' go run . seed seed/products.json ../store/src/data/content.json
-       cd ../..
-
-   It takes a minute or two and prints nothing when it succeeds.
+7. Capture a consistent prelaunch target snapshot and prepare the fresh WordPress catalog through [the migration runbook](migration.md). Reconcile real prices/quantities, assets, legacy obligations and policy content, then approve the exact plan. Apply only to the offline prelaunch target and verify its snapshots/Publish result. Do not load the historical seed as launch stock; unknown quantities are quarantined. Preserve any existing orders and never reopen a closed migration gate.
 
 **Check:** in Neon, open **Tables**. `products` should have 290 rows, and `content` should have rows too.
 
@@ -177,10 +173,7 @@ All images go in one Cloudinary folder called `loverbaazar`, sorted like `produc
        npx wrangler deploy
        cd ../..
 
-7. Move the old images while your old site is online. It copies only images the shop uses, gives them clear names, and updates every address. It's safe to re-run until it says `failed: 0`:
-
-       export SHOP=https://YOUR-SHOP.workers.dev ADMIN_TOKEN=... CLOUDINARY_CLOUD=... CLOUDINARY_KEY=... CLOUDINARY_SECRET=...
-       python3 scripts/images_to_cloudinary.py
+7. Complete [the asset migration workflow](migration.md#assets-before-hosting-retirement): plan, bounded download, verified Free-account upload, source/destination verification, reviewed catalog rewrite and public legacy-asset map. Regenerate the catalog approval after rewriting images. The tool no longer replays stale full-product saves through the admin API. Keep WordPress hosting until every required dependency is verified.
 
 8. Save your `wrangler.jsonc` change:
 

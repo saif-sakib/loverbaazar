@@ -42,7 +42,9 @@ export LOCAL_UPLOADS="$ROOT/apps/store/public/uploads" DEV_BUILD_DIR="$ROOT/apps
 cd "$ROOT/apps/store"
 [[ -d node_modules ]] || npm ci --no-audit --no-fund
 BIN="$task_dir/api"
-(cd "$ROOT/apps/api" && go build -o "$BIN" . && "$BIN" seed seed/products.json ../store/src/data/content.json)
+seed_mode=seed
+if [[ ${LB_ISOLATED:-0} == 1 ]]; then seed_mode=seed-fixture; fi
+(cd "$ROOT/apps/api" && go build -o "$BIN" . && "$BIN" "$seed_mode" seed/products.json ../store/src/data/content.json)
 export BUILD_OUTPUT="$ROOT/apps/store/dist"
 if [[ ${LB_ISOLATED:-0} == 1 ]]; then export BUILD_OUTPUT="$task_dir/store"; fi
 "$BIN" & API=$!

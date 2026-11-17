@@ -83,3 +83,17 @@ test('cache write failures do not discard a healthy origin response', async () =
   globalThis.fetch = async () => f.fresh();
   assert.equal((await f.request()).status, 200);
 });
+
+test('legacy assets redirect only exact verified paths and preserve real 404s', async () => {
+  const { default: worker } = await import(`data:text/javascript,${encodeURIComponent(source)}#assets-${version++}`);
+  const originFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error('Asset redirects must not call the API'); };
+  const env = { ASSETS: { fetch: async req => new URL(req.url).pathname === '/legacy-assets.json' ? Response.json({ '/wp-content/uploads/test.png': 'https://res.cloudinary.com/fixture/image/upload/test.png', '/wp-content/uploads/unsafe.png': 'https://evil.invalid/file' }) : new Response('Not found', { status: 404 }) } };
+  for (const method of ['GET', 'HEAD']) {
+    const r = await worker.fetch(new Request('https://shop.test/wp-content/uploads/test.png?size=300', { method }), env, {});
+    assert.equal(r.status, 301); assert.equal(r.headers.get('Location'), 'https://res.cloudinary.com/fixture/image/upload/test.png');
+  }
+  for (const path of ['missing.png', 'unsafe.png']) assert.equal((await worker.fetch(new Request('https://shop.test/wp-content/uploads/' + path), env, {})).status, 404);
+  assert.equal((await worker.fetch(new Request('https://shop.test/wp-content/uploads/test.png', { method: 'POST' }), env, {})).status, 405);
+  globalThis.fetch = originFetch;
+});

@@ -25,3 +25,13 @@ Real integration checks own a disposable database and build output:
 This starts `LB_ISOLATED=1` on ports 18081/18788/55436, creates fixture products through admin, Publishes locally, places a guest order, checks fulfillment/concurrent stock/cancellation/CSV and races 20 buyers for one unit. The runner removes its server, Worker and database on success or failure. `LB_API_PORT`, `LB_STORE_PORT`, `LB_DB_PORT` select different free ports. `CHROME_PATH` selects Chromium; optional `LB_SCREENSHOTS=/tmp/lb-mobile-check` retains fixture screenshots. All writes stay on the owned loopback shop; no customer email or cloud publication is sent.
 
 Physical Android/iPhone acceptance steps and screenshots: [mobile UI report](../../../docs/mobile-ui.md). Browser emulation does not establish real keyboard, screen-reader or Safari behavior.
+
+WordPress migration checks use their own disposable databases and private temporary artifacts:
+
+```sh
+PYTHONPATH=scripts python3 -m unittest discover -s scripts/migration -p 'test_*.py' -v
+./scripts/test-migration.sh
+./scripts/test-wordpress-export.sh
+```
+
+Run these from the repository root. The last command downloads local WordPress/MariaDB Docker fixtures and WooCommerce; it does not use the real site or publish a port. See [migration results](../../../docs/migration-results.md). Real inventory comes only from an approved export/review; legacy `in_stock` flags do not prove a quantity. Disposable `LB_ISOLATED=1` demos use explicit synthetic fixture stock.

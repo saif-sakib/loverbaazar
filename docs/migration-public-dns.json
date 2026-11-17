@@ -1,0 +1,128 @@
+{
+  "captured_utc": "2026-11-17T19:53:47.527526+00:00",
+  "captured_dhaka": "2026-11-18T01:53:47.527526+06:00",
+  "scope": "Public DNS only; not a full Cloudflare zone, mailbox inventory or ownership/billing verification. No DNS changes. TXT values intentionally omitted.",
+  "queries": [
+    {
+      "name": "loverbaazar.com",
+      "type": "NS",
+      "resolver": "https://dns.google/resolve?name=loverbaazar.com&type=NS",
+      "status": 0,
+      "answers": [
+        {
+          "name": "loverbaazar.com.",
+          "type": 2,
+          "TTL": 21600,
+          "data": "shaz.ns.cloudflare.com."
+        },
+        {
+          "name": "loverbaazar.com.",
+          "type": 2,
+          "TTL": 21600,
+          "data": "lars.ns.cloudflare.com."
+        }
+      ],
+      "txt_record_count": null
+    },
+    {
+      "name": "loverbaazar.com",
+      "type": "A",
+      "resolver": "https://dns.google/resolve?name=loverbaazar.com&type=A",
+      "status": 0,
+      "answers": [
+        {
+          "name": "loverbaazar.com.",
+          "type": 1,
+          "TTL": 300,
+          "data": "104.21.61.191"
+        },
+        {
+          "name": "loverbaazar.com.",
+          "type": 1,
+          "TTL": 300,
+          "data": "172.67.213.16"
+        }
+      ],
+      "txt_record_count": null
+    },
+    {
+      "name": "loverbaazar.com",
+      "type": "AAAA",
+      "resolver": "https://dns.google/resolve?name=loverbaazar.com&type=AAAA",
+      "status": 0,
+      "answers": [
+        {
+          "name": "loverbaazar.com.",
+          "type": 28,
+          "TTL": 300,
+          "data": "2606:4700:3034::ac43:d510"
+        },
+        {
+          "name": "loverbaazar.com.",
+          "type": 28,
+          "TTL": 300,
+          "data": "2606:4700:3037::6815:3dbf"
+        }
+      ],
+      "txt_record_count": null
+    },
+    {
+      "name": "loverbaazar.com",
+      "type": "MX",
+      "resolver": "https://dns.google/resolve?name=loverbaazar.com&type=MX",
+      "status": 0,
+      "answers": [
+        {
+          "name": "loverbaazar.com.",
+          "type": 15,
+          "TTL": 300,
+          "data": "5 mx1-hosting.jellyfish.systems."
+        },
+        {
+          "name": "loverbaazar.com.",
+          "type": 15,
+          "TTL": 300,
+          "data": "20 mx3-hosting.jellyfish.systems."
+        },
+        {
+          "name": "loverbaazar.com.",
+          "type": 15,
+          "TTL": 300,
+          "data": "10 mx2-hosting.jellyfish.systems."
+        }
+      ],
+      "txt_record_count": null
+    },
+    {
+      "name": "loverbaazar.com",
+      "type": "TXT",
+      "resolver": "https://dns.google/resolve?name=loverbaazar.com&type=TXT",
+      "status": 0,
+      "answers": [],
+      "txt_record_count": 1
+    },
+    {
+      "name": "mail.loverbaazar.com",
+      "type": "A",
+      "resolver": "https://dns.google/resolve?name=mail.loverbaazar.com&type=A",
+      "status": 0,
+      "answers": [
+        {
+          "name": "mail.loverbaazar.com.",
+          "type": 1,
+          "TTL": 300,
+          "data": "66.29.132.200"
+        }
+      ],
+      "txt_record_count": null
+    },
+    {
+      "name": "www.loverbaazar.com",
+      "type": "CNAME",
+      "resolver": "https://dns.google/resolve?name=www.loverbaazar.com&type=CNAME",
+      "status": 0,
+      "answers": [],
+      "txt_record_count": null
+    }
+  ]
+}

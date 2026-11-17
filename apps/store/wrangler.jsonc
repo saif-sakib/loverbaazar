@@ -1,4 +1,4 @@
 { "name": "loverbaazar", "main": "../../edge/worker.js", "compatibility_date": "2026-11-01",
   "triggers": { "crons": ["*/10 * * * *"] },
-  "assets": { "directory": "./dist", "not_found_handling": "404-page", "run_worker_first": ["/api/*"] },
+  "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "404-page", "run_worker_first": ["/api/*", "/wp-content/*"] },
   "vars": { "API_ORIGIN": "https://loverbaazar-api.onrender.com" } }

@@ -155,6 +155,9 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 func checkProduct(p map[string]any) error {
+	if p["migrationBlocked"] == true && p["active"] != false {
+		return fmt.Errorf("product is quarantined; resolve the migration review before activating it")
+	}
 	for _, k := range []string{"cats", "tags", "images", "attrs"} {
 		if v, exists := p[k]; exists {
 			if _, ok := v.([]any); !ok {

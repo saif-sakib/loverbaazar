@@ -37,6 +37,9 @@ Foundation contracts, environment setup and release protocol: [docs/foundation.m
 
 ## Rules
 
+- WordPress migration follows `docs/migration.md`. Keep all raw exports, review sheets, approvals and legacy archives outside Git/web roots. Never infer quantities from availability or attach historical orders by a matching phone.
+- Apply catalog plans only to an offline prelaunch target with exact owner-reviewed hashes. Never clear quarantine, delete orders or reopen the migration gate to force an import. Legacy `seed` is not launch reconciliation.
+
 - Browsing must never touch the database. Prices and stock come from `/api/stock`, an in-memory snapshot. Only writes refresh it.
 - The server computes every total. Never trust browser prices.
 - Change stock only with relative updates: `SET stock=stock-$1 WHERE stock>=$1`. Admin saves send `stockDelta`, never a stock number.

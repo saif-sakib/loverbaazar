@@ -1,6 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
-import { pages, posts, fileSlug, fill, SITE, siteUrl } from "../lib/shop";
+import { pages, posts, fileSlug, fill, SITE, siteUrl, languageOf } from "../lib/shop";
 export const getStaticPaths = () => [...pages, ...posts].map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
 const html = fill(p.html).replace(/href="tel:([^"]*)"/g, (_, n) => `href="tel:${n.replace(/[^\d+]/g, "")}"`);
@@ -30,7 +30,7 @@ const article = p.date
 const json = (o: any) => JSON.stringify(o).replace(/</g, "\\u003c");
 ---
 
-<Base title={p.title} description={summary} type={p.date ? "article" : "website"} noindex={!!p.draft}>
+<Base language={languageOf(p.title + " " + html)} title={p.title} description={summary} type={p.date ? "article" : "website"} noindex={!!p.draft}>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={json(crumbs)} />
     {article && <script type="application/ld+json" set:html={json(article)} />}

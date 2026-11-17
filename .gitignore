@@ -24,3 +24,8 @@ apps/store/public/uploads
 .DS_Store
 .idea
 .vscode
+
+# Private migration work must also stay outside this public checkout.
+*.sqlite
+*.sqlite-*
+migration-private/
