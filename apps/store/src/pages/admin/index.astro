@@ -49,7 +49,10 @@ import "../../styles/admin.css";
             <input id="find" type="search" placeholder="Find anything…" aria-label="Search the admin" autocomplete="off" />
             <div id="findres" hidden></div>
           </div>
-          <nav id="tabs"></nav>
+          <label class="mobile-section">Go to
+            <select id="admin-section" aria-label="Admin section"></select>
+          </label>
+          <nav id="tabs" aria-label="Shop management"></nav>
           <div class="adminactions">
             <button class="link" id="pub2">Publish now</button>
             <button class="link" id="out">Log out</button>
@@ -57,7 +60,7 @@ import "../../styles/admin.css";
         </aside>
         <main class="adminmain">
           <div class="dirtybar" id="dirtybar" hidden>
-            <span>You have saved changes that need <b>Publish</b> before customers can see them.</span>
+            <span><b>Website changes ready</b><br />Publish your saved edits to make them visible to customers.</span>
             <button class="btn" id="pub">Publish changes</button>
           </div>
           <div id="head"></div>

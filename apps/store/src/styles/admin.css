@@ -379,3 +379,71 @@ figcaption { display: flex; justify-content: space-between; margin-top: 6px; }
   .admin input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .admin select, .admin textarea { font-size: 16px; }
   .admin .tbl td.actions .link { min-height: 36px; align-items: center; }
 }
+
+/* Task-first management: one navigation level, one save bar per editor. */
+.admin { --line: #e2e6ec; --mute: #647084; --ink: #192334; background: #f3f5f8; }
+.admin #app:not([hidden]) { grid-template-columns: 228px minmax(0, 1fr); gap: 32px; padding-top: 24px; }
+.admin .adminbar { border: 1px solid var(--line); padding: 18px 12px; box-shadow: none; }
+.admin #tabs { gap: 4px; }
+.admin #tabs a { padding: 10px 12px; font-size: 13px; }
+.admin #tabs a.on { background: #f9e9ed; color: #8c1530; }
+.admin .nav-group { border: 0; padding-top: 16px; font-size: 10px; letter-spacing: .1em; }
+.admin .adminbar-top { flex-wrap: wrap; gap: 12px; }
+.admin .adminactions { margin-top: 12px; }
+.admin .mobile-section { display: none; }
+.admin #head { margin-bottom: 24px; }
+.admin #head h1 { font-size: 30px; margin: 0; }
+.admin #head > .meta { max-width: 72ch; margin: 10px 0 0; line-height: 1.6; }
+.admin .subtabs { border: 0; padding: 5px; background: #e9edf3; border-radius: 10px; width: fit-content; max-width: 100%; margin-bottom: 20px; }
+.admin .subtabs a { border-radius: 7px; padding: 8px 14px; }
+.admin .subtabs a.on { box-shadow: 0 1px 3px #19233414; }
+.admin .effect { font-size: 11px; font-weight: 600; padding: 5px 9px; }
+.admin .panel { border-radius: 14px; box-shadow: 0 2px 6px #19233404; padding: 24px; }
+.admin .sec-head { margin-bottom: 20px; padding-bottom: 16px; }
+.admin .sec-desc { font-size: 13px; max-width: 65ch; }
+.admin .sec-tags, .admin .where-badge { display: none; }
+.admin .settings .panel { margin-bottom: 20px; }
+.admin .settings, .admin .editor { max-width: 960px; }
+.admin .field { margin-bottom: 20px; }
+.admin .fhelp { line-height: 1.5; max-width: 65ch; }
+.admin .optional-fields { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: #fafbfc; margin: 16px 0 22px; }
+.admin .optional-fields > summary { color: var(--ink); margin: 0; font-size: 13px; list-style-position: inside; }
+.admin .optional-fields > summary small { display: block; color: var(--mute); font-size: 12px; font-weight: 400; margin: 4px 0 0 16px; }
+.admin .optional-fields[open] > summary { margin-bottom: 18px; }
+.admin .optional-fields .field:last-child { margin-bottom: 0; }
+.admin .stick, .admin .editor .stick { border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; background: #fff; box-shadow: 0 -6px 22px #1923340a; margin-top: 22px; bottom: 12px; }
+.admin .stick .stick-hint { flex-basis: 100%; font-size: 12px; }
+.admin .save-status { font-size: 12px; font-weight: 600; color: var(--mute); margin-right: auto; }
+.admin .stick .btn { min-height: 40px; }
+.admin .dirtybar { padding: 16px 18px; border: 1px solid #edce9f; border-radius: 12px; background: #fff9ed; margin-bottom: 24px; font-size: 13px; }
+.admin .jobs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.admin .jobs a { background: #fff; padding: 16px; border: 1px solid var(--line); border-radius: 10px; }
+.admin .repbtn button { width: 36px; height: 36px; }
+.admin .richbar { gap: 4px; padding: 8px; }
+.admin .richbar button { min-height: 34px; }
+.admin .richbox { min-height: 220px; }
+.admin .richbox:focus { outline: 2px solid var(--brand); outline-offset: -2px; }
+@media (max-width: 900px) {
+  .admin #app:not([hidden]) { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-top: 12px; }
+  .admin .adminbar { padding: 14px; }
+  .admin .adminbar-top { flex-wrap: nowrap; padding-bottom: 12px; }
+  .admin .mobile-section { display: flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 600; color: var(--mute); }
+  .admin .mobile-section select { flex: 1; min-width: 0; }
+  .admin #tabs { display: none; }
+  .admin .adminactions { margin-top: 0; padding-top: 10px; }
+  .admin .adminfind { display: none; }
+  .admin #head h1 { font-size: 26px; }
+  .admin .headbadges { display: none; }
+  .admin .jobs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin .panel { padding: 18px; }
+  .admin .stick, .admin .editor .stick { padding: 12px; bottom: 8px; gap: 8px; }
+  .admin .save-status { flex-basis: 100%; }
+  .admin .stick .btn { flex: 1; padding: 10px; }
+  .admin .stick-hint { line-height: 1.4; }
+  .admin .dirtybar { align-items: stretch; gap: 12px; flex-direction: column; }
+  .admin .subtabs { width: 100%; gap: 2px; }
+  .admin .subtabs a { flex: 1; text-align: center; padding: 8px; font-size: 12px; }
+}
+.admin .rich-advanced { margin-left: auto; font-size: 12px; color: var(--mute); }
+.admin .rich-advanced summary { cursor: pointer; padding: 8px; }
+.admin .rich-advanced[open] { border: 1px solid var(--line); border-radius: 8px; }

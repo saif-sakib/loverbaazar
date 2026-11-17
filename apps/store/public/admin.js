@@ -23,42 +23,11 @@
 
   // Direct 1-click grouped navigation; related sections also share top subtabs.
   const NAV_GROUPS = [
-    [
-      "Daily Work",
-      [
-        ["dashboard", "Overview"],
-        ["orders", "Orders"],
-        ["messages", "Inbox"],
-        ["reviews", "Reviews"],
-      ],
-    ],
-    [
-      "Catalog",
-      [
-        ["products", "Products"],
-        ["categories", "Categories"],
-        ["coupons", "Coupons"],
-        ["customers", "Customers"],
-        ["tags", "Search tags"],
-      ],
-    ],
-    [
-      "Website",
-      [
-        ["home", "Home page"],
-        ["menu", "Navigation menu"],
-        ["pages", "Pages"],
-        ["blog", "Blog"],
-      ],
-    ],
-    [
-      "Settings",
-      [
-        ["delivery", "Delivery and payment"],
-        ["shop", "Shop details"],
-      ],
-    ],
+    ["Manage shop", [["dashboard", "Overview"], ["orders", "Orders"], ["products", "Products"], ["customers", "Customers"], ["coupons", "Discounts"]]],
+    ["Customer care", [["messages", "Messages"], ["reviews", "Reviews"]]],
+    ["Store setup", [["home", "Website"], ["delivery", "Settings"]]],
   ];
+
   const SUBGROUPS = [
     { messages: "Messages", reviews: "Reviews" },
     { products: "All products", categories: "Categories", tags: "Search tags" },
@@ -66,8 +35,8 @@
     { delivery: "Delivery and payment", shop: "Shop details" },
   ];
 
-  const LIVE_BADGE = `<span class="effect live">● Live — updates in ~2 min</span>`;
-  const PUB_BADGE = `<span class="effect pub">◆ Needs Publish</span>`;
+  const LIVE_BADGE = `<span class="effect live">Live updates</span>`;
+  const PUB_BADGE = `<span class="effect pub">Publish required</span>`;
   const effectBadges = (mode) =>
     mode === "live"
       ? LIVE_BADGE
@@ -78,21 +47,21 @@
           : "";
 
   const HEADS = {
-    dashboard: ["Welcome", "Your shop today, and quick links to the tasks you do most.", ""],
+    dashboard: ["Shop overview", "Your shop today, and quick links to the tasks you do most.", ""],
     orders: ["Orders", "Find orders, update shipping status, save courier tracking, or print invoices. Status updates appear on order tracking immediately.", ""],
-    messages: ["Messages", "Questions sent by customers from the Contact Us page (/contact-us/).", ""],
+    messages: ["Messages", "Read and manage customer questions.", ""],
     reviews: ["Reviews", "Customer product reviews waiting for moderation. Approved reviews appear on product pages after you click Publish.", "pub"],
     products: ["Products", "Edit prices, old prices, stock, and visibility inline — they save automatically and go live in ~2 minutes. Click Edit for names, photos, categories, and descriptions.", "both"],
-    categories: ["Categories", "Product groups served at /product-category/<path>/. Add categories to your top menu or home grid under Website → Navigation menu.", "pub"],
+    categories: ["Categories", "Organize products into categories customers can browse.", "pub"],
     coupons: ["Coupons", "Discount codes customers apply on the Checkout page. Active coupons start working immediately.", "live"],
     customers: ["Customers", "Everyone who has ordered. Click an order count to view their orders, or reset a forgotten customer account password.", ""],
-    tags: ["Tags", "Search keywords on products, used on /product-tag/ pages and by Google.", "pub"],
-    home: ["Home page", "Edit the main hero headline, promotional banners, and featured product rows on your storefront home page (/).", "pub"],
-    menu: ["Navigation menu", "Choose which category groups appear in the top header dropdowns and the home page 'Shop by category' grid.", "pub"],
+    tags: ["Tags", "Optional keywords for organizing and finding products.", "pub"],
+    home: ["Home page", "Update your welcome message, banners, and featured products.", "pub"],
+    menu: ["Navigation menu", "Choose the categories customers see in your website menu.", "pub"],
     pages: ["Pages", "Edit About Us, How To Buy, Terms, Privacy Policy, and other pages. Any extra published pages are added to the Company footer column.", "pub"],
-    blog: ["Blog", "Articles shown on /blog/ and at /<slug>/ for customers and Google search.", "pub"],
-    delivery: ["Delivery and payment", "Configure delivery fees, free shipping threshold, payment numbers, announcement bar, and whether checkout is open.", "live"],
-    shop: ["Shop details", "Manage your shop name, logo, phone numbers, address, opening hours, return policy, and social links used across the store and invoices.", "pub"],
+    blog: ["Blog", "Write and update articles for your customers.", "pub"],
+    delivery: ["Delivery and payment", "Manage delivery charges, payment methods, and online ordering.", "live"],
+    shop: ["Shop details", "Keep your business identity and contact information up to date.", "pub"],
   };
 
   // The search box and the home screen. The last word list is what people might type.
@@ -130,6 +99,7 @@
   };
   let token = session("t") || remembered();
   let unsaved = false;
+  let savingChanges = false;
   const LEAVE = "You have changes you haven't saved. Leave without saving?";
   const pendingUploads = new Set();
   async function cleanupUploads(urls = [...pendingUploads]) {
@@ -222,6 +192,7 @@
   };
 
   const publish = run(async () => {
+    if (savingChanges) return say("Please wait for your changes to finish saving.");
     $("#pub").disabled = true;
     $("#pub2").disabled = true;
     say("Publishing…");
@@ -241,14 +212,54 @@
   // Binds Save and an optional Save & Publish now button so a failed save never publishes.
   const bindSavePublish = (f, saveFn) => {
     let publishAfter = false;
+    let saving = false;
+    const status = document.createElement("span");
+    status.className = "save-status";
+    status.setAttribute("role", "status");
+    status.textContent = "No unsaved changes";
+    $(".stick", f)?.prepend(status);
+    const changed = () => { status.textContent = "Unsaved changes"; unsaved = true; };
+    f.addEventListener("input", changed);
+    f.addEventListener("change", changed);
+    f.addEventListener("click", (e) => {
+      if (e.target.closest("[data-add-row], [data-remove], [data-up-row], [data-down], [data-cmd], [data-block], [data-x], [data-l], [data-r]")) changed();
+    });
     f.onsubmit = run(async (e) => {
       e.preventDefault();
-      unsaved = false;
+      if (saving) return;
+      const invalid = $(":invalid", f);
+      if (invalid) {
+        publishAfter = false;
+        invalid.closest("details")?.setAttribute("open", "");
+        invalid.reportValidity();
+        invalid.focus();
+        return;
+      }
+      saving = true;
+      savingChanges = true;
       const andPub = publishAfter;
       publishAfter = false;
-      await saveFn(e);
-      await cleanupUploads();
-      if (andPub) await publish();
+      const buttons = $$(".stick button", f);
+      buttons.forEach(b => b.disabled = true);
+      status.textContent = "Saving…";
+      f.inert = true;
+      try {
+        await saveFn(e);
+        unsaved = false;
+        status.textContent = "All changes saved";
+        await cleanupUploads();
+        savingChanges = false;
+        if (andPub) await publish();
+      } catch (error) {
+        unsaved = true;
+        status.textContent = "Could not save. Your changes are still here.";
+        throw error;
+      } finally {
+        saving = false;
+        savingChanges = false;
+        buttons.forEach(b => b.disabled = false);
+        f.inert = false;
+      }
     });
     const submitAs = (andPub) => {
       if (!f.noValidate && f.reportValidity && !f.reportValidity()) return;
@@ -256,9 +267,6 @@
       if (f.requestSubmit) f.requestSubmit();
       else f.onsubmit({ preventDefault: () => {} });
     };
-    $$("[data-save]", f).forEach((b) => {
-      b.onclick = () => submitAs(false);
-    });
     $$("#savepub, [data-savepub]", f).forEach((b) => {
       b.onclick = () => submitAs(true);
     });
@@ -337,12 +345,8 @@
     `<label class="field"><span class="flabel">${esc(label)}</span>${help ? `<small class="fhelp">${esc(help)}</small>` : ""}<textarea name="${name}" rows="${n}">${esc(value ?? "")}</textarea></label>`;
   const toggle = (label, name, on, help = "") =>
     `<label class="check field"><input type="checkbox" name="${name}" ${on ? "checked" : ""}><span><span class="flabel">${esc(label)}</span>${help ? `<small class="fhelp">${esc(help)}</small>` : ""}</span></label>`;
-  const secHead = (title, desc, where = "", mode = "") => {
-    const badge = effectBadges(mode);
-    return `<div class="sec-head"><div><h2>${esc(title)}</h2>${desc ? `<p class="sec-desc">${esc(desc)}</p>` : ""}</div>${where || badge ? `<div class="sec-tags">${where ? `<span class="where-badge">Where: ${esc(where)}</span>` : ""}${badge}</div>` : ""}</div>`;
-  };
-  const secFoot = (withPub = true) =>
-    `<div class="panel-foot"><button type="button" class="btn ghost small" data-save>Save</button>${withPub ? ` <button type="button" class="btn pub-now small" data-savepub>Save &amp; Publish now</button>` : ""}</div>`;
+  const secHead = (title, desc) =>
+    `<div class="sec-head"><div><h2>${esc(title)}</h2>${desc ? `<p class="sec-desc">${esc(desc)}</p>` : ""}</div></div>`;
 
   // Editable rows: delivery areas, payment methods, homepage sections and so on.
   function rows(host, items, fields, blank, opts = {}) {
@@ -472,7 +476,7 @@
       <button type="button" data-block="h2">Heading</button><button type="button" data-block="p">Text</button>
       <button type="button" data-cmd="insertUnorderedList">List</button><button type="button" data-link>Link</button>
       <label class="richup">Image<input type="file" accept="image/*" hidden></label>
-      <button type="button" data-html>Code view</button></div>
+      <details class="rich-advanced"><summary>Advanced</summary><button type="button" data-html>Edit HTML</button></details></div>
       <div class="richbox" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Text"></div>
       <textarea class="richsrc" rows="12" hidden aria-label="HTML"></textarea></div>`;
     const box = $(".richbox", host),
@@ -523,7 +527,7 @@
       ${tile("Sales today", money(d.todaySales), "#orders/all", "primary")}${tile("Waiting for confirmation", d.pending, "#orders/pending", d.pending > 0 ? "warn" : "")}${tile("Ready to ship", d.toShip, "#orders/confirmed", d.toShip > 0 ? "warn" : "")}${tile("New messages", d.unread, "#messages", d.unread > 0 ? "warn" : "")}${tile("Pending reviews", d.reviews, "#reviews", d.reviews > 0 ? "warn" : "")}${tile("Sales, last 30 days", money(d.monthSales), "#orders/all")}
     </div>
     <h3 class="jobhead">Quick actions</h3>
-    <div class="jobs">${JOBS.slice(0, 10)
+    <div class="jobs">${JOBS.slice(0, 6)
       .map(([label, href]) => `<a href="${href}">${esc(label)}</a>`)
       .join("")}</div>
     <div class="panel"><h3>Daily sales, last 14 days</h3>${
@@ -880,14 +884,16 @@
         ${field("Old price (৳)", "regular", p.regular, "min=0 step=1", "number", "Crossed out to show % off & list on /offers/. 0 for none.")}
         ${field("Stock quantity", "stock", p.stock, "required min=0 step=1", "number", "0 marks the item as Sold out. Live in ~2 min.")}
       </div>
-      ${field("Product code (SKU)", "sku", p.sku, "", "text", "Optional product code shown on the product page and searchable.")}
       ${field("Short description", "short", p.short, "maxlength=300", "text", "Shown right beside the main photo and used as the Google search snippet.")}
       <div class="field"><span class="flabel">Categories</span><small class="fhelp">Choose which category pages and home page rows include this product. (Needs Publish)</small><div id="pcatpick">${checkList("cat", p.cats || [], true)}</div><div class="inline-cats"><input id="quickcat" placeholder="Need a new category? Type name…" aria-label="New category name"><button type="button" class="btn ghost small" id="addquickcat">+ Add category</button></div></div>
       <div class="field"><span class="flabel">Product photos</span><small class="fhelp">The first photo is the main thumbnail on product cards. Use ◀ / ▶ to reorder. (Needs Publish)</small><div id="imgs" class="imgs"></div>
         <label class="btn ghost small upl">Upload photos<input id="up" type="file" accept="image/*" multiple hidden></label>
         <input id="imgurl" placeholder="Or paste an image address and press Enter" aria-label="Image address"></div>
+      <details class="advanced optional-fields"><summary>More product details <small>Specifications, product code &amp; search tags</small></summary>
+      ${field("Product code (SKU)", "sku", p.sku, "", "text", "Optional product code shown on the product page and searchable.")}
       <div class="field"><span class="flabel">Specifications</span><small class="fhelp">Optional key details shown under Buy buttons, such as Colour, Capacity, or Warranty.</small><div id="attrs"></div></div>
       <label class="field"><span class="flabel">Search tags (comma-separated)</span><small class="fhelp">Extra keywords for search engines and /product-tag/ pages.</small><input name="tagnames" value="${esc((p.tags || []).map((t) => allTags.find((x) => x.slug === t)?.name || t).join(", "))}"></label>
+      </details>
       <div class="field"><span class="flabel">Full description</span><small class="fhelp">Detailed features and product info shown below the main section. (Needs Publish)</small><div id="desc"></div></div>
       ${toggle("Visible in shop", "active", p.active, "Turn off to hide this product from customers without deleting it. (Live in ~2 min)")}
       <div class="stick"><button class="btn">Save product</button> <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button> <button type="button" class="btn ghost" id="back">Back</button>${isNew ? "" : ` <button type="button" class="link danger" id="del">Delete product</button>`}<span class="stick-hint">Price, stock & visibility go live in ~2 min. Other edits need Publish.</span></div></form>`;
@@ -1397,7 +1403,7 @@
         ${kind === "post" ? field("Publish date", "date", d.date, "", "date", "Posts are ordered newest first.") + field("Short summary", "excerpt", d.excerpt, "maxlength=180", "text", "Shown below the title on /blog/ and in Google search results.") : ""}
         <div class="field"><span class="flabel">Content</span><div id="body"></div></div>
         ${toggle("Draft (keep hidden)", "draft", d.draft, "Hidden from customers even after Publish until unchecked.")}
-        <div class="stick"><button class="btn">Save ${word}</button> <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button> <button type="button" class="btn ghost" id="back">Back</button><span class="stick-hint">◆ Save stores a draft here; <b>Save &amp; Publish now</b> updates the live site too.</span></div></form>`;
+        <div class="stick"><button class="btn">Save ${word}</button> <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button> <button type="button" class="btn ghost" id="back">Back</button><span class="stick-hint">Save keeps your edits here. Publish makes them visible on the website.</span></div></form>`;
       const f = $("#df");
       const body = rich($("#body"), d.html);
       if (isNew)
@@ -1503,7 +1509,7 @@
 
     let html = "";
     let stickBtn = "Save changes";
-    let stickHint = "◆ Save stores a draft; <b>Save &amp; Publish now</b> updates the live storefront immediately.";
+    let stickHint = "Save your edits here, then Publish to update the website.";
 
     if (only === "delivery") {
       stickBtn = "Save delivery & payment";
@@ -1514,22 +1520,23 @@
           ${toggle("Accepting online orders", "ordersOpen", L.ordersOpen, "When turned off, customers can still browse products, but placing orders at checkout is paused.")}
           ${field("Closed message", "closedNote", L.closedNote, "", "text", "Shown in a notice box at the top of the Checkout page when online orders are paused.")}
           ${field("Top announcement bar", "notice", L.notice, "placeholder='Eid Sale: 10% off with code EID10'", "text", "Shown as a bar at the very top of every page. Leave empty to hide.")}
-          ${secFoot(false)}
+
         </section>
         <section class="panel">
           ${secHead("Delivery areas & order rules", "Configure delivery areas and fees shown on product pages and checkout. Fees are charged per piece because appliances are heavy.", "Product pages, Cart & Checkout", "live")}
           <div id="zones"></div>
+          <details class="advanced optional-fields"><summary>Optional order rules <small>Free delivery &amp; minimum order</small></summary>
           <div class="fields2">
             ${field("Free delivery threshold (৳)", "freeOver", L.freeOver, "min=0 step=1", "number", "Orders at or above this subtotal (after coupon discount) get free delivery everywhere. Set 0 to disable.")}
             ${field("Minimum order amount (৳)", "minOrder", L.minOrder, "min=0 step=1", "number", "Smallest cart subtotal allowed to place an online order. Set 0 for no minimum.")}
           </div>
-          ${secFoot(false)}
+          </details>
         </section>
         <section class="panel">
           ${secHead("Payment methods", "Enable or disable payment options at checkout. Active methods are also listed in the website footer.", "Checkout & Website footer", "live")}
           <p class="hint-box"><strong>How mobile payments work:</strong> Add a mobile/account number (such as bKash, Nagad, or Rocket) and checkout instructs the customer to send money there and asks for their Transaction ID. Leave the number empty for Cash on delivery.</p>
           <div id="pays"></div>
-          ${secFoot(false)}
+
         </section>`;
     } else if (only === "shop") {
       stickBtn = "Save shop details";
@@ -1552,8 +1559,9 @@
             </div>
           </div>
           ${area("Footer summary", "about", W.about, 2, "Short sentence shown under your shop name in the website footer.")}
-          ${area("Google search description (SEO)", "description", W.description, 2, "Summary shown under your website link in Google search results and social link previews.")}
-          ${secFoot(true)}
+          <details class="advanced optional-fields"><summary>Search engine description</summary>
+          ${area("Search summary", "description", W.description, 2, "Used in search results and link previews.")}</details>
+
         </section>
         <section class="panel">
           ${secHead("Phone, WhatsApp & location", "Support numbers and address shown in the header, Contact Us page, product pages, floating buttons, and invoices.", "Header strip, Product pages, Contact page, Floating buttons & Invoices", "pub")}
@@ -1564,7 +1572,7 @@
             ${field("Opening hours", "hours", W.hours, "placeholder='Sat–Thu, 9:00 AM – 9:00 PM'", "text", "Shown on the Contact Us page. Leave empty to hide.")}
           </div>
           ${field("Shop address", "address", W.address, "", "text", "Shown in the footer, Contact Us page, and printed on customer invoices.")}
-          ${secFoot(true)}
+
         </section>
         <section class="panel">
           ${secHead("Return policy & social links", "Warranty/return details shown on product pages and social media links in the footer.", "Product pages & Website footer", "pub")}
@@ -1573,7 +1581,7 @@
             ${field("Facebook page URL", "facebook", W.facebook, "", "url", "Shows the Facebook icon in the website footer. Leave empty to hide.")}
             ${field("YouTube channel URL", "youtube", W.youtube, "", "url", "Shows the YouTube icon in the website footer. Leave empty to hide.")}
           </div>
-          ${secFoot(true)}
+
         </section>`;
     } else if (only === "home") {
       stickBtn = "Save home page";
@@ -1586,17 +1594,17 @@
             ${field("Button label", "heroButton", W.hero.button, "", "text", "Text inside the main action button (e.g. 'Shop all products').")}
             ${field("Button link", "heroLink", W.hero.link, 'list="sitelinks"', "text", "Page or category opened when customers click the button.")}
           </div>
-          ${secFoot(true)}
+
         </section>
         <section class="panel">
           ${secHead("Promotional banners", "Optional sale or campaign images shown directly below the hero. Leave empty for no banners.", "Below Hero on Home page (/)", "pub")}
           <div id="banners"></div>
-          ${secFoot(true)}
+
         </section>
         <section class="panel">
           ${secHead("Featured product sections", "Rows of products on the home page. Choose any category or '★ Products on offer' (all discounted items, biggest savings first). Use ▲ / ▼ to reorder.", "Main rows on Home page (/)", "pub")}
           <div id="home"></div>
-          ${secFoot(true)}
+
         </section>`;
     } else if (only === "menu") {
       stickBtn = "Save navigation menu";
@@ -1615,6 +1623,10 @@
     let zones, pays, banners, home, menu;
 
     if (only === "delivery") {
+      const closedField = f.closedNote.closest(".field");
+      const syncClosed = () => { closedField.hidden = f.ordersOpen.checked; };
+      f.ordersOpen.addEventListener("change", syncClosed);
+      syncClosed();
       zones = rows(
         $("#zones"),
         L.delivery,
@@ -1767,6 +1779,19 @@
         };
       }
 
+      const latest = await api("/settings");
+      const siteFields = {
+        shop: ["name", "tagline", "phone", "whatsapp", "email", "hours", "facebook", "youtube", "address", "returns", "about", "description", "logo"],
+        home: ["hero", "banners", "home"],
+        menu: ["menu"],
+      };
+      if (only === "delivery") {
+        shop = latest.site;
+        live = { ...latest.live, ...Object.fromEntries(["ordersOpen", "closedNote", "notice", "freeOver", "minOrder", "delivery", "payments"].map(key => [key, live[key]])) };
+      } else {
+        live = latest.live;
+        shop = { ...latest.site, ...Object.fromEntries((siteFields[only] || []).map(key => [key, shop[key]])) };
+      }
       await api("/settings", { method: "PUT", body: { live, site: shop } });
       L = live;
       W = shop;
@@ -1810,15 +1835,24 @@
     "new-post": () => blog.add(),
     publish: async () => {
       await dashboard();
-      await publish();
+      say("Use Publish changes above to publish your saved website edits.");
     },
   };
   const NAVTAB = { product: "products", "new-product": "products", "new-post": "blog", settings: "delivery", publish: "dashboard" };
 
   let here = "";
   function go() {
+    if (savingChanges) {
+      history.replaceState(null, "", "#" + here);
+      const previous = here.split("/")[0] || "dashboard";
+      $("#admin-section").value = NAVTAB[previous] || previous;
+      say("Please wait for your changes to finish saving.");
+      return;
+    }
     if (unsaved && !confirm(LEAVE)) {
       history.replaceState(null, "", "#" + here);
+      const previous = here.split("/")[0] || "dashboard";
+      $("#admin-section").value = NAVTAB[previous] || previous;
       return;
     }
     unsaved = false;
@@ -1827,12 +1861,14 @@
     const tab = routes[first] ? first : "dashboard";
     here = location.hash.slice(1);
     const nav = NAVTAB[tab] || tab;
+    $("#admin-section").value = nav;
+    const primary = ["categories", "tags"].includes(nav) ? "products" : ["menu", "pages", "blog"].includes(nav) ? "home" : nav === "shop" ? "delivery" : nav;
     say("");
     $("#err").textContent = "";
     const [title, help, mode] = HEADS[nav] || ["", "", ""];
     const parts = SUBGROUPS.find((g) => g[nav]);
     $$("#tabs a").forEach((a) => {
-      const current = a.getAttribute("href") === "#" + nav;
+      const current = a.getAttribute("href") === "#" + primary;
       a.classList.toggle("on", current);
       if (current) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
@@ -1895,6 +1931,8 @@
   async function enter() {
     $("#login").hidden = true;
     $("#app").hidden = false;
+    $("#admin-section").innerHTML = Object.entries(HEADS).map(([key, [label]]) => `<option value="${key}">${esc(label)}</option>`).join("");
+    $("#admin-section").onchange = (e) => { location.hash = e.target.value; };
     $("#tabs").innerHTML = NAV_GROUPS.map(
       ([group, items]) =>
         `<div class="nav-group">${esc(group)}</div>` +
@@ -1917,9 +1955,6 @@
   $("#pub2").onclick = publish;
   document.addEventListener("input", (e) => {
     if (e.target.closest("#view form")) unsaved = true;
-  });
-  document.addEventListener("submit", () => {
-    unsaved = false;
   });
   addEventListener("beforeunload", (e) => {
     if (unsaved) e.preventDefault();

@@ -157,7 +157,7 @@ test('admin sections fit a 375px screen', () => shop(async page => {
   await page.addInitScript(() => { if (location.protocol === 'http:' || location.protocol === 'https:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
   await ready(page, '/admin/');
   for (const tab of ['dashboard', 'products', 'orders', 'categories', 'home', 'menu', 'shop', 'delivery', 'customers', 'coupons', 'pages', 'blog', 'reviews', 'messages']) {
-    await page.locator(`#tabs a[href="#${tab}"]`).click();
+    await page.locator('#admin-section').selectOption(tab);
     await page.waitForTimeout(150);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `Admin ${tab} overflows`);
     assert.equal(await page.locator('#err').textContent(), '', `Admin ${tab} failed`);
@@ -174,3 +174,68 @@ test('a changed server total is visible before retrying checkout', () => shop(as
   await page.waitForFunction(() => document.querySelector('[data-sum] .total').textContent.includes('1,300'));
   assert.match(await page.locator('[data-err]').textContent(), /1300/);
 }, { cart: { 1: 1 } }));
+
+
+test('admin settings have one save bar and preserve hidden and unrelated settings', () => shop(async (page, context) => {
+  await page.addInitScript(() => { if (location.protocol === 'http:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
+  const original = await (await context.request.get('/api/admin/settings', { headers: { 'X-Admin-Token': 'local-admin-token-for-this-computer-only' } })).json();
+  let reads = 0, saved;
+  await context.route('**/api/admin/settings', async r => {
+    if (r.request().method() === 'PUT') { saved = r.request().postDataJSON(); return r.fulfill({ json: {} }); }
+    reads++;
+    return r.fulfill({ json: { live: { ...original.live, maxPending: 7 }, site: { ...original.site, name: reads > 2 ? 'Updated in another tab' : original.site.name } } });
+  });
+  await ready(page, '/admin/#home');
+  assert.equal(await page.locator('[data-save]').count(), 0);
+  assert.equal(await page.locator('#sf .stick').count(), 1);
+  await page.locator('[name="heroTitle"]').fill('Updated welcome');
+  assert.match(await page.locator('.save-status').textContent(), /Unsaved/);
+  await page.locator('#sf .stick button').first().click();
+  await page.waitForFunction(() => document.querySelector('.save-status')?.textContent === 'All changes saved');
+  assert.equal(saved.site.hero.title, 'Updated welcome');
+  assert.equal(saved.site.name, 'Updated in another tab');
+  assert.equal(saved.live.maxPending, 7);
+}));
+
+test('admin failed saves retain edits and never publish; double submit sends once', () => shop(async (page, context) => {
+  await page.addInitScript(() => { if (location.protocol === 'http:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
+  let writes = 0, publishes = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await context.route('**/api/admin/settings', async r => {
+    if (r.request().method() !== 'PUT') return r.continue();
+    writes++; await gate;
+    return r.fulfill({ status: 503, json: { error: 'Try saving again' } });
+  });
+  await context.route('**/api/admin/publish', r => { publishes++; return r.fulfill({ json: {} }); });
+  await ready(page, '/admin/#shop');
+  await page.locator('[name="name"]').fill('Unsaved shop name');
+  await page.locator('#savepub').click();
+  await page.waitForFunction(() => document.querySelector('#sf').inert);
+  await page.locator('#sf').evaluate(f => f.dispatchEvent(new Event('submit', { cancelable: true })));
+  await page.locator('#admin-section').selectOption('orders');
+  await page.waitForFunction(() => location.hash === '#shop');
+  assert.equal(await page.locator('#admin-section').inputValue(), 'shop');
+  release();
+  await page.waitForFunction(() => !document.querySelector('#sf').inert);
+  assert.equal(writes, 1); assert.equal(publishes, 0);
+  assert.equal(await page.locator('[name="name"]').inputValue(), 'Unsaved shop name');
+  assert.match(await page.locator('.save-status').textContent(), /Could not save/);
+}));
+
+test('invalid settings cannot publish and a later Save does not publish unexpectedly', () => shop(async (page, context) => {
+  await page.addInitScript(() => { if (location.protocol === 'http:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
+  let writes = 0, publishes = 0;
+  await context.route('**/api/admin/settings', r => {
+    if (r.request().method() !== 'PUT') return r.continue();
+    writes++; return r.fulfill({ json: {} });
+  });
+  await context.route('**/api/admin/publish', r => { publishes++; return r.fulfill({ json: {} }); });
+  await ready(page, '/admin/#shop');
+  await page.locator('[name="email"]').fill('invalid-email');
+  await page.locator('#savepub').click();
+  assert.equal(writes, 0); assert.equal(publishes, 0);
+  await page.locator('[name="email"]').fill('shop@example.com');
+  await page.locator('#sf .stick button').first().click();
+  await page.waitForFunction(() => document.querySelector('.save-status')?.textContent === 'All changes saved');
+  assert.equal(writes, 1); assert.equal(publishes, 0);
+}));
