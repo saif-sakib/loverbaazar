@@ -1,6 +1,6 @@
 # LoverBaazar
 
-Run locally (needs Docker, Go, Node): `./scripts/dev.sh`, then open http://127.0.0.1:8787/
+Run a disposable local demo (needs Docker, Go, Node): `LB_ISOLATED=1 ./scripts/dev.sh`, then open http://127.0.0.1:8787/. Use `./scripts/dev.sh` for existing verified local inventory. Unknown legacy quantities are quarantined, never invented.
 
 For setup/checks use `./scripts/check.sh --browsers`; isolated test commands and environment/release contracts are in [docs/foundation.md](docs/foundation.md).
 
@@ -33,6 +33,8 @@ admin, under Settings. Their first values come from `apps/api/defaults.json`.
 
 Admin covers orders, products, categories, coupons, customers, reviews, messages, pages, blog and shop settings.
 
+- Verified WordPress migration: [docs/migration.md](docs/migration.md)
+- Export WordPress privately: [docs/wordpress-export.md](docs/wordpress-export.md)
 - Go live for $0: [docs/go-live.md](docs/go-live.md)
 - Numbered implementation and launch tasks: [docs/roadmap.md](docs/roadmap.md)
 - Architecture audit and verified baseline: [docs/architecture-audit.md](docs/architecture-audit.md)

@@ -93,7 +93,7 @@ func migrate(ctx context.Context) error {
 		if _, e := tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations(version INT PRIMARY KEY, checksum TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`); e != nil {
 			return e
 		}
-		for i, sql := range []string{schema, migrationSQL} {
+		for i, sql := range []string{schema, migrationSQL, catalogMigrationSQL} {
 			sum := hashTok(sql)
 			var old string
 			e := tx.QueryRow(ctx, `SELECT checksum FROM schema_migrations WHERE version=$1`, i+1).Scan(&old)

@@ -222,7 +222,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 17 — Capture the WordPress and hosting inventory
 
-**Status:** Planned · **Depends on:** 3, 4
+**Status:** In progress — export/inventory tooling verified; fresh owner backups/export pending · **Depends on:** 3, 4
+
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Obtain a fresh private WordPress database/export, uploads/files backup, WooCommerce product/variation/stock/order/customer records, Rank Math metadata/redirects and all existing public URL sources. Capture the current DNS zone, mailbox/other-site inventory and Stellar Plus renewal/end dates.
 - Record source time, file checksums, actual record counts, unresolved fields and business-critical legacy URLs. Keep raw exports/customer details outside Git and public CI artifacts; commit only sanitized tooling and aggregate evidence.
@@ -230,7 +232,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 18 — Build a repeatable, validated catalog importer
 
-**Status:** Planned · **Depends on:** 2, 7, 17
+**Status:** In progress — validated importer and isolated checks complete; actual catalog acceptance pending · **Depends on:** 2, 7, 17
+
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Replace fixed-page/minor-unit assumptions with a complete paginated/export-based import that validates currency, source precision, IDs, slugs, categories, attributes, images and real quantities. Support dry run, change report, explicit create/update policy and safe reruns.
 - Map variable products to supported independent SKU/option inventory or block unresolved products. Respect sold-individually, unmanaged stock/backorders and inactive items; never translate an in-stock flag into 100 sellable units.
@@ -238,7 +242,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 19 — Preserve customers and legacy orders safely
 
-**Status:** Planned · **Depends on:** 5, 17, 18
+**Status:** In progress — private archive/journal verified; actual coverage and obligation approval pending · **Depends on:** 5, 17, 18
+
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Deliver a tested historical migration or searchable private archive with explicit owner-approved coverage. Preserve original identifiers, statuses, timestamps, totals and outstanding fulfillment obligations; map legacy statuses to documented meanings.
 - Do not replay historical orders through checkout or decrement current stock again. Account mapping must verify identity; never claim WooCommerce password hashes work with the current password scheme or automatically attach a person's orders merely because someone registered a matching number.
@@ -246,7 +252,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 20 — Move every required asset off WordPress hosting
 
-**Status:** Planned · **Depends on:** 8, 17, 18
+**Status:** In progress — asset pipeline and redirects verified locally; real transfers/quota acceptance pending · **Depends on:** 8, 17, 18
+
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Extend/verify `images_to_cloudinary.py` for product, embedded description, category, page, blog and site assets. Keep deterministic `loverbaazar/products/<category>/<product>-N` naming and corresponding `pages/`, `blog/`, `site/` locations.
 - Create a resumable manifest with source/destination checks, useful alt text, dimensions and explicit failures. Preserve required downloads and old image URL mappings; implement appropriate legacy asset redirects before removing their old host.
@@ -254,7 +262,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 21 — Reconcile and approve the sellable product database
 
-**Status:** Planned · **Depends on:** 16, 18, 20
+**Status:** In progress — protected review/apply workflow ready; actual catalog approval pending · **Depends on:** 16, 18, 20
+
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Produce a product-by-product review of real names/models, category, SKU/options, stock quantity, current/regular price, description, specifications, images, warranty and active status. Resolve duplicates, placeholder content, missing photos and unsupported options.
 - Give the owner a practical review/import/admin-edit process. Capture corrections as safe deltas or a controlled prelaunch reconciliation, never a blind stock overwrite during sales.
@@ -262,7 +272,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 22 — Finish truthful brand, policy and editorial content
 
-**Status:** Planned · **Depends on:** 10, 12, 15, 17
+**Status:** In progress — editorial audit and approval prepared; business-content approval pending · **Depends on:** 10, 12, 15, 17
+
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Review shop identity, phone/address/hours, delivery areas/charges/times, enabled payment accounts, warranty/returns/refunds, About/How to Buy/Terms/Privacy, category introductions and useful buying guides. Keep defaults only in `defaults.json`, with owner changes managed in admin.
 - Remove template/demo claims and stale WordPress shortcodes. Preserve valuable Bangla/English content and make language metadata reflect actual content. Do not publish invented testimonials or unverified brand guarantees.
@@ -270,7 +282,9 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 23 — Rehearse migration and final-delta reconciliation
 
-**Status:** Planned · **Depends on:** 18, 19, 20, 21, 22
+**Status:** In progress — synthetic rehearsal and restore passed; real-data rehearsal and restore point pending · **Depends on:** 18, 19, 20, 21, 22
+
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Run the full migration against an isolated copy, then rerun it and simulate changes arriving on WordPress after the first export. Produce a dry-run delta for final prices, quantities, catalog edits and outstanding orders.
 - Reconcile source/target counts, identifiers, order totals/statuses, relationships, Asia/Dhaka display and image mappings. Document an explicit source-of-truth switch and single-writer freeze, including how old orders fulfilled after launch affect inventory.

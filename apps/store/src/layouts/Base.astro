@@ -2,8 +2,8 @@
 import "@fontsource-variable/plus-jakarta-sans";
 import "../styles/site.css";
 import "../styles/mobile.css";
-import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl } from "../lib/shop";
-const { title, description = SITE.description, image, noindex, type = "website" } = Astro.props;
+import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf } from "../lib/shop";
+const { title, description = SITE.description, image, noindex, type = "website", language = languageOf(`${title || ""} ${description}`) } = Astro.props;
 const full = title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`;
 const canon = new URL(Astro.url.pathname, Astro.site);
 const parts = SITE.name.split(/(?=[A-Z])/);
@@ -51,7 +51,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
 ---
 
 <!doctype html>
-<html lang="en" data-phone={SITE.phone}>
+<html lang={language} data-phone={SITE.phone}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
@@ -64,7 +64,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
         : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}
     />
     <link rel="canonical" href={canon} />
-    <meta property="og:locale" content="en_BD" />
+    <meta property="og:locale" content={language.replace("-", "_")} />
     <meta property="og:title" content={full} />
     <meta property="og:description" content={description} />
     <meta property="og:site_name" content={SITE.name} />

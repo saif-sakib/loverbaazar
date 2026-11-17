@@ -73,6 +73,21 @@ async function stock(request, env, url, ctx) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/wp-content/")) {
+      if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
+      try {
+        const mapResponse = await env.ASSETS.fetch(new Request(new URL("/legacy-assets.json", url)));
+        if (mapResponse.ok) {
+          const map = await mapResponse.json();
+          const target = map[url.pathname];
+          if (typeof target === "string") {
+            const destination = new URL(target);
+            if (destination.protocol === "https:" && destination.hostname === "res.cloudinary.com" && !destination.username && !destination.password) return new Response(null, { status: 301, headers: { Location: destination.href, "Cache-Control": "public, max-age=3600" } });
+          }
+        }
+      } catch { /* Unmapped or invalid assets keep their real static 404. */ }
+      return env.ASSETS.fetch(request);
+    }
     if (url.pathname === "/api/stock" && request.method === "GET") return stock(request, env, url, ctx);
     try {
       return await forward(request, env, url);

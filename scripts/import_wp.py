@@ -1,35 +1,76 @@
 #!/usr/bin/env python3
-"""Turn the WordPress API dumps in data/raw into the store's catalogue. Re-runnable."""
-import json, re, html, pathlib
-R = pathlib.Path(__file__).resolve().parent.parent
-raw = R / "data/raw"
-load = lambda n: json.load(open(raw / n, encoding="utf-8"))
-txt = lambda h: re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", h or ""))).strip()
-def clean(h):
-    h = re.sub(r"(?is)<(script|style|iframe|form)\b.*?</\1>", "", h or "")
-    h = re.sub(r"(?i)\s(on\w+|style|class|id)=(\"[^\"]*\"|'[^']*')", "", h)
-    return re.sub(r"(?i)javascript:", "", h).strip()
-SKIP = {"sign-up","wishlist","wishlist-2","my-account","checkout","checkout-2","cart","cart-2","shop","shop-2","home","sample-page","best-price-blog","contact-us-2","contact-us","privacy-policy-2"}
-cats = [{"id":c["id"],"name":html.unescape(c["name"]),"slug":c["slug"],"parent":c["parent"],"count":c["count"],
-         "path":c["link"].split("/product-category/")[1].strip("/")} for c in load("cats.json")]
-tags = [{"name":html.unescape(t["name"]),"slug":t["slug"]} for i in (1,2,3) for t in load(f"tags{i}.json") if t["count"]]
-products = []
-for i in (1,2,3):
-    for p in load(f"all{i}.json"):
-        pr = p["prices"]
-        products.append({"id":p["id"],"slug":p["slug"],"name":html.unescape(p["name"]).strip(),"sku":p.get("sku",""),
-          "price":int(pr["price"])//100,"regular":int(pr["regular_price"] or pr["price"])//100,"inStock":bool(p["is_in_stock"]),
-          "cats":[c["slug"] for c in p["categories"]],"tags":[t["slug"] for t in p["tags"]],
-          "images":[{"src":m["src"],"thumb":m["thumbnail"],"alt":m.get("alt") or ""} for m in p["images"]],
-          "short":txt(p.get("short_description"))[:300],"desc":clean(p.get("description")),
-          "attrs":[{"name":a["name"],"values":[html.unescape(t["name"]) for t in a["terms"]]} for a in p.get("attributes",[])]})
-pg = lambda x,**k: {"slug":x["slug"],"title":txt(x["title"]["rendered"]),"html":clean(x["content"]["rendered"]),**k}
-pages = [pg(p) for p in load("pages.json") if p["slug"] not in SKIP and p["content"]["rendered"].strip()]
-privacy = next(p for p in load("pages.json") if p["slug"]=="privacy-policy-2")
-pages.append({**pg(privacy),"slug":"privacy-policy"})
-posts = [pg(p,date=p["date"][:10],excerpt=txt(p["excerpt"]["rendered"])[:180]) for p in load("posts.json")]
-(R/"apps/store/src/data").mkdir(parents=True,exist_ok=True); (R/"apps/api/seed").mkdir(parents=True,exist_ok=True)
-json.dump({"cats":cats,"tags":tags,"pages":pages,"posts":posts},open(R/"apps/store/src/data/content.json","w",encoding="utf-8"),ensure_ascii=False)
-for f in (R/"apps/store/src/data/products.json",R/"apps/api/seed/products.json"):
-    json.dump(products,open(f,"w",encoding="utf-8"),ensure_ascii=False)
-print(len(products),"products",len(cats),"cats",len(tags),"tags",len(pages),"pages",len(posts),"posts",[p["slug"] for p in pages])
+"""Prepare a private catalog and dry-run plan from a complete, checksummed WordPress export."""
+import argparse
+import json
+from pathlib import Path
+from migration.evidence import inspect_evidence
+from migration.core import CLASSES, Invalid, POLICIES, approve, archive_note, editorial_audit, legacy_archive, load_bundle, lookup, make_plan, normalize, private, review_csv, write
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest='command', required=True)
+    evidence = commands.add_parser('inventory')
+    for field in ['sql-backup', 'uploads-backup', 'dns-zone', 'hosting-inventory', 'output']:
+        evidence.add_argument('--' + field, required=True)
+    prepare = commands.add_parser('prepare')
+    prepare.add_argument('source')
+    prepare.add_argument('--output', required=True)
+    prepare.add_argument('--target', help='Private catalog-snapshot JSON; absent means create-only empty target')
+    prepare.add_argument('--policy', choices=['create', 'reconcile'], default='create')
+    prepare.add_argument('--assets', help='Private, verified asset manifest; rewrites references before generating the reviewed plan')
+    prepare.add_argument('--overrides', help='Explicit owner stock/content corrections, keyed by source product ID')
+    archive = commands.add_parser('archive')
+    archive.add_argument('source'); archive.add_argument('--output', required=True)
+    search = commands.add_parser('lookup')
+    search.add_argument('archive'); search.add_argument('--order-id', required=True)
+    journal = commands.add_parser('note')
+    journal.add_argument('archive')
+    for field in ['order-id', 'key', 'kind', 'note', 'operator']:
+        journal.add_argument('--' + field, required=True)
+    approval = commands.add_parser('approve')
+    for field in ['plan', 'catalog', 'review', 'policies', 'owner', 'output']:
+        approval.add_argument('--' + field, required=True)
+    args = parser.parse_args()
+    if args.command == 'inventory':
+        write(args.output, inspect_evidence({k: getattr(args, k) for k in ('sql_backup', 'uploads_backup', 'dns_zone', 'hosting_inventory')}))
+        print('Private evidence checksums recorded. Restore and owner verification are still required.')
+    elif args.command == 'prepare':
+        bundle = load_bundle(args.source)
+        overrides = json.loads(private(args.overrides).read_text()) if args.overrides else {}
+        catalog = normalize(bundle, overrides)
+        if args.assets:
+            from migration.assets import rewrite
+            catalog = rewrite(catalog, json.loads(private(args.assets).read_text()))
+        target = json.loads(private(args.target).read_text()) if args.target else {'records': [], 'imported': []}
+        if target.get('phase', 'prelaunch') != 'prelaunch' or target.get('orders', 0):
+            raise Invalid('Target already accepts new-store orders; migration is closed')
+        output = private(args.output)
+        catalog_path, plan_path = output / 'catalog.json', output / 'plan.json'
+        write(catalog_path, catalog)
+        plan = make_plan(catalog, target, args.policy)
+        write(plan_path, plan)
+        review_csv(output / 'product-review.csv', catalog)
+        write(output / 'editorial-review.json', editorial_audit(catalog))
+        write(output / 'policy-approval.template.json', {**{key: False for key in POLICIES}, 'target_settings_hash': target.get('settings_hash', ''), 'target_facts': target.get('settings', {}), 'source_identity': bundle.get('site_settings', {}), 'retained_decisions': {r['kind'] + ':' + r['key']: 'review-required' for r in plan['retained']}})
+        write(output / 'source-inventory.json', {'manifest': bundle['manifest'], 'source_counts': {k: len(bundle[k]) for k in CLASSES}, 'required_owner_evidence': ['private SQL backup + checksum', 'uploads/files backup + checksum', 'DNS zone', 'mailboxes and other hosted sites', 'Stellar Plus renewal/end date', 'commercial policy approval', 'legacy archive coverage approval']})
+        print(json.dumps({'changes': len(plan['records']), 'conflicts': len(plan['conflicts']), 'quarantined_products': sum(bool(r['issues']) for r in catalog['review']), 'source_counts': {k: len(bundle[k]) for k in CLASSES}}))
+    elif args.command == 'archive':
+        print(json.dumps(legacy_archive(load_bundle(args.source), args.output)))
+    elif args.command == 'note':
+        archive_note(args.archive,args.order_id,args.key,args.kind,args.note,args.operator)
+        print('Private legacy action recorded; current stock and new-store accounts were not changed.')
+    elif args.command == 'lookup':
+        # Intentional private output for an authenticated local operator; never expose as public HTTP.
+        print(json.dumps(lookup(args.archive, args.order_id), ensure_ascii=False, indent=2))
+    else:
+        result = approve(private(args.plan), private(args.catalog), private(args.review), private(args.policies), args.owner)
+        write(args.output, result)
+        print('Approval bound to the exact reviewed plan. No database changes made.')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (Invalid, OSError, ValueError, KeyError) as error:
+        raise SystemExit('Migration stopped: ' + str(error))

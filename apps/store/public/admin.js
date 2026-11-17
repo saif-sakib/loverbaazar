@@ -929,6 +929,7 @@
     say("");
     let images = (p.images || []).map((i) => ({ ...i }));
     view().innerHTML = `<form class="panel editor" id="pf">
+      ${p.migrationBlocked ? `<p class="note" role="status">Migration review required: ${esc((p.migrationIssues || []).join(", "))}. Keep this product hidden until its source data is corrected and reviewed.</p>` : ""}
       ${secHead(isNew ? "Add product" : "Edit product", "Fill in product details below. Price, stock and visibility update live; name, photos, categories and text require Publish.", isNew ? "Shop & new /product/<slug>/ page" : `/product/${p.slug}/`, "both")}
       ${field("Product name", "name", p.name, "required maxlength=200", "text", "Shown on product cards, search results, cart, and customer invoices. (Needs Publish)")}
       <details class="advanced"><summary>Web address: /product/<span id="slugview">${esc(p.slug) || "made-from-the-name"}</span>/</summary>

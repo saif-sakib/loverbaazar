@@ -73,3 +73,11 @@ export const attributeValues = (p: any, key: string): string[] => {
  const pattern=key==="brand" ? /^(brand|manufacturer|ব্র্যান্ড|ব্রান্ড)$/i : /^(color|colour|রং)$/i;
  return [...new Set((p.attrs||[]).filter((a: any)=>pattern.test(a.name.trim())).flatMap((a: any)=>a.values).map((v: any)=>String(v).trim()).filter(Boolean))] as string[];
 };
+
+// Use the dominant script for bilingual editorial metadata, without relabeling every page.
+export const languageOf = (value: string) => {
+  const plain = value.replace(/<[^>]*>/g, " ");
+  const bangla = (plain.match(/[\u0980-\u09ff]/g) || []).length;
+  const latin = (plain.match(/[A-Za-z]/g) || []).length;
+  return bangla > latin ? "bn-BD" : "en-BD";
+};

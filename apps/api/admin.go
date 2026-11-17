@@ -378,6 +378,17 @@ func adminQuickEdit(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "prices cannot be negative")
 		return
 	}
+	if in.Active != nil && *in.Active {
+		var blocked bool
+		if err := db.QueryRow(r.Context(), `SELECT coalesce(data->'migrationBlocked'='true'::jsonb,false) FROM products WHERE id=$1`, paramID(r, "id")).Scan(&blocked); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			oops(w, err)
+			return
+		}
+		if blocked {
+			fail(w, 409, "product is quarantined; resolve the migration review before activating it")
+			return
+		}
+	}
 	var stock int
 	err := db.QueryRow(r.Context(), `UPDATE products SET price=coalesce($2,price),regular=GREATEST(coalesce($3,regular),coalesce($2,price)),stock=GREATEST(stock+$4,0),active=coalesce($5,active)
 		WHERE id=$1 RETURNING stock`, paramID(r, "id"), in.Price, in.Regular, in.StockDelta, in.Active).Scan(&stock)

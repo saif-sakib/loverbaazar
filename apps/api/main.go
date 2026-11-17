@@ -60,12 +60,22 @@ func main() {
 	if err := connect(ctx); err != nil {
 		log.Fatal("invalid database configuration")
 	}
-	if len(os.Args) >= 3 && os.Args[1] == "seed" {
+	if len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "catalog-") {
+		if err := catalogCommand(ctx, os.Args[1:]); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if len(os.Args) >= 3 && (os.Args[1] == "seed" || os.Args[1] == "seed-fixture") {
 		content := ""
 		if len(os.Args) > 3 {
 			content = os.Args[3]
 		}
-		if err := seed(ctx, os.Args[2], content); err != nil {
+		fixture := os.Args[1] == "seed-fixture"
+		if fixture && (os.Getenv("LB_ISOLATED") != "1" || os.Getenv("APP_ENV") != "local" || !fixtureDatabaseAllowed(os.Getenv("DATABASE_URL"))) {
+			log.Fatal("fixture seeding requires an isolated local environment")
+		}
+		if err := seedCatalog(ctx, os.Args[2], content, fixture); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -141,6 +151,9 @@ func connect(ctx context.Context) error {
 // seed loads the imported catalogue. It is safe to re-run: existing products are left alone, and
 // content of a kind the shop already has is skipped, so anything the admin deleted stays deleted.
 func seed(ctx context.Context, productsFile, contentFile string) error {
+	return seedCatalog(ctx, productsFile, contentFile, false)
+}
+func seedCatalog(ctx context.Context, productsFile, contentFile string, fixture bool) error {
 	if err := migrate(ctx); err != nil {
 		return err
 	}
@@ -152,14 +165,46 @@ func seed(ctx context.Context, productsFile, contentFile string) error {
 	if err = json.Unmarshal(b, &list); err != nil {
 		return err
 	}
-	if len(list) > 0 {
-		if _, err = db.Exec(ctx, `INSERT INTO products(id,slug,price,regular,stock,data)
-			SELECT (p->>'id')::bigint, p->>'slug', (p->>'price')::bigint, (p->>'regular')::bigint,
-				CASE WHEN (p->>'inStock')='true' THEN 100 ELSE 0 END, p
-			FROM jsonb_array_elements($1::jsonb) p ON CONFLICT(id) DO NOTHING`, string(b)); err != nil {
+	for _, p := range list {
+		if _, ok := wholeNumber(p["price"]); !ok {
+			return fmt.Errorf("invalid whole-taka seed price")
+		}
+		if _, ok := wholeNumber(p["regular"]); !ok {
+			return fmt.Errorf("invalid whole-taka regular price")
+		}
+	}
+	for _, p := range list {
+		quantity, known := integer(p["stock"], 0, maxStock)
+		if fixture {
+			quantity, known = 20, true
+			if p["inStock"] == false {
+				quantity = 0
+			}
+		}
+		active := known
+		if flag, ok := p["active"].(bool); ok {
+			active = active && flag
+		}
+		// Legacy availability flags do not prove real quantities. Unknown stock is quarantined.
+		if !known {
+			quantity = 0
+			p["migrationBlocked"] = true
+			p["migrationIssues"] = []any{"unverified-stock"}
+		}
+		p["active"], p["stock"], p["inStock"] = active, quantity, quantity > 0
+		if err := checkProduct(p); err != nil {
+			return err
+		}
+		j, err := json.Marshal(p)
+		if err != nil {
+			return err
+		}
+		if _, err = db.Exec(ctx, `INSERT INTO products(id,slug,price,regular,stock,active,data)
+            VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO NOTHING`, p["id"], p["slug"], p["price"], p["regular"], quantity, active, string(j)); err != nil {
 			return err
 		}
 	}
+
 	if contentFile == "" {
 		return nil
 	}
