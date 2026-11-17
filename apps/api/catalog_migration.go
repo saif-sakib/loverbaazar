@@ -365,6 +365,15 @@ func migrationFile(path string) (string, error) {
 	return p, nil
 }
 func catalogCommand(ctx context.Context, args []string) error {
+	if len(args) == 0 || (args[0] != "catalog-snapshot" && args[0] != "catalog-apply") {
+		return errors.New("unknown catalog command")
+	}
+	if os.Getenv("APP_ENV") != "local" && os.Getenv("APP_ENV") != "preview" {
+		return errors.New("catalog commands require a local/preview target before schema initialization")
+	}
+	if args[0] == "catalog-apply" && os.Getenv("MIGRATION_MAINTENANCE") != "1" {
+		return errors.New("stop the prelaunch API and enable migration maintenance first")
+	}
 	if e := migrate(ctx); e != nil {
 		return e
 	}

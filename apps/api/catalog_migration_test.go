@@ -115,6 +115,9 @@ func TestCatalogMigrationAllOrNothingAndApproval(t *testing.T) {
 		t.Fatal("changed plan accepted")
 	}
 	t.Setenv("APP_ENV", "production")
+	if err := catalogCommand(bg, []string{"catalog-snapshot", t.TempDir() + "/production.json"}); err == nil || !strings.Contains(err.Error(), "before schema initialization") {
+		t.Fatal("CLI initialized production schema before rejecting mode")
+	}
 	raw, approval = approvedPlan(t, []importRecord{first})
 	if e := applyCatalogPlan(bg, raw, approval); e == nil {
 		t.Fatal("production migration accepted")
