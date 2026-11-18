@@ -133,7 +133,11 @@ func requestGuard(next http.Handler) http.Handler {
 					return
 				}
 			}
-			if r.URL.Path != "/api/admin/image" && r.ContentLength != 0 && !strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
+			contentType := strings.ToLower(r.Header.Get("Content-Type"))
+			photoSave := strings.HasPrefix(contentType, "multipart/form-data;") &&
+				(r.Method == http.MethodPost && r.URL.Path == "/api/admin/products" ||
+					r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/api/admin/products/"))
+			if !photoSave && r.URL.Path != "/api/admin/image" && r.ContentLength != 0 && !strings.HasPrefix(contentType, "application/json") {
 				fail(w, 415, "use application/json")
 				return
 			}

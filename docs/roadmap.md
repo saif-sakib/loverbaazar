@@ -135,6 +135,8 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 **Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md). Real isolated local success/failure/retry and protocol regression checks pass. On 18 November, the [admin-triggered publication](https://github.com/saif-sakib/loverbaazar/actions/runs/44136254142) and [latest main release](https://github.com/saif-sakib/loverbaazar/actions/runs/44202649487) passed deployment confirmation. The Cloudflare preview returned the matching main commit as JSON. Cross-device confirmation, asset replacement and hosted rollback remain pending.
 
 
+**Product photo follow-up.** Gallery and description selections stay in the browser until a product save. A checked save uploads only referenced files, preserves retries and tracks interrupted uploads for compensation. Rollback and shared images remain protected. A disposable trial on the Cloudinary Free account verified served upload, idempotent retry, replacement and confirmed removal of both fixture assets. Historical assets without verified ownership remain queued for review. Deployment and hosted admin smoke test are pending.
+
 ## Tasks 9–16: mobile-first UI and UX
 
 

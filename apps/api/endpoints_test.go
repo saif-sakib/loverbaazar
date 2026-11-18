@@ -409,8 +409,8 @@ func TestImageUploadInputs(t *testing.T) {
 	reset(t)
 	t.Setenv("LOCAL_UPLOADS", t.TempDir())
 	png := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
-	send := func(body []byte) int {
-		req, _ := http.NewRequest("POST", api.URL+"/api/admin/image?folder=products/pans&name=pan-1", bytes.NewReader(body))
+	send := func(folder string, body []byte) int {
+		req, _ := http.NewRequest("POST", api.URL+"/api/admin/image?folder="+folder+"&name=photo-1", bytes.NewReader(body))
 		req.Header.Set("X-Admin-Token", adminKey)
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -419,14 +419,17 @@ func TestImageUploadInputs(t *testing.T) {
 		res.Body.Close()
 		return res.StatusCode
 	}
-	if c := send(png); c != 200 {
+	if c := send("pages/about", png); c != 200 {
 		t.Errorf("png: %d", c)
 	}
-	if c := send([]byte("<svg onload=alert(1)>")); c != 400 {
+	if c := send("pages/about", []byte("<svg onload=alert(1)>")); c != 400 {
 		t.Errorf("svg or text: %d", c)
 	}
-	if c := send(append(png, make([]byte, 6<<20)...)); c != 413 {
+	if c := send("pages/about", append(png, make([]byte, 6<<20)...)); c != 413 {
 		t.Errorf("too big: %d", c)
+	}
+	if c := send("products/pans", png); c != 400 {
+		t.Errorf("direct product upload: %d", c)
 	}
 }
 

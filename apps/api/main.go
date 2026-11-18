@@ -103,6 +103,7 @@ func main() {
 		refresh()
 		loadBuilds(c)
 		kickOrderMail()
+		kickPhotoSweep()
 	}()
 	addr := "127.0.0.1:8080"
 	if p := os.Getenv("PORT"); p != "" {
@@ -363,6 +364,7 @@ func router() http.Handler {
 		a.Put("/settings", adminSaveSettings)
 		a.Post("/image", adminImage)
 		a.Post("/image/cleanup", adminCleanupImages)
+		a.Get("/image/status", adminPhotoStatus)
 		a.Post("/publish", adminPublish)
 		a.Get("/publish", publishStatus)
 	})

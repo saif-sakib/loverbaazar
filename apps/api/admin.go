@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha1"
 	"encoding/csv"
@@ -12,7 +11,6 @@ import (
 	"io"
 	"log"
 	"maps"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -271,8 +269,8 @@ func wholeNumber(v any) (int64, bool) {
 // adminSaveProduct creates (POST) or replaces (PUT) a product. Stock is never written as a number:
 // orders may have sold units since the form opened, so a PUT carries stockDelta, the change the admin made.
 func adminSaveProduct(w http.ResponseWriter, r *http.Request) {
-	var p map[string]any
-	if !read(w, r, &p) {
+	p, photos, photoKey, valid := readProductSave(w, r)
+	if !valid {
 		return
 	}
 	id := paramID(r, "id")
@@ -333,24 +331,24 @@ func adminSaveProduct(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	var err error
-	var oldImages []any
-	if r.Method == http.MethodPost {
-		if err = db.QueryRow(ctx, `SELECT nextval('product_ids')`).Scan(&id); err == nil {
-			p["id"] = id
-			j, _ := json.Marshal(p)
-			_, err = db.Exec(ctx, `INSERT INTO products(id,slug,price,regular,stock,active,data) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb)`, id, slug, price, regular, stock, active, string(j))
-		}
-	} else {
-		p["id"] = id
-		j, _ := json.Marshal(p)
-		var tag pgconn.CommandTag
-		db.QueryRow(ctx, `SELECT data->'images' FROM products WHERE id=$1`, id).Scan(&oldImages)
-		tag, err = db.Exec(ctx, `UPDATE products SET slug=$2,price=$3,regular=$4,stock=GREATEST(stock+$5,0),active=$6,data=$7::jsonb WHERE id=$1`, id, slug, price, regular, delta, active, string(j))
-		if err == nil && tag.RowsAffected() == 0 {
-			fail(w, 404, "product not found")
+	if len(photos) == 0 {
+		if err := replaceProductPhotoRefs(p, nil, false); err != nil {
+			oops(w, err)
 			return
 		}
+	}
+
+	var err error
+	save := func(tx pgx.Tx, targetID int64) (int64, error) {
+		return writeSavedProduct(ctx, tx, targetID, r.Method == http.MethodPost, p, slug, price, regular, stock, delta, active)
+	}
+	if len(photos) > 0 {
+		id, err = saveProductPhotos(ctx, id, r.Method, p, slug, photos, photoKey, fmt.Sprintf("%d:%d:%t", stock, delta, active), save)
+	} else {
+		err = pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
+			id, err = save(tx, id)
+			return err
+		})
 	}
 	if duplicate(err) {
 		fail(w, 409, "another product already uses that URL slug")
@@ -360,8 +358,36 @@ func adminSaveProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	refreshProducts()
-	go dropImages(oldImages, p["images"].([]any))
+	kickPhotoSweep()
 	ok(w, map[string]any{"ok": true, "id": id})
+}
+
+func writeSavedProduct(ctx context.Context, tx pgx.Tx, id int64, creating bool, p map[string]any, slug string, price, regular, stock, delta int64, active bool) (int64, error) {
+	var oldData string
+	if creating && id == 0 {
+		if err := tx.QueryRow(ctx, `SELECT nextval('product_ids')`).Scan(&id); err != nil {
+			return 0, err
+		}
+	}
+	if !creating {
+		err := tx.QueryRow(ctx, `SELECT data::text FROM products WHERE id=$1 FOR UPDATE`, id).Scan(&oldData)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, userErr{404, "product not found"}
+		}
+		if err != nil {
+			return 0, err
+		}
+	}
+	p["id"] = id
+	data, _ := json.Marshal(p)
+	if creating {
+		_, err := tx.Exec(ctx, `INSERT INTO products(id,slug,price,regular,stock,active,data) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb)`, id, slug, price, regular, stock, active, string(data))
+		return id, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE products SET slug=$2,price=$3,regular=$4,stock=GREATEST(stock+$5,0),active=$6,data=$7::jsonb WHERE id=$1`, id, slug, price, regular, delta, active, string(data)); err != nil {
+		return 0, err
+	}
+	return id, retireProductPhotos(ctx, tx, oldData, string(data))
 }
 
 // adminQuickEdit changes price, stock or visibility from the product list.
@@ -407,26 +433,34 @@ func adminQuickEdit(w http.ResponseWriter, r *http.Request) {
 // old orders still refer to it.
 func adminDeleteProduct(w http.ResponseWriter, r *http.Request) {
 	id, ctx := paramID(r, "id"), r.Context()
-	var images []any
-	if err := db.QueryRow(ctx, `SELECT data->'images' FROM products WHERE id=$1`, id).Scan(&images); errors.Is(err, pgx.ErrNoRows) {
+	deleted := false
+	err := pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
+		var oldData string
+		if err := tx.QueryRow(ctx, `SELECT data::text FROM products WHERE id=$1 FOR UPDATE`, id).Scan(&oldData); err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, `DELETE FROM products p WHERE id=$1 AND NOT EXISTS(SELECT 1 FROM order_items i WHERE i.product_id=p.id)`, id)
+		if err != nil {
+			return err
+		}
+		deleted = tag.RowsAffected() > 0
+		if deleted {
+			return retireProductPhotos(ctx, tx, oldData, "")
+		}
+		_, err = tx.Exec(ctx, `UPDATE products SET active=FALSE WHERE id=$1`, id)
+		return err
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
 		fail(w, 404, "product not found")
 		return
-	} else if err != nil {
-		oops(w, err)
-		return
-	}
-	tag, err := db.Exec(ctx, `DELETE FROM products p WHERE id=$1 AND NOT EXISTS(SELECT 1 FROM order_items i WHERE i.product_id=p.id)`, id)
-	if err == nil && tag.RowsAffected() == 0 {
-		_, err = db.Exec(ctx, `UPDATE products SET active=FALSE WHERE id=$1`, id)
 	}
 	if err != nil {
 		oops(w, err)
 		return
 	}
 	refreshProducts()
-	deleted := tag.RowsAffected() > 0
 	if deleted {
-		go dropImages(images, nil)
+		kickPhotoSweep()
 	}
 	ok(w, map[string]any{"deleted": deleted})
 }
@@ -744,6 +778,11 @@ func adminSaveSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func adminImage(w http.ResponseWriter, r *http.Request) {
+	folder := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("folder")))
+	if folder == "products" || strings.HasPrefix(folder, "products/") {
+		fail(w, 400, "reload the product editor. Photos upload when you save the product.")
+		return
+	}
 	b, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 5<<20))
 	if err != nil {
 		fail(w, 413, "image must be under 5 MB")
@@ -784,22 +823,17 @@ func adminCleanupImages(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	if len(in.URLs) == 0 {
-		rows, e := db.Query(ctx, `SELECT url FROM retired_images WHERE retired_at<now()-interval '30 days'`)
-		if e != nil {
-			oops(w, e)
-			return
-		}
-		for rows.Next() {
-			var u string
-			if rows.Scan(&u) == nil {
-				in.URLs = append(in.URLs, u)
-			}
-		}
-		rows.Close()
+	if len(in.URLs) != 0 {
+		dropURLs(ctx, in.URLs)
+		done(w)
+		return
 	}
-	dropURLs(ctx, in.URLs)
-	done(w)
+	removed, err := sweepProductPhotos(ctx)
+	if err != nil {
+		oops(w, err)
+		return
+	}
+	ok(w, map[string]any{"removed": removed})
 }
 
 // uploadFolder holds every shop image, in readable places such as
@@ -851,54 +885,14 @@ func signUpload(params map[string]string, secret string) string {
 
 // cloudinary stores an upload on the free plan, which needs no card.
 func cloudinary(ctx context.Context, file []byte, folder, name string) (string, error) {
-	cloud, key, secret := os.Getenv("CLOUDINARY_CLOUD"), os.Getenv("CLOUDINARY_KEY"), os.Getenv("CLOUDINARY_SECRET")
-	if cloud == "" {
-		return "", userErr{501, "image storage is not configured. Add the Cloudinary keys on Render"}
-	}
-	dir, id := safeUploadPlace(ctx, folder, name)
-	params := map[string]string{
-		"asset_folder": dir,
-		"invalidate":   "true",
-		"public_id":    id,
-		"timestamp":    strconv.FormatInt(time.Now().Unix(), 10),
-	}
-	var body bytes.Buffer
-	m := multipart.NewWriter(&body)
-	m.WriteField("api_key", key)
-	m.WriteField("signature", signUpload(params, secret))
-	for k, v := range params {
-		m.WriteField(k, v)
-	}
-	part, _ := m.CreateFormFile("file", "upload")
-	part.Write(file)
-	m.Close()
-	client := &http.Client{Timeout: 30 * time.Second}
-	res, err := client.Post("https://api.cloudinary.com/v1_1/"+cloud+"/image/upload", m.FormDataContentType(), &body)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	var out struct {
-		URL string `json:"secure_url"`
-	}
-	if err = json.NewDecoder(res.Body).Decode(&out); err != nil || out.URL == "" {
-		return "", fmt.Errorf("cloudinary upload failed: %d", res.StatusCode)
-	}
-	return strings.Replace(out.URL, "/upload/", "/upload/f_auto,q_auto/", 1), nil
+	_, id := safeUploadPlace(ctx, folder, name)
+	return uploadCloudPhoto(ctx, file, id, "")
 }
 
 // publicID finds an image's name inside its address. Only the shop's own folder counts, so nothing
 // else in the Cloudinary account can ever be deleted from here.
-func publicID(url string) string {
-	i := strings.Index(url, "/"+uploadFolder+"/")
-	if !strings.Contains(url, "res.cloudinary.com/") || i < 0 {
-		return ""
-	}
-	id, _, _ := strings.Cut(url[i+1:], "?")
-	if dot := strings.LastIndex(id, "."); dot > strings.LastIndex(id, "/") {
-		id = id[:dot]
-	}
-	return id
+func publicID(address string) string {
+	return cloudImageID(address, "")
 }
 
 func localUploadFile(u string) string {
@@ -924,13 +918,18 @@ func extractImageRefs(raw string) []string {
 	return out
 }
 
+// The argument number differs between the retention write and the reference check.
+const publishedImageFilter = `FROM releases WHERE (id IN (SELECT id FROM releases WHERE state='published' ORDER BY created_at DESC LIMIT 2)
+	OR (state IN ('queued','running') AND created_at>now()-interval '1 day'))`
+const publishedImageInUse = `EXISTS(SELECT 1 ` + publishedImageFilter + ` AND strpos(payload::text,$2)>0)`
+
 func isImageRefUsed(ctx context.Context, needle string) bool {
 	var retired bool
 	if e := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM retired_images WHERE strpos(url,$1)>0 AND retired_at>now()-interval '30 days')`, needle).Scan(&retired); e != nil || retired {
 		return true
 	}
 	var protected bool
-	if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM releases WHERE (id IN (SELECT id FROM releases WHERE state='published' ORDER BY created_at DESC LIMIT 2) OR (state IN ('queued','running') AND created_at>now()-interval '1 day')) AND strpos(payload::text,$1)>0)`, needle).Scan(&protected); err != nil || protected {
+	if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 `+publishedImageFilter+` AND strpos(payload::text,$1)>0)`, needle).Scan(&protected); err != nil || protected {
 		return true
 	}
 	if needle == "" {
@@ -985,7 +984,7 @@ func unusedURLs(ctx context.Context, urls []string) (cloudIDs []string, localFil
 	seenCloud := map[string]bool{}
 	seenLocal := map[string]bool{}
 	for _, u := range urls {
-		if id := publicID(u); id != "" && !seenCloud[id] {
+		if id := cloudImageID(u, os.Getenv("CLOUDINARY_CLOUD")); id != "" && !seenCloud[id] {
 			seenCloud[id] = true
 			if !isImageRefUsed(ctx, id) {
 				cloudIDs = append(cloudIDs, id)
@@ -1003,7 +1002,7 @@ func unusedURLs(ctx context.Context, urls []string) (cloudIDs []string, localFil
 func dropURLs(ctx context.Context, urls []string) {
 	cloudIDs, localFiles := unusedURLs(ctx, urls)
 	for _, id := range cloudIDs {
-		if err := cloudinaryDelete(id); err != nil {
+		if err := destroyCloudPhoto(ctx, id); err != nil {
 			log.Print("cloudinary delete: ", err)
 		}
 	}
@@ -1022,24 +1021,7 @@ func dropOldURLs(urls []string) {
 	queueImages(ctx, urls)
 }
 
-// dropImages frees Cloudinary (and local dev) space. Call it with `go`: a failure here must never hold up a save.
-func dropImages(before, after []any) {
-	keep := map[string]bool{}
-	for _, u := range imageURLs(after) {
-		keep[u] = true
-	}
-	var removed []string
-	for _, u := range imageURLs(before) {
-		if !keep[u] {
-			removed = append(removed, u)
-		}
-	}
-	if len(removed) > 0 {
-		dropOldURLs(removed)
-	}
-}
-
-func cloudinaryDelete(id string) error {
+func destroyCloudPhoto(ctx context.Context, id string) error {
 	cloud, key, secret := os.Getenv("CLOUDINARY_CLOUD"), os.Getenv("CLOUDINARY_KEY"), os.Getenv("CLOUDINARY_SECRET")
 	if cloud == "" {
 		return nil
@@ -1049,15 +1031,20 @@ func cloudinaryDelete(id string) error {
 	for k, v := range params {
 		form.Set(k, v)
 	}
-	res, err := httpClient.PostForm("https://api.cloudinary.com/v1_1/"+cloud+"/image/destroy", form)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.cloudinary.com/v1_1/"+cloud+"/image/destroy", strings.NewReader(form.Encode()))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
 	var out struct{ Result string }
 	json.NewDecoder(res.Body).Decode(&out)
-	if out.Result != "ok" && out.Result != "not found" {
-		return fmt.Errorf("%s: status %d, %q", id, res.StatusCode, out.Result)
+	if res.StatusCode/100 != 2 || (out.Result != "ok" && out.Result != "not found") {
+		return fmt.Errorf("Cloudinary destroy status %d", res.StatusCode)
 	}
 	return nil
 }
