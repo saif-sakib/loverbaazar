@@ -373,13 +373,13 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 31 — Enforce complete pull-request CI
 
-**Status:** In progress · **Depends on:** 1, 4, 5, 6, 7, 8
+**Status:** Done · **Depends on:** 1, 4, 5, 6, 7, 8
 
 - Add pull-request and main-branch checks for Go formatting/vet/tests, targeted race coverage, JS syntax, Worker tests, deterministic Astro build/content validation and the browser suite. Run databases only in disposable CI services, with no deploy secrets or production data.
 - Install/cache the supported browser/toolchain reliably. Keep routine checks bounded; place expensive browser matrices or load checks on appropriate manual/scheduled jobs. Retain only sanitized diagnostic artifacts with short retention.
 - Verify a deliberate failing API/Worker/UI/build check blocks release, fork PRs have no secret access, and the intended branch rules protect deployment. Existing main-only API tests remain useful until this gate is ready.
 
-**Evidence, 18 November 2026.** Added reusable, secret-free Store CI for pull requests and main code releases. Covers race, API, Worker, migration, browser, accessibility, protected artifacts and encrypted restore. The release waits for successful CI for code changes. Verify the GitHub branch rule and deliberate-failure evidence.
+**Evidence, 18 November 2026.** Added reusable, read-only Store CI for pull requests and main code releases. It covers Go races, API and Worker tests, migration, browser, accessibility and encrypted restore. [GitHub CI passed](https://github.com/saif-sakib/loverbaazar/actions/runs/44208908427). GitHub requires its check on up-to-date main pull requests, including administrators. An [intentional failure](https://github.com/saif-sakib/loverbaazar/pull/15) was blocked before the disposable PR was closed. The code-release workflow requires successful CI.
 
 
 ### Task 32 — Coordinate API and storefront releases
@@ -434,7 +434,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Write procedures for lost credentials, Render restart, Neon suspension, failed migration, bad release, corrupt content and missing images. Separate code rollback, domain rollback and disaster restore; freeze/reconcile writes before any data replacement.
 - Simulate orders created after a backup and prove the recovery plan explicitly preserves/reconciles them. Done with a successful restore report and exact commands/owner steps, not only a green backup job.
 
-**Evidence, 18 November 2026.** Restored a verified encrypted backup into an isolated empty PostgreSQL database in one second in the fixture. Verified totals, stock, settings/content/media and the later source order. Exercised guarded Worker rollback with simulated provider state. Owner-key archive and hosted-scale timing are pending.
+**Evidence, 18 November 2026.** Restored a verified encrypted backup into an isolated empty PostgreSQL database in one to two seconds in the fixture. Verified totals, stock, settings/content/media and the later source order. Exercised guarded Worker rollback with simulated provider state. Owner-key archive and hosted-scale timing are pending.
 
 
 ### Task 37 — Add operational visibility, quotas and failure handling
