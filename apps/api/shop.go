@@ -42,8 +42,10 @@ func normPhone(p string) string {
 		}
 	}
 	s := b.String()
-	if len(s) == 13 && strings.HasPrefix(s, "88") {
+	if len(s) == 13 && strings.HasPrefix(s, "880") {
 		s = s[2:]
+	} else if len(s) == 10 && strings.HasPrefix(s, "1") {
+		s = "0" + s
 	}
 	return s
 }
@@ -213,7 +215,7 @@ func storefrontFrom(ctx context.Context, q querier) ([]byte, error) {
 			return nil, err
 		}
 	}
-	for _, key := range []string{"pages", "posts"} {
+	for _, key := range []string{"pages", "posts", "cats", "tags"} {
 		list := out[key].([]json.RawMessage)
 		for i, raw := range list {
 			var d map[string]any
@@ -328,6 +330,11 @@ func couponPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ok(w, map[string]any{"discount": discountOf(kind, value, sub)})
+}
+
+func countCheckout(r *http.Request) bool {
+	host := os.Getenv("CHECKOUT_METRICS_HOST")
+	return !dev && os.Getenv("APP_ENV") == "production" && host != "" && strings.EqualFold(requestHost(r), host)
 }
 
 func checkout(w http.ResponseWriter, r *http.Request) {
@@ -512,6 +519,9 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 	if repeat {
 		ok(w, map[string]any{"number": number, "total": total})
 		return
+	}
+	if countCheckout(r) {
+		log.Print("checkout_metric event=order_created")
 	}
 	refreshProducts()
 	bill.number, bill.total, bill.area, bill.payment = number, total, zone.Label, pay.Label

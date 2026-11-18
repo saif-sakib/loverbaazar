@@ -381,7 +381,7 @@ figcaption { display: flex; justify-content: space-between; margin-top: 6px; }
 }
 
 /* Task-first management: one navigation level, one save bar per editor. */
-.admin { --line: #e2e6ec; --mute: #647084; --ink: #192334; background: #f3f5f8; }
+.admin { --line: #e2e6ec; --mute: #596579; --ink: #192334; background: #f3f5f8; }
 .admin #app:not([hidden]) { grid-template-columns: 228px minmax(0, 1fr); gap: 32px; padding-top: 24px; }
 .admin .adminbar { border: 1px solid var(--line); padding: 18px 12px; box-shadow: none; }
 .admin #tabs { gap: 4px; }

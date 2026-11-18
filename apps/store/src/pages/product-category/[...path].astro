@@ -1,14 +1,12 @@
 ---
+import { jsonLd, recordSEO, plainText } from "../../lib/seo";
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { cats, inCat, fileSlug, SITE, taka, siteUrl } from "../../lib/shop";
+import { cats, inCat, fileSlug, SITE, siteUrl } from "../../lib/shop";
 export const getStaticPaths = () => cats.map((c) => ({ params: { path: fileSlug(c.path) }, props: { c } }));
 const { c } = Astro.props;
 const items = inCat(c.slug);
-const minPrice = items.length ? Math.min(...items.map((x: any) => x.price)) : 0;
-const seoDesc = items.length
-  ? `${c.name} price in Bangladesh starts from ${taka(minPrice)}. Shop ${items.length} ${c.name} products online at ${SITE.name} with cash on delivery.`
-  : `${c.name} price in Bangladesh. Buy ${c.name} online from ${SITE.name} with cash on delivery.`;
+const seo = recordSEO(c, plainText(c.html) || `Browse ${c.name} at ${SITE.name}. See product details, prices and availability.`);
 const crumbs = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
@@ -18,12 +16,11 @@ const crumbs = {
     { "@type": "ListItem", position: 3, name: c.name },
   ],
 };
-const json = (o: any) => JSON.stringify(o).replace(/</g, "\\u003c");
 ---
 
-<Base title={c.name} description={seoDesc} noindex={!items.length}>
+<Base title={c.name} {...seo} noindex={seo.noindex || !items.length}>
   <Fragment slot="head">
-    <script type="application/ld+json" set:html={json(crumbs)} />
+    <script type="application/ld+json" set:html={jsonLd(crumbs)} />
   </Fragment>
   <div class="wrap">
     <p class="crumbs">
@@ -31,6 +28,7 @@ const json = (o: any) => JSON.stringify(o).replace(/</g, "\\u003c");
     </p>
     <div class="pagehead">
       <h1>{c.name}</h1>
+      {c.html && <div class="prose"><Fragment set:html={c.html} /></div>}
     </div>
     {items.length ? <Grid items={items} /> : <div class="empty"><p>No products here yet. See everything else we sell in the shop.</p><a class="btn" href="/shop/">Shop all</a></div>}
   </div>

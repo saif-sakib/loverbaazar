@@ -5,7 +5,7 @@ import { SITE, telOf, waOf } from "../../lib/shop";
 
 <Base
   title="Contact us"
-  description={`Contact ${SITE.name} by phone (${SITE.phone}), WhatsApp, or email, or visit us at ${SITE.address || "Jashore, Bangladesh"}.`}
+  description={`Contact ${SITE.name} by phone (${SITE.phone}), WhatsApp, or email${SITE.address ? ` or visit us at ${SITE.address}` : ""}.`}
 >
   <div class="wrap">
     <div class="pagehead">

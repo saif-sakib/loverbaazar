@@ -3,7 +3,12 @@ on:
   push: { branches: [main] }
   repository_dispatch: { types: [publish] }
   workflow_dispatch:
-concurrency: { group: publish, cancel-in-progress: false }
+  schedule:
+    # Update published offers each morning in Bangladesh. Enable after preview verification.
+    - cron: "23 0 * * *"
+concurrency:
+  group: publish
+  queue: max
 permissions: { contents: read }
 jobs:
   test: # code pushes only: the admin's Publish button changes content, not code
@@ -35,7 +40,7 @@ jobs:
         run: node --test scripts/release-verification.test.mjs
   deploy:
     needs: test
-    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped') && (github.event_name != 'schedule' || (vars.SEO_REFRESH_ENABLED == 'true' && vars.STORE_ENV == 'production'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -46,6 +51,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: { node-version: 22 }
       - run: npm ci --no-audit --no-fund
+      - if: env.CF_READY != 'true' && github.event_name == 'schedule'
+        run: |
+          echo "::error::The daily offer refresh needs the Cloudflare deployment secrets."
+          exit 1
       - if: env.CF_READY == 'true' && vars.CATALOG_URL == ''
         run: |
           echo "::error::Set the CATALOG_URL variable. Without it this deploy would replace the shop with the old imported data."

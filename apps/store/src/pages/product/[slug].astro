@@ -1,7 +1,9 @@
 ---
 import Base from "../../layouts/Base.astro";
+import { gtinOf, jsonLd, plainText, publicImage, recordSEO } from "../../lib/seo";
+import { gallerySizes, responsiveImage, sizedImage } from "../../lib/image-delivery.mjs";
 import Card from "../../components/Card.astro";
-import { products, cats, img, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, siteUrl, attributeValues } from "../../lib/shop";
+import { products, cats, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, siteUrl, attributeValues, languageOf } from "../../lib/shop";
 export const getStaticPaths = () => products.map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
 const d = off(p);
@@ -9,29 +11,30 @@ const url = siteUrl(`/product/${p.slug}/`);
 const myCats = p.cats.map((s: string) => cats.find((c: any) => c.slug === s)).filter(Boolean);
 const related = products.filter((x) => x.id !== p.id && x.cats.some((c: string) => p.cats.includes(c))).slice(0, 4);
 const stars = rating(p);
-const absImg = (u = "") => {
-  const s = img(u);
-  return s.startsWith("http") ? s : siteUrl(s);
-};
-const cleanDesc = (p.short || p.desc || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-const seoDesc =
-  p.short ||
-  `${p.name} price in Bangladesh is ${taka(p.price)} at ${SITE.name}. ${cleanDesc ? cleanDesc.slice(0, 110) : `Buy ${myCats[0]?.name || "home appliances"} online. See available delivery and payment methods before ordering.`}`;
+const description = plainText(p.short || p.desc) || `${p.name} at ${SITE.name}. See specifications, availability and delivery options.`;
+const seo = recordSEO(p, description);
 const brandName = attributeValues(p, "brand")[0];
+const gtin = gtinOf(p);
+const mainImage = p.images[0];
+const displayImage = (image: any) => responsiveImage(image?.src, image?.src || image?.thumb, [320, 640, 960]);
+const imageSet = displayImage(mainImage);
+const thumbnail = (image: any) => responsiveImage(image.src, image.thumb || image.src, [160]).src;
 const ld = {
   "@context": "https://schema.org",
   "@type": "Product",
   name: p.name,
   sku: p.sku || undefined,
   brand: brandName ? { "@type": "Brand", name: brandName } : undefined,
-  image: p.images.length ? p.images.map((i: any) => absImg(i.src)) : [siteUrl("/og-image.jpg")],
-  description: cleanDesc || p.name,
+  gtin,
+  mpn: p.mpn || undefined,
+  image: p.images.map((i: any) => publicImage(i.src)).filter(Boolean),
+  description: plainText(p.short || p.desc) || p.name,
   offers: {
     "@type": "Offer",
-    url,
+    url: seo.canonical || url,
     priceCurrency: "BDT",
     price: p.price,
-    itemCondition: "https://schema.org/NewCondition",
+    itemCondition: p.condition === "new" ? "https://schema.org/NewCondition" : undefined,
     availability: p.inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
     seller: { "@type": "Organization", name: SITE.name },
   },
@@ -56,22 +59,21 @@ const crumbs = {
     { "@type": "ListItem", position: myCats[0] ? 3 : 2, name: p.name },
   ],
 };
-const json = (o: any) => JSON.stringify(o).replace(/</g, "\\u003c");
 const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
 ---
 
 <Base
   title={p.name}
-  description={seoDesc}
-  image={p.images[0]?.src ? absImg(p.images[0].src) : "/og-image.jpg"}
+  {...seo}
+  image={seo.image || publicImage(mainImage?.src)}
   type="product"
 >
   <Fragment slot="head">
     <meta property="product:price:amount" content={String(p.price)} />
     <meta property="product:price:currency" content="BDT" />
     <meta property="product:availability" content={p.inStock ? "in stock" : "out of stock"} />
-    <script type="application/ld+json" set:html={json(ld)} />
-    <script type="application/ld+json" set:html={json(crumbs)} />
+    <script type="application/ld+json" set:html={jsonLd(ld)} />
+    <script type="application/ld+json" set:html={jsonLd(crumbs)} />
   </Fragment>
   <div class="wrap">
     <p class="crumbs">
@@ -86,20 +88,22 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
     <section class="pd" data-product={p.id} data-price={p.price}>
       <div>
         <div class="stage">
-          <img class="main" data-main src={img(p.images[0]?.src)} alt={p.images[0]?.alt || p.name} width="600" height="600" />
+          <img class="main" data-main {...imageSet} sizes={imageSet.srcset ? gallerySizes : undefined}
+            data-zoom={sizedImage(mainImage?.src, 960)} alt={mainImage?.alt || p.name} width="600" height="600" fetchpriority="high" />
         </div>
         {p.images.length > 1 && (
           <div class="gal">
             {p.images.map((i: any, n: number) => (
-              <button class={n === 0 ? "on" : undefined} data-thumb={img(i.src)} aria-label={`View image ${n + 1}`}>
-                <img src={img(i.thumb)} alt="" loading="lazy" width="66" height="66" />
+              <button class={n === 0 ? "on" : undefined} data-thumb={displayImage(i).src} data-srcset={displayImage(i).srcset} data-zoom={sizedImage(i.src, 960)}
+                data-alt={i.alt || p.name} aria-label={`View image ${n + 1}`} aria-pressed={n === 0}>
+                <img src={thumbnail(i)} alt="" loading="lazy" width="66" height="66" />
               </button>
             ))}
           </div>
         )}
       </div>
       <div>
-        <h1>{p.name}</h1>
+        <h1 lang={languageOf(p.name)}>{p.name}</h1>
         {p.reviews.length > 0 && (
           <p class="meta">
             <a href="#reviews">

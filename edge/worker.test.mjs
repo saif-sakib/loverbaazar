@@ -18,7 +18,7 @@ async function fixture() {
   const ctx = { waitUntil: task => background.push(task) };
   const request = (query = '') => worker.fetch(new Request('https://shop.test/api/stock' + query), { API_ORIGIN: 'https://api.test', ORIGIN_SECRET: 'test-origin-secret' }, ctx);
   const fresh = () => new Response('{"products":{"1":[100,100,5]}}', { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
-  return { entries, cache, background, request, fresh };
+  return { worker, entries, cache, background, request, fresh };
 }
 
 test('query variations and 20 simultaneous cold requests share one origin call', async () => {
@@ -96,4 +96,21 @@ test('legacy assets redirect only exact verified paths and preserve real 404s', 
   for (const path of ['missing.png', 'unsafe.png']) assert.equal((await worker.fetch(new Request('https://shop.test/wp-content/uploads/' + path), env, {})).status, 404);
   assert.equal((await worker.fetch(new Request('https://shop.test/wp-content/uploads/test.png', { method: 'POST' }), env, {})).status, 405);
   globalThis.fetch = originFetch;
+});
+
+test("WordPress search and approved numeric links redirect without forwarding to the API", async () => {
+  const { worker } = await fixture();
+  const paths = [];
+  const env = { ASSETS: { fetch: async request => {
+    const path = new URL(request.url).pathname;
+    paths.push(path);
+    return path === "/legacy-ids.json" ? Response.json({ "10": "/product/pressure-cooker/" }) : new Response("Not found", { status: 404 });
+  } } };
+  const get = path => worker.fetch(new Request("https://shop.test" + path), env, {});
+  const search = await get("/?s=চাল+rice&redirect=https://unrelated.test");
+  assert.equal(search.status, 301);
+  assert.equal(search.headers.get("Location"), "/search/?q=%E0%A6%9A%E0%A6%BE%E0%A6%B2+rice");
+  assert.equal((await get("/index.php?page_id=10")).headers.get("Location"), "/product/pressure-cooker/");
+  assert.equal((await get("/?p=999")).status, 404);
+  assert.deepEqual(paths, ["/legacy-ids.json", "/legacy-ids.json", "/index.php"]);
 });

@@ -32,7 +32,7 @@ body {
   color: var(--ink);
   font:
     15px/1.6 "Plus Jakarta Sans Variable",
-    system-ui,
+    "Noto Sans Bengali", system-ui,
     sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -517,6 +517,7 @@ h3 {
   font: inherit;
   padding: 0;
 }
+a.link { text-decoration: underline; text-underline-offset: 2px; }
 
 /* Product cards */
 .grid {
@@ -1400,37 +1401,6 @@ main {
     transition: transform 0.7s;
   }
 }
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .hero > div:first-child > * {
-    animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) both;
-  }
-  .hero > div:first-child > :nth-child(2) {
-    animation-delay: 0.06s;
-  }
-  .hero > div:first-child > :nth-child(3) {
-    animation-delay: 0.12s;
-  }
-  .hero > div:first-child > :nth-child(4) {
-    animation-delay: 0.18s;
-  }
-  .hero .pics a {
-    animation: rise 0.8s cubic-bezier(0.2, 0.7, 0.3, 1) both;
-  }
-  .hero .pics a:nth-child(2) {
-    animation-delay: 0.1s, 1.8s;
-  }
-  .hero .pics a:nth-child(3) {
-    animation-delay: 0.2s, 2.6s;
-  }
-
-}
-
 @media (max-width: 860px) {
   .wrap {
     padding: 0 16px;
@@ -1542,7 +1512,6 @@ main {
 .hero .eyebrow { color: #e9b6c2; font-size: 10px; }
 .hero p:not(.eyebrow) { color: #e0ccd2; font-size: 15px; }
 .hero .pics { min-width: 0; }
-.hero .pics a { animation: none; }
 .hero .pics a:first-child { min-height: 330px; }
 .hero .pics img { inset: 8% 8% 20%; height: 72%; }
 .hero-actions { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }

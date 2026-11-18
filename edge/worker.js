@@ -70,10 +70,36 @@ async function stock(request, env, url, ctx) {
   return (await refreshStock(request, env, originURL, cache, key)).clone();
 }
 
+// Only the homepage and old WP entry points enter the Worker for query links.
+async function legacyEntry(request, env, url) {
+  if (request.method !== "GET" && request.method !== "HEAD") return env.ASSETS.fetch(request);
+  const query = url.searchParams;
+  const redirect = to => new Response(null, { status: 301, headers: { Location: to, "Cache-Control": "public, max-age=3600" } });
+  if (query.has("s")) {
+    const search = query.get("s").trim().slice(0, 160);
+    if (search) return redirect("/search/?" + new URLSearchParams({ q: search }));
+  }
+  const idParam = ["p", "page_id", "product_id"].find(name => query.has(name));
+  if (idParam) {
+    const id = query.get(idParam);
+    if (/^[1-9]\d{0,15}$/.test(id)) {
+      try {
+        const response = await env.ASSETS.fetch(new Request(new URL("/legacy-ids.json", url)));
+        const to = response.ok ? (await response.json())[id] : undefined;
+        if (typeof to === "string" && /^\/(?!\/)[^?\\#]*\/$/.test(to)) return redirect(to);
+      } catch { /* Treat the missing lookup as an unresolved legacy URL. */ }
+    }
+    return env.ASSETS.fetch(new Request(new URL("/index.php", url), { method: request.method }));
+  }
+  return env.ASSETS.fetch(request);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/wp-content/")) {
+    if (url.pathname === "/" || url.pathname === "/index.php") return legacyEntry(request, env, url);
+    if (!url.pathname.startsWith("/api/")) {
+      if (!url.pathname.startsWith("/wp-content/")) return env.ASSETS.fetch(request);
       if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
       try {
         const mapResponse = await env.ASSETS.fetch(new Request(new URL("/legacy-assets.json", url)));

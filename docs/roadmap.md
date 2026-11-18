@@ -294,59 +294,80 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 24 — Preserve legacy URLs and define redirects
 
-**Status:** Planned · **Depends on:** 17, 18
+**Status:** In progress · **Depends on:** 17, 18
 
 - Build a URL ledger from WordPress exports, sitemaps and available Search Console/backlink/traffic exports. Preserve exact product/category/tag/page/post paths, nested categories, trailing slashes and percent-encoded Bangla through `fileSlug()`.
 - Map changed URLs and legacy images/downloads to their closest relevant destinations; retain useful old query-link behavior. Review broad existing redirects for soft-404s. Genuine missing resources return an actual 404/410, without universal homepage redirects or redirect chains.
 - Define HTTPS, apex/www, canonical query/filter and staging URL policies. Verify the complete ledger, unusual encodings, redirects and status codes; protect commercially important URLs with regression checks.
 
+**Evidence, 18 November 2026.** Public sitemap ledger and exact path/query aliases implemented. Local comparison covered 348 URLs, with 336 direct, eight equivalent alias redirects, and four private decisions pending. Complete real-export, asset and Search Console/backlink coverage before cutover. [Results and remaining actions](seo-performance-results.md)
+
+
 ### Task 25 — Finish on-page SEO and indexing rules
 
-**Status:** Planned · **Depends on:** 22, 24
+**Status:** In progress · **Depends on:** 22, 24
 
 - Preserve useful Rank Math titles/descriptions/canonicals and provide editable SEO fields with sensible per-page fallbacks. Improve headings, category text, internal links, descriptions, actual language metadata, social images and article information without repetitive keyword stuffing.
 - Align sitemap inclusion with canonical/indexable active content, excluding admin/account/cart/checkout/search/tracking, drafts and intentional noindex pages. Make preview indexing protection environment-aware and preserve Search Console verification.
 - Verify unique meaningful titles/descriptions, one primary H1, canonical correctness, noindex/robots behavior and valid share images. Do not claim robots disallow makes private data secure or reliably removes an already indexed URL.
 
+**Evidence, 18 November 2026.** Editable product/category/page/post search properties, preview protection, canonical build checks and production sitemap generated from page heads. Local production-shaped build passed. Actual approved policy/catalog metadata, live images and Search Console verification are pending. [Results and remaining actions](seo-performance-results.md)
+
+
 ### Task 26 — Make product structured data and feeds trustworthy
 
-**Status:** Planned · **Depends on:** 8, 21, 25
+**Status:** In progress · **Depends on:** 8, 21, 25
 
 - Validate Product/Offer/Breadcrumb/Store/Article JSON-LD and RSS/merchant feeds. Use real brand/model/SKU/GTIN where available, BDT, accurate stock, legitimate approved reviews, policy data and absolute image URLs. Omit unknown identifiers rather than inventing them.
 - Implement a documented freshness policy for build-time prices/availability and feeds. Rebuild already-published content or serve appropriate memory-snapshot feeds without releasing pending editorial edits. Include the trigger, maximum lag and failure alert; a browser price patch alone does not update static HTML.
 - Verify rich-result validation, feed parsing and a price/stock change across HTML, visible UI and feeds. Confirm channel/country eligibility before treating Merchant Center as a required sales channel. Google indexing timing is outside the application's control.
 
+**Evidence, 18 November 2026.** BDT Product/Offer fields, verified GTIN handling, separate blog/product RSS and opt-in daily published-offer refresh implemented. Local frozen-release and artifact-change checks passed. Final rich-results test, real offer reconciliation and hosted workflow evidence are pending. [Results and remaining actions](seo-performance-results.md)
+
+
 ### Task 27 — Optimize images, fonts and mobile rendering
 
-**Status:** Planned · **Depends on:** 12, 20
+**Status:** In progress · **Depends on:** 12, 20
 
 - Deliver correctly sized Cloudinary responsive images with constrained transformation widths, useful `srcset`/`sizes`, modern formats, reserved dimensions and eager/high-priority loading only for real above-fold/LCP images. Lazy-load the remainder.
 - Reduce unused font weights/subsets while retaining Bangla/English glyph coverage and stable fallback layout. Verify broken-image handling, zoom quality and gallery sizing.
 - Measure mobile network/image transfers and layout shift on home, category and product pages. Done with recorded before/after evidence and acceptable Cloudinary credit use; do not trade an oversized original for uncontrolled per-device transformation costs.
 
+**Evidence, 18 November 2026.** Bounded responsive Cloudinary image URLs, priority/lazy loading, gallery zoom and self-hosted Latin/Bangla fonts implemented. Fixture measurements completed. Confirm real Cloudinary photo quality, migration coverage and free-tier usage. [Results and remaining actions](seo-performance-results.md)
+
+
 ### Task 28 — Set and meet frontend performance budgets
 
-**Status:** Planned · **Depends on:** 10, 11, 27
+**Status:** In progress · **Depends on:** 10, 11, 27
 
 - Measure representative pages on throttled mobile hardware/network profiles, then reduce blocking work, unnecessary JavaScript/CSS, long tasks, excessive DOM/card rendering and full-index downloads where justified. Keep Astro static output and avoid adding a frontend runtime without evidence.
 - Initial targets: ordinary storefront first-load transfer ≤1 MB, compressed first-party JS ≤75 KB and CSS ≤40 KB, with separately recorded image/font budgets. Adjust targets only with documented measurements and a reason; do not hide regressions by changing thresholds silently.
 - Target LCP ≤2.5 s, INP ≤200 ms and CLS ≤0.1; lab measurements are prelaunch evidence, field 75th-percentile results come later. Verify cold/warm cache and meaningful input interactions. [Metric definitions](https://web.dev/articles/vitals)
 
+**Evidence, 18 November 2026.** Repeatable cold/warm phone-profile lab and documented byte thresholds. All representative fixture pages passed. Repeat against the approved catalog and hosted release, then collect field results when eligible. [Results and remaining actions](seo-performance-results.md)
+
+
 ### Task 29 — Add useful, private and free measurement
 
-**Status:** Planned · **Depends on:** 25, 28
+**Status:** In progress · **Depends on:** 25, 28
 
 - Prepare Search Console ownership/sitemap monitoring and minimal free analytics or aggregate counters appropriate to the owner's questions. Track product discovery, checkout attempts/success and failures without recording names, phone numbers, addresses, transaction IDs or secrets.
 - Make optional analytics respectful of applicable consent/privacy choices; a blocked analytics script must never break shopping. Use provider dashboards or lightweight aggregate tooling before adding a new service.
 - Verify duplicate purchase events/idempotent retries and exclusion of preview/test traffic. Done with a baseline/report guide for conversion, popular products, 404s and Web Vitals, stating where low traffic means field data is unavailable.
 
+**Evidence, 18 November 2026.** Documented Search Console/404/field baseline. Optional production-only request and unique committed-order counts tested with retries and no customer fields. Ownership, hosted reporting and baseline traffic remain pending. [Results and remaining actions](seo-performance-results.md)
+
+
 ### Task 30 — Complete accessibility and Bangla/English usability
 
-**Status:** Planned · **Depends on:** 10, 11, 12, 13, 14, 15, 16, 22
+**Status:** In progress · **Depends on:** 10, 11, 12, 13, 14, 15, 16, 22
 
 - Audit semantics, headings, landmarks, labels, focus management, dialogs, status/error announcements, contrast, target sizes, zoom/reflow, reduced motion and keyboard navigation across shopping and admin. Use [WCAG 2.2 AA](https://www.w3.org/TR/WCAG22/) as the implementation target.
 - Check Bangla numerals/phone entry, mixed-language long names, address wrapping, font coverage and clear local currency/date presentation. Do not add a partially translated language switcher that promises unsupported content.
 - Verify with automated accessibility checks plus manual keyboard/screen-reader and 200% zoom checks. Done when critical journeys have no unresolved serious accessibility barriers and any remaining limitations are recorded.
+
+**Evidence, 18 November 2026.** Resolved automated contrast, accessible naming and link issues. Axe, keyboard/reflow and disposable Bangla guest checkout passed. Finish real 200% zoom, TalkBack/VoiceOver and final content checks. [Results and remaining actions](seo-performance-results.md)
+
 
 ## Tasks 31–37: CI/CD, hosting and DevOps
 

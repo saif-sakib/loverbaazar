@@ -257,7 +257,12 @@
       renderCart();
     }
     if (t.dataset.thumb) {
-      $("[data-main]").src = t.dataset.thumb;
+      const image = $("[data-main]");
+      if (t.dataset.srcset) image.srcset = t.dataset.srcset;
+      else image.removeAttribute("srcset");
+      image.src = t.dataset.thumb;
+      image.alt = t.dataset.alt || image.alt;
+      image.dataset.zoom = t.dataset.zoom || t.dataset.thumb;
       $$("[data-thumb]").forEach((b) => { b.classList.toggle("on", b === t); b.setAttribute("aria-pressed", String(b === t)); });
     }
   });
@@ -768,7 +773,7 @@
     pane.hidden = true;
     stage.append(pane);
     const wide = matchMedia("(hover: hover) and (min-width: 900px)");
-    const url = () => `url("${(pic.currentSrc || pic.src).replace(/["\\\n]/g, encodeURIComponent)}")`;
+    const url = () => `url("${(pic.dataset.zoom || pic.currentSrc || pic.src).replace(/["\\\n]/g, encodeURIComponent)}")`;
     pic.addEventListener("mousemove", (e) => {
       if (!wide.matches) return;
       const r = pic.getBoundingClientRect();
@@ -783,7 +788,7 @@
       const box = document.createElement("dialog");
       box.className = "lightbox";
       box.setAttribute("aria-label", "Product image");
-      box.innerHTML = `<img src="${esc(pic.currentSrc || pic.src)}" alt="${esc(pic.alt)}"><button class="x" aria-label="Close">×</button>`;
+      box.innerHTML = `<img src="${esc(pic.dataset.zoom || pic.currentSrc || pic.src)}" alt="${esc(pic.alt)}"><button class="x" aria-label="Close">×</button>`;
       const close = () => {
         box.close();
         box.remove();
@@ -791,7 +796,10 @@
         removeEventListener("keydown", key);
       };
       const key = (e) => e.key === "Escape" && close();
-      box.onclick = close;
+      box.addEventListener("click", (event) => {
+        if (event.target === box || event.target.closest("button")) close();
+      });
+      box.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
       addEventListener("keydown", key);
       document.body.append(box);
       box.showModal();
@@ -1003,7 +1011,7 @@
   }));
   document.addEventListener("error", e => {
     const image = e.target;
-    if (image instanceof HTMLImageElement && !image.src.endsWith("/placeholder.svg")) { image.removeAttribute("srcset"); image.src = "/placeholder.svg"; }
+    if (image instanceof HTMLImageElement && !image.src.endsWith("/placeholder.svg")) { image.closest("picture")?.querySelectorAll("source").forEach(source => source.remove()); image.removeAttribute("srcset"); image.removeAttribute("data-zoom"); image.src = "/placeholder.svg"; }
   }, true);
   $$("img").forEach(image => { if (image.complete && !image.naturalWidth && image.getAttribute("src")) image.dispatchEvent(new Event("error")); });
   $$("[data-thumb]").forEach(b => b.setAttribute("aria-pressed", String(b.classList.contains("on"))));

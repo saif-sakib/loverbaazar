@@ -248,6 +248,9 @@ def normalize(bundle, overrides=None):
                  'inStock': stock > 0, 'cats': product_cats, 'tags': [slug(t['slug']) for t in p.get('tags', [])], 'images': images, 'desc': clean(desc), 'short': text(short)[:300],
                  'attrs': [{'name': text(a['name']), 'values': [text(x.get('name', '')) if isinstance(x, dict) else text(x) for x in a.get('options', a.get('terms', [a['option']] if a.get('option') else []))]} for a in p.get('attributes', [])],
                  'migrationBlocked': bool(issues), 'migrationIssues': issues, 'sourceType': p.get('type'), 'sourceStatus': p.get('status'), 'sourceProtected': bool(p.get('protected_content')), 'seo': p.get('seo', {}), 'sourceModified': p.get('date_modified_gmt', '')}
+        gtin = p.get('global_unique_id')
+        if isinstance(gtin, str) and gtin.strip():
+            value['gtin'] = gtin.strip()
         records.append({'kind': 'product', 'key': str(pid), 'value': value})
         review.append({'id': pid, 'name': value['name'], 'sku': value['sku'], 'price': current, 'stock': stock, 'active': value['active'], 'issues': ';'.join(issues), 'record_sha256': digest(value)})
         ledger.append({'source': p.get('permalink', f'/product/{ps}/'), 'destination': f'/product/{ps}/', 'source_id': pid})
@@ -266,7 +269,7 @@ def normalize(bundle, overrides=None):
             body = rendered(p.get('content', p.get('html', '')))
             value = {'slug': key, 'title': text(rendered(p.get('title'))), 'html': clean(body), 'draft': p.get('status') != 'publish' or bool(p.get('protected_content')), 'seo': p.get('seo', {})}
             if kind == 'post':
-                value.update(date=str(p.get('date_gmt') or p.get('date', ''))[:10], excerpt=text(rendered(p.get('excerpt')))[:180])
+                value.update(date=str(p.get('date_gmt') or p.get('date', ''))[:10], modified=str(p.get('modified_gmt') or '')[:10], excerpt=text(rendered(p.get('excerpt')))[:180])
             records.append({'kind': kind, 'key': key, 'value': value})
     unique(records, lambda r: (r['kind'], r['key']), 'record identity')
     unique([r for r in records if r['kind'] in {'page', 'post'}], lambda r: r['key'], 'page/post route')
