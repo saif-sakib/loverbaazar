@@ -19,6 +19,7 @@ func TestOrderMailDurabilityAndRecovery(t *testing.T) {
 	t.Setenv("TURNSTILE_SECRET", "test-secret")
 	t.Setenv("BREVO_KEY", "")
 	t.Setenv("SHOP_EMAIL", "sender@example.invalid")
+	t.Setenv("SHOP_REPLY_TO", "help@example.invalid")
 	t.Setenv("ADMIN_EMAIL", "owner@example.invalid")
 	t.Setenv("CUSTOMER_ORDER_EMAIL", "true")
 	logs := answer(t, 200, `{"success":true,"hostname":"shop.test"}`)
@@ -70,6 +71,10 @@ func TestOrderMailDurabilityAndRecovery(t *testing.T) {
 		!strings.Contains(string(calls[1]["to"]), "buyer@example.invalid") ||
 		strings.Contains(string(calls[1]["to"]), "owner@example.invalid") {
 		t.Fatal("mail provider did not get isolated recipients")
+	}
+	if !strings.Contains(string(calls[1]["sender"]), "sender@example.invalid") ||
+		!strings.Contains(string(calls[1]["replyTo"]), "help@example.invalid") {
+		t.Fatal("mail provider did not get the configured sender and reply address")
 	}
 	var used, cleared int
 	if err := db.QueryRow(bg, `SELECT (SELECT recipients FROM notification_daily_budget),(SELECT count(*) FROM order_notifications WHERE state='accepted' AND payload='{}')`).Scan(&used, &cleared); err != nil || used != 4 || cleared != 2 {

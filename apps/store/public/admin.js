@@ -154,7 +154,7 @@
     }
     const generation = navigationGeneration;
     return pendingReads.get(key).then(result => {
-      if (path !== "/publish" && generation !== navigationGeneration) throw Object.assign(new Error("Section changed"), { stale: true });
+      if (generation !== navigationGeneration) throw Object.assign(new Error("Section changed"), { stale: true });
       return result;
     });
   }
@@ -174,11 +174,18 @@
     return j;
   }
 
-  const say = (m) => {
+  let noticeTimer;
+  const say = (m, dismissAfter = 0) => {
+    clearTimeout(noticeTimer);
     $("#ok").textContent = m;
     $("#ok").hidden = !m;
+    if (dismissAfter) noticeTimer = setTimeout(() => say(""), dismissAfter);
   };
   const logout = (msg) => {
+    publicationGeneration++;
+    clearTimeout(publicationTimer);
+    watchedPublicationId = "";
+    say("");
     clearProductPhotoPreviews();
     cleanupUploads();
     session("t", null);
@@ -228,7 +235,7 @@
       }
     };
   // Saved, but customers only see it after Publish.
-  let publicationGeneration=0;
+  let publicationGeneration = 0;
   const needsPublish = (m) => {
     publicationGeneration++;
     say(m);
@@ -239,27 +246,42 @@
   };
 
   let publicationTimer;
+  let watchedPublicationId = "";
   async function publicationStatus() {
+    const generation = publicationGeneration;
     try {
-      const generation=publicationGeneration;
-      const p=await api("/publish");
-      if(generation!==publicationGeneration)return;
-      $("#dirtybar").hidden=!p.dirty;
-      if(!p.dirty) {try{localStorage.removeItem("dirty");}catch{}}
-      if(p.latest && ["queued","running"].includes(p.latest.state)) {
-        say(`Publication ${p.latest.state}. Saved changes stay pending until deployment finishes.`);
-        clearTimeout(publicationTimer);publicationTimer=setTimeout(publicationStatus,5000);
-      } else if(p.latest?.state==="failed") say("Publication failed. Your saved changes still need Publish. Retry after checking the build.");
-      else if(p.latest?.state==="published") say(p.dirty?"Published. Newer edits still need Publish.":"Publication confirmed.");
-    }catch { /* Retain the existing pending marker on network failure. */ }
+      const { dirty, latest } = await apiRequest("/publish");
+      if (generation !== publicationGeneration) return;
+      $("#dirtybar").hidden = !dirty;
+      if (!dirty) {
+        try { localStorage.removeItem("dirty"); } catch {}
+      }
+      if (latest && ["queued", "running"].includes(latest.state)) {
+        watchedPublicationId = latest.id;
+        say(`Publication ${latest.state}. Saved changes stay pending until deployment finishes.`);
+        clearTimeout(publicationTimer);
+        publicationTimer = setTimeout(publicationStatus, 5000);
+        return;
+      }
+      const finished = latest?.id && latest.id === watchedPublicationId;
+      watchedPublicationId = "";
+      if (latest?.state === "failed" && dirty) {
+        say("Publication failed. Your saved changes still need Publish. Retry after checking the build.");
+      } else if (latest?.state === "published" && finished) {
+        say(dirty ? "Published. Newer edits still need Publish." : "Publication confirmed.", 8000);
+      }
+    } catch { /* Retain the existing pending marker on network failure. */ }
   }
   const publish = run(async () => {
     if (savingChanges) return say("Please wait for your changes to finish saving.");
+    publicationGeneration++;
+    clearTimeout(publicationTimer);
     $("#pub").disabled = true;
     $("#pub2").disabled = true;
     say("Publishing…");
     try {
       const r = await api("/publish", { method: "POST" });
+      watchedPublicationId = r.id;
       say(r.message);
       await publicationStatus();
     } finally {
@@ -1739,7 +1761,7 @@
 
         </section>
         <section class="panel">
-          ${secHead("Delivery areas & order rules", "Configure delivery areas and fees shown on product pages and checkout. Fees are charged per piece because appliances are heavy.", "Product pages, Cart & Checkout", "live")}
+          ${secHead("Delivery areas & order rules", "Configure delivery areas and base charges shown on product pages and checkout.", "Product pages, Cart & Checkout", "live")}
           <div id="zones"></div>
           <details class="advanced optional-fields"><summary>Optional order rules <small>Free delivery &amp; minimum order</small></summary>
           <div class="fields2">
@@ -1848,7 +1870,7 @@
         L.delivery,
         [
           { k: "label", label: "Area name", placeholder: "e.g. Inside Jashore" },
-          { k: "fee", label: "Charge per piece (৳)", type: "number", min: 0, help: "0 for free delivery" },
+          { k: "fee", label: "Base delivery charge (৳)", type: "number", min: 0, help: "Amount for one item. Enter 0 for free delivery." },
           { k: "days", label: "Delivery time (optional)", placeholder: "e.g. 2 to 3 days" },
         ],
         { label: "", fee: 0, days: "" },
@@ -2166,7 +2188,7 @@
   };
 
   async function enter() {
- publicationStatus();
+    publicationStatus();
     $("#login").hidden = true;
     $("#app").hidden = false;
     $("#admin-section").innerHTML = Object.entries(HEADS).map(([key, [label]]) => `<option value="${key}">${esc(label)}</option>`).join("");

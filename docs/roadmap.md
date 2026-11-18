@@ -416,7 +416,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Record notification outcome and support bounded retry/manual resend with deduplication, preferably in the existing database/process without paid queues or continuous polling that prevents Neon sleep. Committed orders remain successful even when Brevo is down or its quota is reached.
 - Verify failure, retry, owner/customer recipient isolation and quota accounting using controlled addresses. Done when the owner sees pending/failed notifications and can recover them without duplicating orders or leaking customer data.
 
-**Evidence, 18 November 2026.** Added transactional queued notifications, owner/customer isolation, accepted/failed/uncertain tracking, bounded retries and daily cap, plus an Admin operations view. Controlled provider simulations passed. Configure the sender and verify delivery to the owner’s test inbox.
+**Evidence, 18 November 2026.** Added transactional queued notifications, owner/customer isolation, accepted/failed/uncertain tracking, bounded retries and daily cap, plus an Admin operations view. Controlled provider simulations passed. The `SHOP_REPLY_TO` setting lets replies reach the monitored shop inbox when the sender uses the store domain. Finish Brevo DNS authentication, select the verified sender and confirm delivery to the owner’s test inbox.
 
 
 ### Task 35 — Make backups complete, private and dependable
