@@ -132,7 +132,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Retain images used by the active release and rollback releases. Delete only after confirmed replacement publication and a bounded retention policy, with quota accounting.
 - Verify failed/cancelled/superseded builds, another-device admin access, edits during a build, replaced photos before Publish and a rollback. Existing public pages must retain working assets throughout.
 
-**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md). Real isolated local success/failure/retry and protocol regression checks pass; actual Cloudflare/GitHub/Render publication and cross-device cloud confirmation remain pending configuration/deployment.
+**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md). Real isolated local success/failure/retry and protocol regression checks pass. On 18 November, the [admin-triggered publication](https://github.com/saif-sakib/loverbaazar/actions/runs/44136254142) and [latest main release](https://github.com/saif-sakib/loverbaazar/actions/runs/44202649487) passed deployment confirmation. The Cloudflare preview returned the matching main commit as JSON. Cross-device confirmation, asset replacement and hosted rollback remain pending.
 
 
 ## Tasks 9–16: mobile-first UI and UX
