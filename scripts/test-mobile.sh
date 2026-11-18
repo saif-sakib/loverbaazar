@@ -3,12 +3,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export LB_ISOLATED=1
-export LB_API_PORT=${LB_API_PORT:-18081} LB_STORE_PORT=${LB_STORE_PORT:-18788} LB_DB_PORT=${LB_DB_PORT:-55436}
+export LB_API_PORT=${LB_API_PORT:-18081} LB_STORE_PORT=${LB_STORE_PORT:-18788} LB_DB_PORT=${LB_DB_PORT:-0}
 export SHOP_URL="http://127.0.0.1:$LB_STORE_PORT"
 # Refuse occupied ports before waiting; otherwise readiness could belong to somebody else.
 python3 - "$LB_API_PORT" "$LB_STORE_PORT" "$LB_DB_PORT" <<'PY'
 import socket,sys
-for p in sys.argv[1:]:
+# The default isolated database is published on a port assigned by Docker.
+ports = sys.argv[1:]
+for p in ports[:2] if ports[2] == '0' else ports:
     with socket.socket() as s:
         try:s.bind(('127.0.0.1',int(p)))
         except OSError:raise SystemExit(f'Fixture port {p} is occupied; leave its owner running and choose another port.')

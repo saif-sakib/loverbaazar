@@ -20,10 +20,9 @@ export default defineConfig({
           builtAt: new Date().toISOString(),
           revision: process.env.BUILD_REVISION ? Number(process.env.BUILD_REVISION) : null,
         }));
-        if (environment !== "production") {
-          const path = new URL("_headers", dir);
-          await writeFile(path, (await readFile(path, "utf8")) + "\n/*\n  X-Robots-Tag: noindex, nofollow\n");
-        }
+        const previewPattern = environment === "production" ? "https://:worker.:account.workers.dev/*" : "/*";
+        const headers = new URL("_headers", dir);
+        await writeFile(headers, (await readFile(headers, "utf8")) + `\n${previewPattern}\n  X-Robots-Tag: noindex, nofollow\n`);
       },
     },
   }],

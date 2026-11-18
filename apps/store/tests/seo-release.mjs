@@ -65,6 +65,9 @@ try {
   assert.match(await read("production", "seo-hidden-fixture/index.html"), /noindex, follow/);
   await assert.rejects(read("production", "seo-draft-fixture/index.html"), { code: "ENOENT" });
   assert.match(await read("production", "robots.txt"), /Sitemap: https:\/\/loverbaazar.com\/sitemap-index.xml/);
+  const productionHeaders = await read("production", "_headers");
+  assert.match(productionHeaders, /https:\/\/:worker\.:account\.workers\.dev\/\*\n  X-Robots-Tag: noindex, nofollow/);
+  assert.doesNotMatch(productionHeaders, /^\/\*\n  X-Robots-Tag:/m);
   const feed = await read("production", "feed.xml");
   assert.match(feed, /<g:sale_price>1250 BDT<\/g:sale_price>/);
   await run("python3", ["-c", "import sys,xml.etree.ElementTree as ET\nfor x in sys.argv[1:]: ET.parse(x)", ...["feed.xml", "blog/feed.xml", "sitemap-index.xml", "sitemap-0.xml"].map(f => join(work, "production", f))]);
