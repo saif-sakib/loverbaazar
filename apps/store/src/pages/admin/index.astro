@@ -71,5 +71,12 @@ import "../../styles/mobile.css";
         </main>
       </div>
     </div>
+    <dialog class="order-invoice" id="order-invoice" aria-labelledby="invoice-title">
+      <form method="dialog" class="invoice-controls">
+        <button type="button" class="btn" data-print-invoice>Print / Save PDF</button>
+        <button class="btn ghost" autofocus>Close</button>
+      </form>
+      <article id="invoice-preview"></article>
+    </dialog>
   </body>
 </html>

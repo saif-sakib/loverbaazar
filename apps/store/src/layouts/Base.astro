@@ -130,7 +130,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
           <div class="suggest" id="search-suggestions" data-suggestions role="listbox" aria-label="Suggested products" hidden></div>
         </form>
         <nav class="icons" aria-label="Your shopping">
-          <a href="/wishlist/">
+          <a class="desktop-shopping-link" href="/wishlist/">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 20s-7.5-4.6-9.2-9A5 5 0 0 1 12 7a5 5 0 0 1 9.2 4c-1.7 4.4-9.2 9-9.2 9Z" />
             </svg>
@@ -144,7 +144,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
             </svg>
             <span>Account</span>
           </a>
-          <a href="/cart/">
+          <a class="desktop-shopping-link" href="/cart/">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 4h2.500l2.2 11h10.100l2-8H6.4" />
               <circle cx="9.5" cy="19.5" r="1.5" />
@@ -157,7 +157,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
       </div>
       <nav class="wrap nav" aria-label="Product categories and pages">
         <button type="button" class="category-toggle" data-categories aria-controls="category-drawer" aria-expanded="false">Categories ▾</button>
-        <a href="/shop/">Shop all</a>
+        <a class="desktop-shopping-link" href="/shop/">Shop all</a>
         {MENU.map((g: any) => (
           <details class="mega">
             <summary>{g.title}</summary>
@@ -172,7 +172,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
         <a href="/product-category/latest-product/">New</a>
         <a href="/product-category/popular-item/">Popular</a>
         <a href="/blog/">Blog</a>
-        <a href="/track/">Track order</a>
+        <a class="desktop-shopping-link" href="/track/">Track order</a>
         <a href="/contact-us/">Contact</a>
       </nav>
     </header>
@@ -234,7 +234,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
           <h4>Policies</h4>
           <a href="/privacy-policy/">Privacy policy</a>
           <a href="/terms-conditions/">Terms and conditions</a>
-          <a href="/track/">Track your order</a>
+          <a class="desktop-shopping-link" href="/track/">Track your order</a>
         </div>
         <div>
           <h4>Payment</h4>

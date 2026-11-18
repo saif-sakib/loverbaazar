@@ -875,26 +875,38 @@
   });
 
   function invoice(o) {
-    const s = site || {},
-      w = window.open("");
-    if (!w) return say("Your browser blocked the invoice window. Please allow pop-ups for this page.");
-    w.document
-      .write(`<!doctype html><title>Invoice ${esc(o.number)}</title><style>body{font:14px/1.5 system-ui,sans-serif;max-width:640px;margin:32px auto;color:#111}table{width:100%;border-collapse:collapse;margin:16px 0}td,th{border:1px solid #bbb;padding:8px;text-align:left}td:last-child,th:last-child{text-align:right}</style>
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:14px;border-bottom:2px solid #222;margin-bottom:16px">
-        <div style="display:flex;align-items:center;gap:12px">
-          <img src="${esc(s.logo || "/favicon.svg")}" alt="" width="42" height="42" style="border-radius:9px;object-fit:cover;flex:none">
-          <div><b style="font-size:18px;display:block">${esc(s.name || "LoverBaazar")}</b><span style="font-size:13px;color:#444">${esc(s.phone)}${s.address ? ` · ${esc(s.address)}` : ""}</span></div>
+    const dialog = $("#order-invoice");
+    if (!dialog) return say("Reload Admin to preview the invoice.");
+    const preview = $("#invoice-preview", dialog);
+    const shop = site || {};
+    const date = new Date(o.created_at).toLocaleDateString("en-GB", {
+      timeZone: "Asia/Dhaka", day: "numeric", month: "short", year: "numeric",
+    });
+
+    preview.innerHTML = `<h2 id="invoice-title">Invoice ${esc(o.number)}</h2>
+      <p class="invoice-date"><time datetime="${esc(o.created_at)}">${esc(date)}</time> · <span class="invoice-status">${esc(o.status)}</span></p>
+      <div class="invoice-parties">
+        <div class="invoice-shop">
+          <img src="${esc(shop.logo || "/favicon.svg")}" alt="" width="42" height="42">
+          <div><strong>${esc(shop.name || "LoverBaazar")}</strong><br>${esc(shop.phone)}${shop.address ? `<br>${esc(shop.address)}` : ""}</div>
         </div>
-        <div style="text-align:right"><b>Invoice ${esc(o.number)}</b><br><span style="font-size:13px;color:#444">${esc(when(o.created_at))}</span></div>
+        <div><strong>${esc(o.name)}</strong><br>${esc(o.phone)}${o.email ? `<br>${esc(o.email)}` : ""}<br>${esc(o.address)} (${esc(o.area)})</div>
       </div>
-      <p><b>${esc(o.name)}</b>, ${esc(o.phone)}${o.email ? `, ${esc(o.email)}` : ""}<br>${esc(o.address)} (${esc(o.area)})</p>
-      <table><tr><th>Item</th><th>Qty</th><th>Amount</th></tr>${(o.items || []).map((i) => `<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>${money(i.price * i.qty)}</td></tr>`).join("")}
-      ${o.discount ? `<tr><td colspan=2>Discount (${esc(o.coupon)})</td><td>−${money(o.discount)}</td></tr>` : ""}
-      <tr><td colspan=2>Delivery charge</td><td>${o.shipping ? money(o.shipping) : "Free"}</td></tr><tr><td colspan=2><b>Total</b></td><td><b>${money(o.total)}</b></td></tr></table>
-      <p>Payment: ${esc(o.payment)} ${esc(o.txn_id)}</p>
-      <p style="text-align:center;margin-top:32px"><b>Thanks for shopping from ${esc(s.name || "LoverBaazar")}!</b><br>We hope to see you again soon.${s.phone ? ` Questions? Call ${esc(s.phone)}.` : ""}</p>`);
-    w.document.close();
-    w.print();
+      <table class="invoice-items">
+        <thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Amount</th></tr></thead>
+        <tbody>${(o.items || []).map((item) => `<tr><td>${esc(item.name)}</td><td>${esc(item.qty)}</td><td>${money(item.price * item.qty)}</td></tr>`).join("")}</tbody>
+      </table>
+      <dl class="invoice-totals">
+        <div><dt>Subtotal</dt><dd>${money(o.subtotal)}</dd></div>
+        ${o.discount ? `<div><dt>Discount (${esc(o.coupon)})</dt><dd>−${money(o.discount)}</dd></div>` : ""}
+        <div><dt>Delivery charge</dt><dd>${o.shipping ? money(o.shipping) : "Free"}</dd></div>
+        <div class="invoice-total"><dt>Total</dt><dd>${money(o.total)}</dd></div>
+      </dl>
+      <p class="invoice-payment">Payment method: ${esc(o.payment)}${o.txn_id ? `<br>Transaction reference: ${esc(o.txn_id)}` : ""}</p>`;
+
+    $("[data-print-invoice]", dialog).onclick = () => window.print();
+    dialog.onclose = () => preview.replaceChildren();
+    dialog.showModal();
   }
 
   // ---- Products ----

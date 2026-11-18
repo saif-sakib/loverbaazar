@@ -447,3 +447,53 @@ figcaption { display: flex; justify-content: space-between; margin-top: 6px; }
 .admin .rich-advanced { margin-left: auto; font-size: 12px; color: var(--mute); }
 .admin .rich-advanced summary { cursor: pointer; padding: 8px; }
 .admin .rich-advanced[open] { border: 1px solid var(--line); border-radius: 8px; }
+
+.order-invoice {
+  width: min(calc(100% - 24px), 680px);
+  max-height: calc(100dvh - 24px);
+  padding: clamp(12px, 4vw, 24px);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.order-invoice::backdrop { background: #18181b9c; }
+.invoice-controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-bottom: 16px; }
+.order-invoice h2 { margin: 0; font-size: 1.25rem; }
+.invoice-date { margin: 4px 0 16px; color: var(--mute); }
+.invoice-status { text-transform: capitalize; }
+.invoice-parties { display: grid; gap: 12px; margin-bottom: 16px; overflow-wrap: anywhere; }
+.invoice-shop { display: flex; align-items: flex-start; gap: 8px; }
+.invoice-shop img { flex: none; border-radius: 8px; object-fit: cover; }
+.invoice-items { width: 100%; border-collapse: collapse; }
+.invoice-items :is(th, td) { padding: 8px 4px; border-bottom: 1px solid var(--line); text-align: left; }
+.invoice-items :is(th, td):not(:first-child) { text-align: right; }
+.invoice-items td:first-child { overflow-wrap: anywhere; }
+.invoice-totals { margin: 16px 0; }
+.invoice-totals > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding-block: 4px; }
+.invoice-totals dt { overflow-wrap: anywhere; }
+.invoice-totals dd { margin: 0; }
+.invoice-total { font-weight: 700; border-top: 1px solid var(--line); }
+.invoice-payment { margin: 0; }
+@media (min-width: 480px) {
+  .invoice-parties { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media print {
+  .admin:has(.order-invoice[open]) { margin: 0; padding: 0; background: #fff; }
+  .admin:has(.order-invoice[open]) > :not(.order-invoice),
+  .order-invoice .invoice-controls, .order-invoice::backdrop { display: none; }
+  .order-invoice[open] {
+    position: static;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    color: #111;
+    overflow: visible;
+  }
+  .invoice-parties, .invoice-items tr, .invoice-totals, .invoice-payment { break-inside: avoid; }
+}
