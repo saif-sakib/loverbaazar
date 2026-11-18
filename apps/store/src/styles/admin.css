@@ -495,7 +495,7 @@ figcaption { display: flex; justify-content: space-between; margin-top: 6px; }
   .invoice-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 15rem); gap: 28px; }
   .invoice-items :is(th, td) { padding: 9px 10px; }
 }
-@page shop-invoice {
+@page {
   size: A4 portrait;
   margin: 15mm 16mm;
 }
@@ -505,7 +505,6 @@ figcaption { display: flex; justify-content: space-between; margin-top: 6px; }
   .order-invoice::backdrop { display: none; }
   .admin:has(.order-invoice[open]) > #invoice-print {
     display: block;
-    page: shop-invoice;
     color: #111;
     font-size: 11pt;
   }
