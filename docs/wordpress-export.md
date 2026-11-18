@@ -2,12 +2,9 @@
 
 The migration code is ready for a real source export. No WordPress export has been supplied yet. Do this once, then provide the local folder path; the remaining import/review/rehearsal can run against an isolated database. Keep the existing WordPress site serving customers during this initial export.
 
-## 1. Download the existing backups
+## 1. Record the hosting inventory
 
-1. Open Namecheap → Hosting List → Go to cPanel.
-2. Open **Files → Backup**. Download a fresh home-directory/files backup and the WordPress MySQL database backup. Record which database belongs to this site privately. A home-directory backup alone is not the SQL backup. [Namecheap backup instructions](https://www.namecheap.com/support/knowledgebase/article/9365/2199/how-to-create-and-restore-backups-in-cpanel/)
-3. Save them outside this Git repository, for example under `~/private/loverbaazar/backups/`. They may contain customer details and credentials; do not attach them to a public issue or commit them.
-4. In a private text file, record the Stellar Plus paid-through/renewal date, all email accounts/forwarders/filters using it, and any other hosted domains/sites. Record explicit “none” only after checking the account. Export the full Cloudflare DNS zone privately; the public DNS snapshot in this repository is only a partial view.
+The owner waived the full WordPress backup. Export selected business data if it should migrate. Privately record the Stellar Plus renewal date, any hosted mailboxes, forwarders and other sites, and the full Cloudflare DNS export.
 
 ## 2. Create the structured business export
 
@@ -57,12 +54,12 @@ If PHP reports insufficient memory, invoke WP-CLI with `php -d memory_limit=512M
    ```
 
 3. The source directory must contain `manifest.json`, `site-settings.json` and nine `.jsonl` files. Zero-record classes still have an empty file with a count/checksum in the manifest.
-4. Provide the local source directory path. Do not paste customer records or credentials into chat. Keep the SQL/files backups until restoration and launch-retirement checks are complete. Remove redundant temporary exports from the old host only after the local copies are verified.
+4. Provide the local source directory path. Do not paste customer records or credentials into chat. Remove redundant temporary exports from the old host only after the local copies are verified.
 
-The exporter records exact quantities, currency precision, product/variation data, categories/tags, pages/posts, attachment metadata, orders/refunds/notes, stock-reduction flags, business customer profiles, Rank Math metadata/redirects, source versions and timestamps. Passwords, sessions, API credentials and order-access keys are excluded from the structured export. Protected content is marked so it cannot be accidentally published. This structured export supplements the SQL/files backup.
+The exporter records exact quantities, currency precision, product/variation data, categories/tags, pages/posts, attachment metadata, orders/refunds/notes, stock-reduction flags, business customer profiles, Rank Math metadata/redirects, source versions and timestamps. Passwords, sessions, API credentials and order-access keys are excluded from the structured export. Protected content is marked so it cannot be accidentally published. This export supports data migration and omits the server files needed to restore WordPress itself.
 
 ## Actions required
 
-1. Download the SQL/files backups and record the hosting/mailbox/DNS inventory privately.
+1. Record the hosting, mailbox and DNS inventory privately.
 2. Run the structured export and download/extract its package outside Git.
 3. Provide the local source folder path so the actual migration can be prepared and verified. Real prices, stock and commercial policies will need your review before launch.

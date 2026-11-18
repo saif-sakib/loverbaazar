@@ -93,7 +93,7 @@ func main() {
 		c, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 		if err := migrate(c); err != nil {
-			log.Print("schema: ", err)
+			log.Printf("startup event=schema_failed type=%T", err)
 			return
 		}
 		if err := applyContentUpdates(c); err != nil {
@@ -102,6 +102,7 @@ func main() {
 		}
 		refresh()
 		loadBuilds(c)
+		kickOrderMail()
 	}()
 	addr := "127.0.0.1:8080"
 	if p := os.Getenv("PORT"); p != "" {
@@ -310,7 +311,7 @@ func applyContentUpdates(ctx context.Context) error {
 
 func router() http.Handler {
 	r := chi.NewRouter()
-	r.Use(middleware.Recoverer, middleware.Timeout(45*time.Second), originGuard, requestGuard)
+	r.Use(observeRequests, middleware.Timeout(45*time.Second), originGuard, requestGuard)
 	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	r.With(middleware.Compress(5)).Get("/api/catalog", catalog)
 	r.With(middleware.Compress(5)).Get("/api/storefront", storefront)
@@ -332,6 +333,10 @@ func router() http.Handler {
 	r.Route("/api/admin", func(a chi.Router) {
 		a.Use(adminOnly, middleware.Compress(5))
 		a.Get("/dashboard", adminDashboard)
+		a.Get("/operations", adminOperations)
+		a.Get("/notifications", adminNotifications)
+		a.With(limit(15, time.Minute)).Post("/notifications/{id}/retry", adminRetryNotification)
+		a.With(limit(3, time.Hour)).Post("/notifications/test", adminTestNotification)
 		a.Get("/orders", adminOrders)
 		a.Get("/orders.csv", adminOrdersCSV)
 		a.Put("/orders/{number}", adminUpdateOrder)

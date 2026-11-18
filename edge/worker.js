@@ -16,7 +16,19 @@ const forward = (request, env, url, init = {}) => {
 };
 
 // Kept for a day: if the API is asleep or down, browsers still get recent prices straight away.
-const staleKey = (url) => new Request(url.origin + "/api/stock-stale");
+const staleKey = (key) => new Request(key.url.replace("/api/stock", "/api/stock-stale"));
+
+async function stockKey(env, url) {
+  const key = new URL(url);
+  try {
+    const metadata = await env.ASSETS.fetch(new Request(new URL("/release.json", url)));
+    if (metadata.ok) {
+      const { id } = await metadata.json();
+      if (/^[a-f0-9]{32}$/i.test(id)) key.searchParams.set("release", id);
+    }
+  } catch { /* Local fixtures and older artifacts can fall back to the default cache. */ }
+  return new Request(key);
+}
 
 // Share an origin request while it is in flight, including across background refreshes.
 const pendingStock = new Map();
@@ -26,16 +38,16 @@ function refreshStock(request, env, url, cache, key) {
     let res;
     try {
       res = await forward(request, env, url, { signal: AbortSignal.timeout(5000) });
-      if (res.ok) {
+      if (res.ok && res.headers.get("Content-Type")?.includes("application/json")) {
         const stale = new Response(res.clone().body, res);
         stale.headers.set("Cache-Control", "public, max-age=86400");
-        await Promise.all([cache.put(key, res.clone()), cache.put(staleKey(url), stale)]).catch(() => {});
+        await Promise.all([cache.put(key, res.clone()), cache.put(staleKey(key), stale)]).catch(() => {});
         return res;
       }
     } catch {
       // An asleep or unavailable origin must not interrupt cached browsing.
     }
-    const saved = await cache.match(staleKey(url)).catch(() => undefined);
+    const saved = await cache.match(staleKey(key)).catch(() => undefined);
     if (saved) {
       const fallback = new Response(saved.body, saved);
       // Briefly cache the fallback too, so a sleeping API is not retried on every visit.
@@ -45,7 +57,7 @@ function refreshStock(request, env, url, cache, key) {
       await cache.put(key, fallback.clone()).catch(() => {});
       return fallback;
     }
-    return res || new Response('{"error":"unavailable"}', { status: 503, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+    return res && !res.ok ? res : busy(503);
   })().finally(() => pendingStock.delete(key.url));
   pendingStock.set(key.url, pending);
   return pending;
@@ -55,11 +67,11 @@ async function stock(request, env, url, ctx) {
   // Stock is public and independent of query strings, cookies and user identity.
   // Use one cache entry so arbitrary query strings cannot bypass the cache.
   const originURL = new URL("/api/stock", url.origin);
-  const key = new Request(originURL);
+  const key = await stockKey(env, originURL);
   const cache = caches.default;
   const hit = await cache.match(key).catch(() => undefined);
   if (hit) return hit;
-  const saved = await cache.match(staleKey(originURL)).catch(() => undefined);
+  const saved = await cache.match(staleKey(key)).catch(() => undefined);
   if (saved) {
     ctx.waitUntil(refreshStock(request, env, originURL, cache, key));
     const copy = new Response(saved.body, saved);
@@ -94,6 +106,39 @@ async function legacyEntry(request, env, url) {
   return env.ASSETS.fetch(request);
 }
 
+async function apiResponse(request, env, url, ctx) {
+  const id = crypto.randomUUID().replaceAll("-", "");
+  const headers = new Headers(request.headers);
+  headers.set("X-Request-ID", id);
+  const upstreamRequest = new Request(request, {headers});
+  let response;
+  try {
+    response = url.pathname === "/api/stock" && request.method === "GET"
+      ? await stock(upstreamRequest, env, url, ctx)
+      : await forward(upstreamRequest, env, url);
+    const type = response.headers.get("Content-Type") || "";
+    const expectsJSON = url.pathname !== "/api/health" && url.pathname !== "/api/admin/orders.csv";
+    if ((!response.ok || expectsJSON) && !type.includes("application/json")) {
+      const status = response.status === 429 ? 429 : 503;
+      await response.body?.cancel().catch(() => {});
+      response = busy(status);
+    }
+  } catch {
+    response = busy(503);
+  }
+  const result = new Response(response.body, response);
+  result.headers.set("X-Request-ID", id);
+  return result;
+}
+
+function busy(status) {
+  return Response.json({ error: status === 429
+    ? "Too many attempts. Please wait before trying again."
+    : "The shop is busy right now. Please try again in a minute." }, {
+    status, headers: {"Cache-Control": "no-store", "Retry-After": status === 429 ? "30" : "60"},
+  });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -114,18 +159,8 @@ export default {
       } catch { /* Unmapped or invalid assets keep their real static 404. */ }
       return env.ASSETS.fetch(request);
     }
-    if (url.pathname === "/api/stock" && request.method === "GET") return stock(request, env, url, ctx);
-    try {
-      return await forward(request, env, url);
-    } catch {
-      return new Response('{"error":"The shop is busy right now. Please try again in a minute."}', {
-        status: 503,
-        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-      });
-    }
+    return apiResponse(request, env, url, ctx);
   },
-  // Render sleeps after 15 idle minutes. /api/health does not touch the database, so Neon still sleeps.
-  scheduled(_e, env, ctx) {
-    ctx.waitUntil(fetch(env.API_ORIGIN + "/api/health", { headers: { "X-Origin-Secret": env.ORIGIN_SECRET } }));
-  },
+  // Existing schedules can be removed in the dashboard. No automatic keep-awake traffic.
+  scheduled() {},
 };

@@ -11,8 +11,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     evidence = commands.add_parser('inventory')
-    for field in ['sql-backup', 'uploads-backup', 'dns-zone', 'hosting-inventory', 'output']:
+    for field in ['dns-zone', 'hosting-inventory', 'output']:
         evidence.add_argument('--' + field, required=True)
+    evidence.add_argument('--sql-backup')
+    evidence.add_argument('--uploads-backup')
+    evidence.add_argument('--owner-waived-full-backup', action='store_true')
     prepare = commands.add_parser('prepare')
     prepare.add_argument('source')
     prepare.add_argument('--output', required=True)
@@ -33,7 +36,7 @@ def main():
         approval.add_argument('--' + field, required=True)
     args = parser.parse_args()
     if args.command == 'inventory':
-        write(args.output, inspect_evidence({k: getattr(args, k) for k in ('sql_backup', 'uploads_backup', 'dns_zone', 'hosting_inventory')}))
+        write(args.output, inspect_evidence({k: getattr(args, k) for k in ('sql_backup', 'uploads_backup', 'dns_zone', 'hosting_inventory') if getattr(args, k)}, owner_waived_full_backup=args.owner_waived_full_backup))
         print('Private evidence checksums recorded. Restore and owner verification are still required.')
     elif args.command == 'prepare':
         bundle = load_bundle(args.source)
@@ -53,7 +56,7 @@ def main():
         review_csv(output / 'product-review.csv', catalog)
         write(output / 'editorial-review.json', editorial_audit(catalog))
         write(output / 'policy-approval.template.json', {**{key: False for key in POLICIES}, 'target_settings_hash': target.get('settings_hash', ''), 'target_facts': target.get('settings', {}), 'source_identity': bundle.get('site_settings', {}), 'retained_decisions': {r['kind'] + ':' + r['key']: 'review-required' for r in plan['retained']}})
-        write(output / 'source-inventory.json', {'manifest': bundle['manifest'], 'source_counts': {k: len(bundle[k]) for k in CLASSES}, 'required_owner_evidence': ['private SQL backup + checksum', 'uploads/files backup + checksum', 'DNS zone', 'mailboxes and other hosted sites', 'Stellar Plus renewal/end date', 'commercial policy approval', 'legacy archive coverage approval']})
+        write(output / 'source-inventory.json', {'manifest': bundle['manifest'], 'source_counts': {k: len(bundle[k]) for k in CLASSES}, 'required_owner_evidence': ['owner backup decision', 'DNS zone', 'mailboxes and other hosted sites', 'Stellar Plus renewal/end date', 'commercial policy approval', 'legacy archive coverage approval']})
         print(json.dumps({'changes': len(plan['records']), 'conflicts': len(plan['conflicts']), 'quarantined_products': sum(bool(r['issues']) for r in catalog['review']), 'source_counts': {k: len(bundle[k]) for k in CLASSES}}))
     elif args.command == 'archive':
         print(json.dumps(legacy_archive(load_bundle(args.source), args.output)))

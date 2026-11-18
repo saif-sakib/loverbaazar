@@ -24,7 +24,7 @@
   // Direct 1-click grouped navigation; related sections also share top subtabs.
   const NAV_GROUPS = [
     ["Manage shop", [["dashboard", "Overview"], ["orders", "Orders"], ["products", "Products"], ["customers", "Customers"], ["coupons", "Discounts"]]],
-    ["Customer care", [["messages", "Messages"], ["reviews", "Reviews"]]],
+    ["Customer care", [["messages", "Messages"], ["reviews", "Reviews"], ["operations", "Operations"]]],
     ["Store setup", [["home", "Website"], ["delivery", "Settings"]]],
   ];
 
@@ -47,6 +47,7 @@
           : "";
 
   const HEADS = {
+    operations: ["Operations", "Check API readiness and recover order notifications.", ""],
     dashboard: ["Shop overview", "Your shop today, and quick links to the tasks you do most.", ""],
     orders: ["Orders", "Find orders, update shipping status, save courier tracking, or print invoices. Status updates appear on order tracking immediately.", ""],
     messages: ["Messages", "Read and manage customer questions.", ""],
@@ -605,6 +606,43 @@
       <div class="panel"><h3>Best sellers, last 30 days</h3>${d.top.length ? `<table class="tbl">${d.top.map((t) => `<tr><td>${esc(t.name)}</td><td>${t.qty} sold</td><td>${money(t.sales)}</td></tr>`).join("")}</table>` : `<p class="empty-state">No product sales yet.</p>`}</div>
       <div class="panel"><h3>Low stock (≤ ${lowStock} left)</h3>${d.low.length ? `<table class="tbl">${d.low.map((p) => `<tr><td><a class="link" href="#product/${p.id}">${esc(p.name)}</a></td><td><b>${p.stock}</b> left</td></tr>`).join("")}</table>` : `<p class="empty-state">All products are well stocked.</p>`}</div>
     </div>`;
+  });
+
+  const operations = run(async () => {
+    const [ops, mail] = await Promise.all([api("/operations"), api("/notifications")]);
+    const count = ops.checkoutResponses;
+    const states = { pending: "Pending", sending: "Sending", accepted: "Accepted by Brevo", failed: "Failed", uncertain: "Check Brevo before retrying" };
+    view().innerHTML = `<div class="panel"><h3>API and checkout</h3>
+      <p>${ops.ready ? "API ready" : "API starting"} · Build <code>${esc(ops.version)}</code></p>
+      <p>Checkout responses since startup: ${count["2xx"]} successful, ${count["4xx"]} request errors, ${count["5xx"]} service errors.</p>
+      <a class="link" href="#publish">Publication status</a>
+    </div><div class="panel"><h3>Order email</h3><p>${mail.enabled ? "Order email enabled" : "Order email paused or unavailable"} · ${mail.today} recipient attempts today (UTC).</p>
+      ${mail.testConfigured ? '<button type="button" id="testmail" class="btn ghost">Send test email</button>' : ""}
+      <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Order</th><th scope="col">Recipient</th><th scope="col">Status</th><th scope="col">Attempts</th><th scope="col">Action</th></tr></thead><tbody>
+      ${mail.notifications.map(m => `<tr><td>${esc(m.order)}</td><td>${esc(m.kind)}</td><td>${esc(states[m.state])}${m.outcome ? `<br><small>${esc(m.outcome.replaceAll("_", " "))}</small>` : ""}</td><td>${m.attempts}/3</td><td>
+        ${mail.enabled && m.attempts < 3 && ["pending", "failed", "uncertain"].includes(m.state) ? `<button type="button" class="btn ghost" data-retry-mail="${m.id}" data-state="${esc(m.state)}" aria-label="Retry ${esc(m.kind)} email for ${esc(m.order)}">Retry</button>` : ""}
+        ${m.state === "uncertain" ? `<small>Brevo tag: lb-order-mail-${m.id}</small>` : ""}
+      </td></tr>`).join("") || '<tr><td colspan="5">There are no order notifications yet.</td></tr>'}
+      </tbody></table></div></div>`;
+    const test = $("#testmail");
+    if (test) test.onclick = run(async () => {
+      test.disabled = true;
+      try {
+        await api("/notifications/test", { method: "POST", body: {} });
+        say("Brevo accepted the test. Check the controlled inbox.");
+      } finally { test.disabled = false; }
+    });
+    $$("[data-retry-mail]").forEach(button => {
+      button.onclick = run(async () => {
+        const verified = button.dataset.state === "uncertain";
+        if (verified && !confirm("Check Transactional Logs in Brevo using the tag in this row. Retry only if you confirmed Brevo did not accept the earlier attempt.")) return;
+        button.disabled = true;
+        try {
+          await api(`/notifications/${button.dataset.retryMail}/retry`, { method: "POST", body: { verifiedMissing: verified } });
+          await operations();
+        } finally { button.disabled = false; }
+      });
+    });
   });
 
   // ---- Orders ----
@@ -1890,6 +1928,7 @@
   const blog = writing("post", "post");
   const routes = {
     dashboard,
+    operations,
     orders,
     products,
     categories: cats,

@@ -152,7 +152,7 @@ func reset(t *testing.T) {
 	if api == nil {
 		t.Skip("needs TEST_DATABASE_URL")
 	}
-	if _, err := db.Exec(bg, `TRUNCATE releases,retired_images,applied,products,users,sessions,orders,order_items,order_events,messages,settings,content,coupons,reviews RESTART IDENTITY CASCADE`); err != nil {
+	if _, err := db.Exec(bg, `TRUNCATE notification_daily_budget,order_notifications,releases,retired_images,applied,products,users,sessions,orders,order_items,order_events,messages,settings,content,coupons,reviews RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	// Fixed charges here, so the tests don't depend on what the shop happens to charge today.

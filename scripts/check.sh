@@ -7,5 +7,6 @@ node -e 'if (+process.versions.node.split(".")[0]<22) process.exit(1)'
 (cd apps/store && npm ci --no-audit --no-fund)
 if [[ ${1:-} == --browsers ]]; then (cd apps/store && npx playwright install chromium); fi
 (cd apps/api && test -z "$(gofmt -l .)" && go vet .)
-node --test edge/worker.test.mjs
+for file in apps/store/public/*.js edge/*.js scripts/*.mjs; do node --check "$file"; done
+node --test edge/worker.test.mjs scripts/release*.test.mjs
 ./scripts/test-api.sh

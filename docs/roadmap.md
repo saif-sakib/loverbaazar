@@ -222,11 +222,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 17 — Capture the WordPress and hosting inventory
 
-**Status:** In progress — export/inventory tooling verified; fresh owner backups/export pending · **Depends on:** 3, 4
+**Status:** In progress — export/inventory tooling verified; selected data export pending · **Depends on:** 3, 4
 
 **Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
-- Obtain a fresh private WordPress database/export, uploads/files backup, WooCommerce product/variation/stock/order/customer records, Rank Math metadata/redirects and all existing public URL sources. Capture the current DNS zone, mailbox/other-site inventory and Stellar Plus renewal/end dates.
+- Obtain the selected private WooCommerce catalog/order records, Rank Math metadata/redirects and required media/URL sources. The owner waived a full WordPress filesystem and MySQL backup on 18 November 2026. Capture the current DNS zone, mailbox/other-site inventory and Stellar Plus renewal/end dates.
 - Record source time, file checksums, actual record counts, unresolved fields and business-critical legacy URLs. Keep raw exports/customer details outside Git and public CI artifacts; commit only sanitized tooling and aggregate evidence.
 - Verify exports are readable and identify which historical orders remain unfulfilled. Done with a reproducible source manifest and exact missing-data actions for the owner, not an assumed fixed product count.
 
@@ -373,59 +373,80 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 31 — Enforce complete pull-request CI
 
-**Status:** Planned · **Depends on:** 1, 4, 5, 6, 7, 8
+**Status:** Done · **Depends on:** 1, 4, 5, 6, 7, 8
 
 - Add pull-request and main-branch checks for Go formatting/vet/tests, targeted race coverage, JS syntax, Worker tests, deterministic Astro build/content validation and the browser suite. Run databases only in disposable CI services, with no deploy secrets or production data.
 - Install/cache the supported browser/toolchain reliably. Keep routine checks bounded; place expensive browser matrices or load checks on appropriate manual/scheduled jobs. Retain only sanitized diagnostic artifacts with short retention.
 - Verify a deliberate failing API/Worker/UI/build check blocks release, fork PRs have no secret access, and the intended branch rules protect deployment. Existing main-only API tests remain useful until this gate is ready.
 
+**Evidence, 18 November 2026.** Added reusable, read-only Store CI for pull requests and main code releases. It covers Go races, API and Worker tests, migration, browser, accessibility and encrypted restore. [GitHub CI passed](https://github.com/saif-sakib/loverbaazar/actions/runs/44208908427). GitHub requires its check on up-to-date main pull requests, including administrators. An [intentional failure](https://github.com/saif-sakib/loverbaazar/pull/15) was blocked before the disposable PR was closed. The code-release workflow requires successful CI.
+
+
 ### Task 32 — Coordinate API and storefront releases
 
-**Status:** Planned · **Depends on:** 8, 31
+**Status:** In progress · **Depends on:** 8, 31
 
 - Release only tested revisions, coordinating Render API deployment/readiness, backward-compatible schema changes and Cloudflare store/Worker deployment. Prevent independent auto-deploy from bypassing checks or racing incompatible frontend/API versions.
 - Build and validate a specific catalog/content revision; record commit, artifact hash, release ID and deployment status. Separate content-only publication from code release while reusing required artifact/data checks. Serialize final promotions so an old build cannot replace a newer one.
 - Verify failed API readiness, failed content fetch/build, cancelled publish and failed promotion keep the previous working release. Rehearse code/asset rollback without restoring or discarding current customer orders.
 
+**Evidence, 18 November 2026.** Added exact-commit Render/API readiness gates and serialized Cloudflare version upload, artifact fingerprint, promotion and guarded rollback. Local tests covered stale and failed candidates. Hosted validation awaits existing-service configuration and one coordinated run.
+
+
 ### Task 33 — Configure and verify the free hosting accounts
 
-**Status:** Planned · **Depends on:** 3, 4, 32
+**Status:** In progress · **Depends on:** 3, 4, 32
 
 - Prepare reviewable configuration/manifests for Cloudflare assets/Worker, one Render Free API, Neon in a suitably nearby region, Cloudinary, Brevo and GitHub. Supply a dashboard-by-dashboard configuration checklist with secret names only. Implement through existing authorized account access or leave precise owner steps.
 - Verify actual account tiers, no payment method/add-ons, limits, TLS, origin secret, custom/preview hostname behavior, static headers/redirects, bot hostnames and catalog build access. Record intended free failure behavior, asset/file limits and the keep-alive cron's quota/terms implications.
 - Smoke-test the preview deployment and production-safe configuration. Update `docs/go-live.md` with current instructions and remove stale fixed counts/email assumptions. Do not change Namecheap DNS or attach the live domain in this task.
 
+**Evidence, 18 November 2026.** Added a reviewable existing-service configuration, Free asset checks and current preview probe. The previous preview was reachable, with differing API and Worker SHAs. Verify plan, zero billing, TLS and secrets in the existing provider dashboards and run the coordinated preview.
+
+
 ### Task 34 — Make order notifications observable and recoverable
 
-**Status:** Planned · **Depends on:** 5, 6, 33
+**Status:** In progress · **Depends on:** 5, 6, 33
 
 - Configure the verified sender, owner recipient and optional customer confirmation. Use the shop's real settings and authenticated sender/domain configuration where applicable; distinguish outbound transactional mail from an inbound mailbox.
 - Record notification outcome and support bounded retry/manual resend with deduplication, preferably in the existing database/process without paid queues or continuous polling that prevents Neon sleep. Committed orders remain successful even when Brevo is down or its quota is reached.
 - Verify failure, retry, owner/customer recipient isolation and quota accounting using controlled addresses. Done when the owner sees pending/failed notifications and can recover them without duplicating orders or leaking customer data.
 
+**Evidence, 18 November 2026.** Added transactional queued notifications, owner/customer isolation, accepted/failed/uncertain tracking, bounded retries and daily cap, plus an Admin operations view. Controlled provider simulations passed. Configure the sender and verify delivery to the owner’s test inbox.
+
+
 ### Task 35 — Make backups complete, private and dependable
 
-**Status:** Planned · **Depends on:** 4, 7, 33
+**Status:** In progress · **Depends on:** 4, 7, 33
 
 - Improve encrypted database backup verification, bounded retention, failure visibility and missing-schedule detection. Include restoration metadata, schema/code revision and asset/config manifests; preserve required original media separately within approved free storage.
 - Keep backup keys recoverable outside the hosting accounts/repository and raw dumps out of public artifacts/logs. Check actual artifact quotas/access and the public-repository scheduled-workflow inactivity rule; provide an owner-operated offline backup fallback.
 - Verify dump/encryption failures, a corrupt/empty artifact and expiry cleanup. Proposed baseline recovery point objective is ≤24 hours of data loss, subject to owner acceptance; do not imply nightly backups provide zero-loss recovery.
 
+**Evidence, 18 November 2026.** Added verified encrypted new-store snapshots, seven-day artifact retention, and a separate freshness check and offline command. Local corruption, weak key, empty and dump-failure checks passed. Existing hosted backup history had failing dump/encrypt runs. Confirm a new hosted archive and owner-held recovery key.
+
+
 ### Task 36 — Rehearse restore, rollback and incident recovery
 
-**Status:** Planned · **Depends on:** 8, 23, 35
+**Status:** In progress · **Depends on:** 8, 23, 35
 
 - Restore an encrypted backup into a disposable database from owner-held keys, then verify orders, amounts, inventory, settings/content and image references. Record elapsed time; initial recovery-time target is ≤2 hours, confirmed or revised from the exercise.
 - Write procedures for lost credentials, Render restart, Neon suspension, failed migration, bad release, corrupt content and missing images. Separate code rollback, domain rollback and disaster restore; freeze/reconcile writes before any data replacement.
 - Simulate orders created after a backup and prove the recovery plan explicitly preserves/reconciles them. Done with a successful restore report and exact commands/owner steps, not only a green backup job.
 
+**Evidence, 18 November 2026.** Restored a verified encrypted backup into an isolated empty PostgreSQL database in one to two seconds in the fixture. Verified totals, stock, settings/content/media and the later source order. Exercised guarded Worker rollback with simulated provider state. Owner-key archive and hosted-scale timing are pending.
+
+
 ### Task 37 — Add operational visibility, quotas and failure handling
 
-**Status:** Planned · **Depends on:** 28, 29, 33, 34, 35, 36
+**Status:** In progress · **Depends on:** 28, 29, 33, 34, 35, 36
 
 - Add request/release IDs, sanitized structured errors, lightweight readiness and counters for checkout failures, publish state and notification/backup failures. Uptime checks hit database-free health/readiness; no stock polling or monitor may wake Neon unnecessarily.
 - Define quota reviews and warnings at roughly 70/85/95% with service-specific remedies, including storage, CU-hours, egress, Worker requests/CPU, image credits, email sends and Actions artifacts/runs. Alerts do not authorize payment or upgrades.
 - Exercise origin sleep/down, missing snapshots, exhausted API access, stale price/stock and closed ordering. Record warm/cold latency and the free-stack availability limitation. Done when customers get a recovery path and the owner knows what failed, who acts and how to stay within $0.
+
+**Evidence, 18 November 2026.** Added request references, sanitized API failure logs, API/admin counters, asset-aware stock cache and upstream retry responses. Removed automatic keep-awake traffic from code and documented quota responses. Warm preview health/readiness measured about 0.31/0.43 seconds. Real cold-start and account quota checks remain pending.
+
 
 ## Tasks 38–42: release verification
 
@@ -496,7 +517,7 @@ The local [go-live skill](../.claude/skills/go-live/SKILL.md) says: **"Never cha
 
 **Status:** Planned · **Depends on:** 21, 23, 42, 44
 
-- Agree a quiet Bangladesh-time window and owner communication. Take fresh WordPress/new-database backups; pause old checkout/catalog/stock writes for the shortest agreed final-sync interval. Record outstanding legacy fulfillment and any stock movement during the freeze.
+- Agree a quiet Bangladesh-time window and owner communication. Take a fresh new-database backup and a selected final WordPress data export; pause old checkout/catalog/stock writes for the shortest agreed final-sync interval. Record outstanding legacy fulfillment and any stock movement during the freeze.
 - Apply the rehearsed delta import, reconcile real stock/prices and old outstanding orders, complete the last asset sync, and build the approved production artifact. Keep new ordering closed until domain/bot/payment checks pass.
 - Verify counts/checksums, sampled exact totals, image independence, publish status and compatibility against the release candidate. Owner signs off the final data and exact website switch. Done only with a measured clean reconciliation; abort/reschedule instead of launching uncertain quantities.
 
@@ -522,7 +543,7 @@ The local [go-live skill](../.claude/skills/go-live/SKILL.md) says: **"Never cha
 
 **Status:** Planned · **Depends on:** 35, 36, 47 and owner confirmation
 
-- Confirm no required website, image, download, email account, subdomain or other site still depends on Stellar Plus. Archive WordPress files/database, required mail and DNS/config exports with a checked recovery copy outside Namecheap hosting.
+- Confirm no required website, image, download, email account, subdomain or other site still depends on Stellar Plus. Preserve required mail, approved catalog/media exports and DNS/config records. The owner waived archiving the full WordPress site.
 - Use a 14–30 day observation/rollback overlap where the current paid term permits; do not incur a renewal to manufacture this overlap. If expiry is earlier, record the shorter window and get the owner's decision before it expires. Check whether cancellation deletes service immediately versus at term end.
 - Owner disables/cancels **hosting** renewal only after reviewing the retirement checklist; keep **domain** renewal and registration active at Namecheap. Remove unused keys/integrations and verify apex/www, inbound mail and backups afterward.
 - Done when the hosting subscription is confirmed retired at the intended date and the new stack's service tiers remain free. Deleting WordPress first is never a prerequisite for pointing the domain.

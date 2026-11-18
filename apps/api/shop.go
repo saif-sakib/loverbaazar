@@ -509,8 +509,11 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 		if _, err = tx.Exec(ctx, `INSERT INTO order_events(order_id,status) VALUES($1,'pending')`, oid); err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, `UPDATE orders SET subtotal=$1,discount=$2,coupon=$3,shipping=$4,total=$5 WHERE id=$6`, sub, discount, in.Coupon, fee, total, oid)
-		return err
+		if _, err := tx.Exec(ctx, `UPDATE orders SET subtotal=$1,discount=$2,coupon=$3,shipping=$4,total=$5 WHERE id=$6`, sub, discount, in.Coupon, fee, total, oid); err != nil {
+			return err
+		}
+		bill.number, bill.total, bill.area, bill.payment = number, total, zone.Label, pay.Label
+		return queueOrderMail(ctx, tx, oid, in.Email, in.Name, site, bill)
 	})
 	if err != nil {
 		oops(w, err)
@@ -524,15 +527,7 @@ func checkout(w http.ResponseWriter, r *http.Request) {
 		log.Print("checkout_metric event=order_created")
 	}
 	refreshProducts()
-	bill.number, bill.total, bill.area, bill.payment = number, total, zone.Label, pay.Label
-	details := bill.text()
-	go notify(fmt.Sprintf("New order %s: ৳%d", number, total),
-		fmt.Sprintf("Customer: %s, %s%s\nAddress: %s\nNote: %s\n\n%s", in.Name, in.Phone, orBlank(", ", in.Email), in.Address, in.Note, details))
-	if in.Email != "" {
-		shop, _ := site["name"].(string)
-		phone, _ := site["phone"].(string)
-		go sendMail([]string{in.Email}, fmt.Sprintf("Your %s order %s", shop, number), customerMail(in.Name, shop, phone, details))
-	}
+	kickOrderMail()
 	ok(w, map[string]any{"number": number, "total": total})
 }
 
@@ -583,7 +578,7 @@ func human(r *http.Request, tok string) bool {
 	body, _ := json.Marshal(map[string]string{"secret": secret, "response": tok, "remoteip": clientIP(r)})
 	res, err := httpClient.Post("https://challenges.cloudflare.com/turnstile/v0/siteverify", "application/json", bytes.NewReader(body))
 	if err != nil {
-		log.Print("turnstile: ", err)
+		log.Print("turnstile event=network_error")
 		return false
 	}
 	defer res.Body.Close()
@@ -631,13 +626,6 @@ func customerMail(name, shop, phone, details string) string {
 		track = fmt.Sprintf("Track your order any time: %s/track/\n", u)
 	}
 	return fmt.Sprintf("Dear %s,\n\nThank you for your order. We will call you soon to confirm it.\n\n%s\n%sQuestions? Call us on %s.\n\nThanks for shopping from %s!\n", name, details, track, phone, shop)
-}
-
-func orBlank(prefix, s string) string {
-	if s == "" {
-		return ""
-	}
-	return prefix + s
 }
 
 // notify emails the admin through Brevo: ADMIN_EMAIL (one address or several, comma separated), or
@@ -688,7 +676,7 @@ func sendMail(to []string, subject, text string) {
 	req.Header.Set("Content-Type", "application/json")
 	res, err := httpClient.Do(req)
 	if err != nil {
-		log.Print("brevo: ", err)
+		log.Print("brevo event=contact_network_error")
 		return
 	}
 	defer res.Body.Close()
