@@ -38,6 +38,7 @@ Admin covers orders, products, categories, coupons, customers, reviews, messages
 - Go live for $0: [docs/go-live.md](docs/go-live.md)
 - Storefront SEO, mobile performance and accessibility: [docs/seo-performance.md](docs/seo-performance.md)
 - Numbered implementation and launch tasks: [docs/roadmap.md](docs/roadmap.md)
+- Routine maintenance and measured upgrade triggers: [docs/maintenance.md](docs/maintenance.md)
 - Architecture audit and verified baseline: [docs/architecture-audit.md](docs/architecture-audit.md)
 - Why this stack: [PLAN.md](PLAN.md)
 - Rules for changing the code: [CLAUDE.md](CLAUDE.md)
