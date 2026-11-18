@@ -51,6 +51,8 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 | 49 | Maintenance and measurable growth thresholds |
 | 50 | Future owner-authorized VPS migration |
 
+**Latest verification, 19 November 2026.** [Production deployment](https://github.com/saif-sakib/loverbaazar/actions/runs/44369534892) passed for commit `a2d4ebe0efd9ea02186e05210e03584d3af8060d`. The storefront and ready API matched. The Worker reported release `C1C1A9AD13A012AF168FE30CF7E4D4D3`, catalog revision 0 and artifact fingerprint `31fc5435e4e6c64ce013a088f22c062cb33771e537195969ba5ad05762242332`. The isolated API, full checkout/publication and three browser-engine checks all passed on that revision.
+
 ## Tasks 1–8: engineering foundation
 
 ### Task 1 — Make local development and testing reproducible
@@ -85,13 +87,15 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 4 — Secure repository, accounts and secrets
 
-**Status:** In progress — repository work complete; account/cloud verification pending · **Depends on:** 1
+**Status:** In progress — GitHub protection verified; provider account recovery and two-factor checks pending · **Depends on:** 1
 
 - Inventory secrets by owning service, scope and rotation procedure without recording values. Check tracked files/history for accidental credentials and private customer exports; rotate confirmed exposures through owner-operated dashboards.
 - Prepare least-privilege GitHub/Cloudflare/Render access, 2FA/recovery ownership, restricted production secrets, minimal workflow permissions, pinned third-party action revisions and dependency update/security checks that remain free.
 - Define branch protection or the available free equivalent and a token-expiry recovery procedure. Verify untrusted pull requests cannot access deploy/backup secrets. Account changes requiring owner access remain explicit pending steps.
 
 **Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md). GitHub 2FA and read-only workflow defaults were verified. Main protection enforces Store CI on current pull requests, including for administrators. Other provider account and recovery checks remain owner actions.
+
+**Verification, 19 November 2026.** Main requires Store CI for administrators, rejects force pushes and defaults Actions to read-only. Confirm two-factor and recovery access in the provider accounts.
 
 ### Task 5 — Harden API, admin and customer privacy boundaries
 
@@ -125,7 +129,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 8 — Make publishing and image cleanup safe
 
-**Status:** In progress — repository work complete; account/cloud verification pending · **Depends on:** 6, 7
+**Status:** In progress — live publication and Cloudinary fixture verified; hosted rollback rehearsal pending · **Depends on:** 6, 7
 
 - Persist saved/published content revision state and associate a build/deployment with its input revision and code version. Show queued, running, failed and confirmed published results; dispatch acceptance must not clear pending changes.
 - Define a consistent catalog/content snapshot for builds. Preserve Publish-required editorial edits when refreshing live price/stock information; a price refresh must not publish unrelated pending names, pages or photos.
@@ -136,6 +140,8 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 
 **Product photo follow-up.** Gallery and description selections stay in the browser until a product save. A checked save uploads only referenced files, preserves retries and tracks interrupted uploads for compensation. Rollback and shared images remain protected. A disposable trial on the Cloudinary Free account verified served upload, idempotent retry, replacement and confirmed removal of both fixture assets. Historical assets without verified ownership remain queued for review. Deployment and hosted admin smoke test are pending.
+
+**Verification, 19 November 2026.** Production serves the new Admin confirmation behavior, and Admin image operations reports zero pending or retired images. The isolated publication and guarded rollback tests passed on the deployed revision. Verify a hosted rollback in a safe environment before claiming that rehearsal.
 
 ## Tasks 9–16: mobile-first UI and UX
 
@@ -152,13 +158,15 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 10 — Improve mobile home, navigation and search entry
 
-**Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 9
+**Status:** Done — mobile navigation verified; owner confirmed phone use · **Depends on:** 9
 
 **Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md). Follow-up verified the four bottom navigation links without header or footer duplicates at phone widths. The Account link stays in the header and the desktop navigation remains available.
 
 - Make categories, product discovery, search, offers, cart and contact easy to reach with one hand. Reduce unnecessary first-screen hero height and competing sticky/floating controls while keeping the current visual identity.
 - Support touch/keyboard category navigation, clear active states, useful search suggestions and honest delivery/payment messages driven by settings.
 - Verify narrow phones, landscape, software keyboard, slow loads and navigation back/forward. Done when a new mobile customer can find a category or product quickly and primary controls remain visible without overlays or hover dependence.
+
+**Verification, 19 November 2026.** Owner confirmed checkout and Admin on Android and iPhone. The current responsive browser matrix passed six routes across eight viewport sizes.
 
 ### Task 11 — Improve catalog, filtering and search results
 
@@ -172,13 +180,15 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 12 — Improve product details and purchase decisions
 
-**Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 9, 11
+**Status:** Done — product and purchase controls verified on phones and in the browser suite · **Depends on:** 9, 11
 
 **Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
 
 - Refine gallery/zoom, real specifications, model/SKU, brand, included items, warranty/returns, availability, quantity and delivery information. Identify seller and manufacturer accurately; show no fabricated ratings, warranty or stock promises.
 - Keep Add to cart/Buy now understandable and reachable on phones. Resolve buy-bar/navigation/chat overlap and include accessible image/option controls. Unsupported selectable product options block that product's launch until represented correctly.
 - Verify photo failures, long text, out-of-stock states, selected options and keyboard/touch zoom. Done when customers can decide what is being sold and what delivery/payment will require before checkout.
+
+**Verification, 19 November 2026.** Product image, quantity and purchase journeys passed the current browser matrix. The owner's Android and iPhone checkout checks passed.
 
 ### Task 13 — Refine cart, wishlist and saved shopping state
 
@@ -192,13 +202,15 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 14 — Finish the Bangladesh guest checkout journey
 
-**Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 6, 12, 13
+**Status:** Done — owner confirmed Android and iPhone checkout · **Depends on:** 6, 12, 13
 
 **Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
 
 - Refine labels, Bangladeshi phone normalization, address/delivery selection, optional email, coupons, per-piece delivery charges, payment instructions and final server-confirmed totals. Keep guest ordering the default path.
 - Clearly label manual mobile payments as requiring verification. Handle Turnstile expiry, duplicate taps, total/stock changes, slow API wake-up and an uncertain response without encouraging a second payment or duplicate order.
 - Verify saved form input on recoverable errors, focus/error announcements, mobile keyboard and confirmation/tracking. Done when the full flow succeeds on phones and failure states retain a safe, understandable recovery path.
+
+**Verification, 19 November 2026.** Owner confirmed Android and iPhone checkout. The isolated current release verified COD, payment reference, lost-response retry, a single stock deduction, and stock return on cancellation.
 
 ### Task 15 — Finish account, tracking, contact and policy journeys
 
@@ -212,7 +224,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 16 — Finish mobile admin workflows
 
-**Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 8, 9
+**Status:** Done — owner confirmed Admin on Android and iPhone · **Depends on:** 8, 9
 
 **Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md). Verified invoice previews at five phone widths and at 1440 px. Single-page and multipage fixture PDFs use A4 margins, repeat item headings across pages and include the saved amounts and the thank-you line.
 
@@ -220,11 +232,13 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Preserve unsaved edits, prevent duplicate saves, distinguish live effects from Publish-required effects and display task 8's real publication status. Provide clear order/payment verification and safe CSV export behavior.
 - Verify 320–414 px widths, slow/error responses, concurrent edits, image replacement, cancel/return actions and form navigation. Done when the owner can update stock and fulfill an order from a real phone with no clipped primary actions.
 
+**Verification, 19 November 2026.** Owner confirmed Admin on Android and iPhone. Current browser tests checked product save and publication, order fulfillment and the printed invoice.
+
 ## Tasks 17–23: real data, content and migration
 
 ### Task 17 — Capture the WordPress and hosting inventory
 
-**Status:** In progress — export/inventory tooling verified; selected data export pending · **Depends on:** 3, 4
+**Status:** In progress — legacy export waived; cPanel inventory and expiry remain · **Depends on:** 3, 4
 
 **Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
@@ -232,9 +246,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Record source time, file checksums, actual record counts, unresolved fields and business-critical legacy URLs. Keep raw exports/customer details outside Git and public CI artifacts; commit only sanitized tooling and aggregate evidence.
 - Verify exports are readable and identify which historical orders remain unfulfilled. Done with a reproducible source manifest and exact missing-data actions for the owner, not an assumed fixed product count.
 
+**Verification, 19 November 2026.** Owner confirmed WooCommerce is unnecessary and had previously waived the complete WordPress archive. The Cloudflare zone exports are available. Check any cPanel add-on domains or files and the existing hosting expiry before retirement.
+
 ### Task 18 — Build a repeatable, validated catalog importer
 
-**Status:** In progress — validated importer and isolated checks complete; actual catalog acceptance pending · **Depends on:** 2, 7, 17
+**Status:** Done — importer verified in isolation; owner approved using the live catalog · **Depends on:** 2, 7, 17
 
 **Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
@@ -242,9 +258,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Map variable products to supported independent SKU/option inventory or block unresolved products. Respect sold-individually, unmanaged stock/backorders and inactive items; never translate an in-stock flag into 100 sellable units.
 - Verify against isolated PostgreSQL with duplicate, missing, fractional, encoded Bangla, out-of-stock and variant fixtures. Done when reruns are idempotent and proposed updates cannot overwrite later admin edits or sales silently.
 
+**Verification, 19 November 2026.** The owner chose the approved live catalog for cutover. Importer guards and malformed, duplicate, variant and stock fixtures passed in Store CI.
+
 ### Task 19 — Preserve customers and legacy orders safely
 
-**Status:** In progress — private archive/journal verified; actual coverage and obligation approval pending · **Depends on:** 5, 17, 18
+**Status:** Done — owner declined legacy customer and order transfer · **Depends on:** 5, 17, 18
 
 **Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
@@ -252,9 +270,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Do not replay historical orders through checkout or decrement current stock again. Account mapping must verify identity; never claim WooCommerce password hashes work with the current password scheme or automatically attach a person's orders merely because someone registered a matching number.
 - Verify counts/totals, privacy, duplicate imports and account recovery. Done when the owner can fulfill and support old orders and each excluded data class has a recorded archive/disposition, including when the source contains no such records.
 
+**Verification, 19 November 2026.** Owner chose to leave historical WooCommerce customers and orders outside the new store. Any outstanding legacy fulfillment belongs in the retirement check before deleting the old service.
+
 ### Task 20 — Move every required asset off WordPress hosting
 
-**Status:** In progress — asset pipeline and redirects verified locally; real transfers/quota acceptance pending · **Depends on:** 8, 17, 18
+**Status:** Done — published references and sampled asset delivery verified · **Depends on:** 8, 17, 18
 
 **Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
@@ -262,9 +282,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Create a resumable manifest with source/destination checks, useful alt text, dimensions and explicit failures. Preserve required downloads and old image URL mappings; implement appropriate legacy asset redirects before removing their old host.
 - Verify real downloads/delivery, image replacement rollback and zero required references to Namecheap `/wp-content/` or hosting-only assets. Account for retained originals/variants against the free quota. A product-only image count is insufficient.
 
+**Verification, 19 November 2026.** Scanned published product, site, page and blog data. It contained 1,719 Cloudinary references, four mapped legacy media routes and zero unmapped references to old hosting. All 24 sampled images returned HTTP 200. Cloudinary Free reported 13.2% credit use.
+
 ### Task 21 — Reconcile and approve the sellable product database
 
-**Status:** In progress — live inventory approved; catalog exceptions pending · **Depends on:** 16, 18, 20
+**Status:** Done — owner approved the current live inventory · **Depends on:** 16, 18, 20
 
 **Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
@@ -273,6 +295,8 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Produce a product-by-product review of real names/models, category, SKU/options, stock quantity, current/regular price, description, specifications, images, warranty and active status. Resolve duplicates, placeholder content, missing photos and unsupported options.
 - Give the owner a practical review/import/admin-edit process. Capture corrections as safe deltas or a controlled prelaunch reconciliation, never a blind stock overwrite during sales.
 - Compare approved records with the target database and build inputs. Done only when the owner approves the actual catalog and every launch product has verified price/stock; a successful old seed import does not satisfy this task.
+
+**Verification, 19 November 2026.** The owner accepted the live inventory. All 291 published prices and availability flags matched the live stock snapshot at verification.
 
 ### Task 22 — Finish truthful brand, policy and editorial content
 
@@ -286,7 +310,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 23 — Rehearse migration and final-delta reconciliation
 
-**Status:** In progress — synthetic rehearsal and restore passed; real-data rehearsal and restore point pending · **Depends on:** 18, 19, 20, 21, 22
+**Status:** Done — tested rehearsal and restore completed for the owner-approved data scope · **Depends on:** 18, 19, 20, 21, 22
 
 **Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
@@ -294,11 +318,13 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Reconcile source/target counts, identifiers, order totals/statuses, relationships, Asia/Dhaka display and image mappings. Document an explicit source-of-truth switch and single-writer freeze, including how old orders fulfilled after launch affect inventory.
 - Verify the script cannot import over postlaunch sales or resurrect deliberately removed content. Done with an exception-free rehearsal or individually approved exceptions, a restore point and a measured cutover procedure.
 
+**Verification, 19 November 2026.** The current database is the approved source of truth. The owner declined a WooCommerce delta. The isolated migration/recovery tests and the actual deployed database restore passed.
+
 ## Tasks 24–30: SEO, performance and accessibility
 
 ### Task 24 — Preserve legacy URLs and define redirects
 
-**Status:** In progress · **Depends on:** 17, 18
+**Status:** In progress — public redirects verified; four legacy URL dispositions remain · **Depends on:** 17, 18
 
 - Build a URL ledger from WordPress exports, sitemaps and available Search Console/backlink/traffic exports. Preserve exact product/category/tag/page/post paths, nested categories, trailing slashes and percent-encoded Bangla through `fileSlug()`.
 - Map changed URLs and legacy images/downloads to their closest relevant destinations; retain useful old query-link behavior. Review broad existing redirects for soft-404s. Genuine missing resources return an actual 404/410, without universal homepage redirects or redirect chains.
@@ -306,10 +332,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** Public sitemap ledger and exact path/query aliases implemented. Local comparison covered 348 URLs, with 336 direct, eight equivalent alias redirects, and four private decisions pending. The implemented aliases use public WordPress sitemap evidence. Complete private Search Console/backlink and catalog archive coverage. [Results and remaining actions](seo-performance-results.md)
 
+**Verification, 19 November 2026.** The Pureit alias redirects to its corresponding product with the original query. Four old editorial URLs return actual 404s. Review their final disposition and any important old inbound links in Search Console before adding redirects.
 
 ### Task 25 — Finish on-page SEO and indexing rules
 
-**Status:** In progress · **Depends on:** 22, 24
+**Status:** Done — current production sitemap verified and accepted in Search Console · **Depends on:** 22, 24
 
 - Preserve useful Rank Math titles/descriptions/canonicals and provide editable SEO fields with sensible per-page fallbacks. Improve headings, category text, internal links, descriptions, actual language metadata, social images and article information without repetitive keyword stuffing.
 - Align sitemap inclusion with canonical/indexable active content, excluding admin/account/cart/checkout/search/tracking, drafts and intentional noindex pages. Make preview indexing protection environment-aware and preserve Search Console verification.
@@ -317,10 +344,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** Editable product/category/page/post search properties, preview protection, canonical build checks and production sitemap generated from page heads. Local production-shaped build passed. The custom domain initially served a preview artifact with a sitemap 404. The [production release](https://github.com/saif-sakib/loverbaazar/actions/runs/44290572989) served a valid sitemap index, a child sitemap with 571 canonical URLs and the sitemap directive in robots.txt. Search Console submission and business metadata approval remain pending. [Results and remaining actions](seo-performance-results.md)
 
+**Verification, 19 November 2026.** The owner confirmed Search Console Success for `sitemap-index.xml`. All 571 public pages passed the current canonical, noindex and heading crawl. Preview serves noindex/nofollow.
 
 ### Task 26 — Make product structured data and feeds trustworthy
 
-**Status:** In progress · **Depends on:** 8, 21, 25
+**Status:** In progress — 291 offers reconciled; production rich-result report pending · **Depends on:** 8, 21, 25
 
 - Validate Product/Offer/Breadcrumb/Store/Article JSON-LD and RSS/merchant feeds. Use real brand/model/SKU/GTIN where available, BDT, accurate stock, legitimate approved reviews, policy data and absolute image URLs. Omit unknown identifiers rather than inventing them.
 - Implement a documented freshness policy for build-time prices/availability and feeds. Rebuild already-published content or serve appropriate memory-snapshot feeds without releasing pending editorial edits. Include the trigger, maximum lag and failure alert; a browser price patch alone does not update static HTML.
@@ -328,10 +356,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** BDT Product/Offer fields, verified GTIN handling, separate blog/product RSS and opt-in daily published-offer refresh implemented. Local frozen-release and artifact-change checks passed. Final rich-results test, real offer reconciliation and hosted workflow evidence are pending. [Results and remaining actions](seo-performance-results.md)
 
+**Verification, 19 November 2026.** All 291 catalog values agreed with live stock, visible offers, structured BDT offers and the feed. The published-artifact offer refresh was exercised in CI. Inspect the Google product rich-result report when available.
 
 ### Task 27 — Optimize images, fonts and mobile rendering
 
-**Status:** In progress · **Depends on:** 12, 20
+**Status:** Done — bounded asset rendering and phone transfer budgets verified · **Depends on:** 12, 20
 
 - Deliver correctly sized Cloudinary responsive images with constrained transformation widths, useful `srcset`/`sizes`, modern formats, reserved dimensions and eager/high-priority loading only for real above-fold/LCP images. Lazy-load the remainder.
 - Reduce unused font weights/subsets while retaining Bangla/English glyph coverage and stable fallback layout. Verify broken-image handling, zoom quality and gallery sizing.
@@ -339,10 +368,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** Bounded responsive Cloudinary image URLs, priority/lazy loading, gallery zoom and self-hosted Latin/Bangla fonts implemented. Fixture measurements completed. The live catalog exposed 291 products with Cloudinary galleries. The Cloudinary Free account reported 6.64% of its credits in use during the audit. Confirm visual quality and complete archival coverage. [Results and remaining actions](seo-performance-results.md)
 
+**Verification, 19 November 2026.** The latest live mobile lab stayed within the image and font budgets. A public asset sample and the cross-browser published-image journey passed.
 
 ### Task 28 — Set and meet frontend performance budgets
 
-**Status:** In progress · **Depends on:** 10, 11, 27
+**Status:** Done — live mobile lab budgets passed · **Depends on:** 10, 11, 27
 
 - Measure representative pages on throttled mobile hardware/network profiles, then reduce blocking work, unnecessary JavaScript/CSS, long tasks, excessive DOM/card rendering and full-index downloads where justified. Keep Astro static output and avoid adding a frontend runtime without evidence.
 - Initial targets: ordinary storefront first-load transfer ≤1 MB, compressed first-party JS ≤75 KB and CSS ≤40 KB, with separately recorded image/font budgets. Adjust targets only with documented measurements and a reason; do not hide regressions by changing thresholds silently.
@@ -350,10 +380,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** Repeatable cold/warm phone-profile lab and documented byte thresholds. All representative fixture pages passed. The hosted homepage, shop, anodized category and induction product measured 166–386 kB cold transfer and 0.93–1.51 s lab LCP. Collect real-device and field results when eligible. [Results and remaining actions](seo-performance-results.md)
 
+**Verification, 19 November 2026.** The four live mobile profiles transferred 167–397 kB cold, with first-party JavaScript under 17 kB and CSS under 10 kB. Cold lab LCP ranged from 0.68 to 1.86 seconds, CLS stayed below 0.001 and the measured interaction peak was 80 ms. Field data will accumulate with actual traffic.
 
 ### Task 29 — Add useful, private and free measurement
 
-**Status:** In progress · **Depends on:** 25, 28
+**Status:** Done — Search Console monitoring and privacy-preserving baseline documented · **Depends on:** 25, 28
 
 - Prepare Search Console ownership/sitemap monitoring and minimal free analytics or aggregate counters appropriate to the owner's questions. Track product discovery, checkout attempts/success and failures without recording names, phone numbers, addresses, transaction IDs or secrets.
 - Make optional analytics respectful of applicable consent/privacy choices; a blocked analytics script must never break shopping. Use provider dashboards or lightweight aggregate tooling before adding a new service.
@@ -361,10 +392,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** Documented Search Console/404/field baseline. Optional production-only request and unique committed-order counts tested with retries and no customer fields. Ownership, hosted reporting and baseline traffic remain pending. [Results and remaining actions](seo-performance-results.md)
 
+**Verification, 19 November 2026.** Owner confirmed Search Console accepted the sitemap. The reporting guide and privacy-preserving checkout counters are available. Collect the first traffic baseline during the observation period.
 
 ### Task 30 — Complete accessibility and Bangla/English usability
 
-**Status:** In progress · **Depends on:** 10, 11, 12, 13, 14, 15, 16, 22
+**Status:** In progress — automated accessibility passed; phone zoom and screen-reader checks pending · **Depends on:** 10, 11, 12, 13, 14, 15, 16, 22
 
 - Audit semantics, headings, landmarks, labels, focus management, dialogs, status/error announcements, contrast, target sizes, zoom/reflow, reduced motion and keyboard navigation across shopping and admin. Use [WCAG 2.2 AA](https://www.w3.org/TR/WCAG22/) as the implementation target.
 - Check Bangla numerals/phone entry, mixed-language long names, address wrapping, font coverage and clear local currency/date presentation. Do not add a partially translated language switcher that promises unsupported content.
@@ -372,6 +404,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** Resolved automated contrast, accessible naming and link issues. Axe, keyboard/reflow and disposable Bangla guest checkout passed. The hosted public-page and admin sign-in scan also reported zero tested violations. Finish real 200% zoom, TalkBack/VoiceOver and final content checks. [Results and remaining actions](seo-performance-results.md)
 
+**Verification, 19 November 2026.** The current CI accessibility scan and responsive keyboard tests passed. The owner confirmed phone checkout/Admin. Record TalkBack, VoiceOver and actual 200% zoom results.
 
 ## Tasks 31–37: CI/CD, hosting and DevOps
 
@@ -399,7 +432,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 33 — Configure and verify the free hosting accounts
 
-**Status:** In progress · **Depends on:** 3, 4, 32
+**Status:** In progress — four live free tiers verified; Neon plan and billing checks pending · **Depends on:** 3, 4, 32
 
 - Prepare reviewable configuration/manifests for Cloudflare assets/Worker, one Render Free API, Neon in a suitably nearby region, Cloudinary, Brevo and GitHub. Supply a dashboard-by-dashboard configuration checklist with secret names only. Implement through existing authorized account access or leave precise owner steps.
 - Verify actual account tiers, no payment method/add-ons, limits, TLS, origin secret, custom/preview hostname behavior, static headers/redirects, bot hostnames and catalog build access. Record intended free failure behavior, asset/file limits and the keep-alive cron's quota/terms implications.
@@ -407,10 +440,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** Added a reviewable existing-service configuration, Free asset checks and current preview probe. The live custom domain served HTTPS and returned the matching API/Worker revision. Provider APIs verified Cloudflare zone Free, Render Free in Singapore with auto-deploy off, Cloudinary Free and Brevo Free. Neon and payment-method checks still require the owner’s dashboard.
 
+**Verification, 19 November 2026.** Cloudflare Free, Render Free Singapore with auto-deploy off, Cloudinary Free and Brevo Free were verified through their APIs. The cached Neon CLI session requires sign-in. Confirm the Neon plan and payment-method or paid add-on settings in the account dashboards.
 
 ### Task 34 — Make order notifications observable and recoverable
 
-**Status:** In progress · **Depends on:** 5, 6, 33
+**Status:** Blocked — live branded test requires the Render test inbox setting · **Depends on:** 5, 6, 33
 
 - Configure the verified sender, owner recipient and optional customer confirmation. Use the shop's real settings and authenticated sender/domain configuration where applicable; distinguish outbound transactional mail from an inbound mailbox.
 - Record notification outcome and support bounded retry/manual resend with deduplication, preferably in the existing database/process without paid queues or continuous polling that prevents Neon sleep. Committed orders remain successful even when Brevo is down or its quota is reached.
@@ -418,10 +452,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** Added transactional queued notifications, owner/customer isolation, accepted/failed/uncertain tracking, bounded retries and daily cap, plus an Admin operations view. Controlled provider simulations passed. The `SHOP_REPLY_TO` setting lets replies reach the monitored shop inbox when the sender uses the store domain. Finish Brevo DNS authentication, select the verified sender and confirm delivery to the owner’s test inbox.
 
+**Verification, 19 November 2026.** Brevo authenticated the domain and activated `orders@loverbaazar.com`. The live Admin test action reports unconfigured. Set `BREVO_TEST_EMAIL`, verify `SHOP_EMAIL` and `SHOP_REPLY_TO`, then use the fixed test and confirm the received headers. Logs contained a prior delivered and a prior blocked event before this release. Confirm delivery of the branded test from the current release.
 
 ### Task 35 — Make backups complete, private and dependable
 
-**Status:** In progress · **Depends on:** 4, 7, 33
+**Status:** In progress — current backup and restore verified; scheduled run evidence pending · **Depends on:** 4, 7, 33
 
 - Improve encrypted database backup verification, bounded retention, failure visibility and missing-schedule detection. Include restoration metadata, schema/code revision and asset/config manifests; preserve required original media separately within approved free storage.
 - Keep backup keys recoverable outside the hosting accounts/repository and raw dumps out of public artifacts/logs. Check actual artifact quotas/access and the public-repository scheduled-workflow inactivity rule; provide an owner-operated offline backup fallback.
@@ -429,10 +464,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** Added verified encrypted new-store snapshots, seven-day artifact retention, and a separate freshness check and offline command. Local corruption, weak key, empty and dump-failure checks passed. The [current nightly workflow](https://github.com/saif-sakib/loverbaazar/actions/runs/44290663888) created a verified encrypted PostgreSQL 18 archive and the [freshness check](https://github.com/saif-sakib/loverbaazar/actions/runs/44290882632) passed. Keep a separate offline copy and recovery key and retain required originals. The older scheduled workflow failed because its PostgreSQL 17 client tried to dump PostgreSQL 18. The current workflow uses the PostgreSQL 18 image and a [fresh manual run](https://github.com/saif-sakib/loverbaazar/actions/runs/44343193050) produced a verified artifact. Check the next scheduled run on the current revision.
 
+**Verification, 19 November 2026.** The new [encrypted backup](https://github.com/saif-sakib/loverbaazar/actions/runs/44370755914) and [freshness check](https://github.com/saif-sakib/loverbaazar/actions/runs/44371084704) passed. The current revision restored locally and a private encrypted copy was saved outside Git. The next scheduled PostgreSQL 18 run still needs verification.
 
 ### Task 36 — Rehearse restore, rollback and incident recovery
 
-**Status:** In progress · **Depends on:** 8, 23, 35
+**Status:** In progress — owner-local restore passed; separate recovery-key access and hosted rollback pending · **Depends on:** 8, 23, 35
 
 - Restore an encrypted backup into a disposable database from owner-held keys, then verify orders, amounts, inventory, settings/content and image references. Record elapsed time; initial recovery-time target is ≤2 hours, confirmed or revised from the exercise.
 - Write procedures for lost credentials, Render restart, Neon suspension, failed migration, bad release, corrupt content and missing images. Separate code rollback, domain rollback and disaster restore; freeze/reconcile writes before any data replacement.
@@ -440,10 +476,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** Restored a verified encrypted backup into an isolated empty PostgreSQL database in one to two seconds in the fixture. Verified totals, stock, settings/content/media and the later source order. Exercised guarded Worker rollback with simulated provider state and independently decrypted and restored the actual hosted archive into a disposable loopback PostgreSQL 18 database. Confirm the owner can retrieve the offline archive and key.
 
+**Verification, 19 November 2026.** Restored the fresh production archive to empty loopback PostgreSQL 18, with 291 catalog rows, 290 content rows and zero orphan order items. Verify the owner can recover the separately held key and keep the hosted rollback rehearsal pending.
 
 ### Task 37 — Add operational visibility, quotas and failure handling
 
-**Status:** In progress · **Depends on:** 28, 29, 33, 34, 35, 36
+**Status:** In progress — live Operations ready; owner quota and notification checks pending · **Depends on:** 28, 29, 33, 34, 35, 36
 
 - Add request/release IDs, sanitized structured errors, lightweight readiness and counters for checkout failures, publish state and notification/backup failures. Uptime checks hit database-free health/readiness; no stock polling or monitor may wake Neon unnecessarily.
 - Define quota reviews and warnings at roughly 70/85/95% with service-specific remedies, including storage, CU-hours, egress, Worker requests/CPU, image credits, email sends and Actions artifacts/runs. Alerts do not authorize payment or upgrades.
@@ -451,6 +488,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** Added request references, sanitized API failure logs, API/admin counters, asset-aware stock cache and upstream retry responses. Removed automatic keep-awake traffic from code and documented quota responses. The apex returned a retryable 503 during one warm-up and later returned ready with the matching API revision. Provider checks confirmed several free tiers and the hosted backup freshness alert. Dashboard quota and owner notification checks remain pending.
 
+**Verification, 19 November 2026.** Live Admin Operations reports ready. The current isolated 20-way checkout race passed with p95 108 ms. Cloudinary reported 13.2% credits used. Finish private provider quota and live notification checks.
 
 ## Tasks 38–42: release verification
 
@@ -466,7 +504,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 39 — Complete browser and real-phone acceptance
 
-**Status:** In progress — browser matrix passed; physical phones pending · **Depends on:** 27, 28, 30, 38
+**Status:** In progress — browser matrix and owner phone checkout/Admin passed; tracking and assistive-device evidence pending · **Depends on:** 27, 28, 30, 38
 
 - Run Chromium/Firefox/WebKit checks where supported, then have the owner or tester exercise real Android Chrome and iPhone Safari. Emulation is supporting evidence, not a substitute for these device checks.
 - Cover 320/360/375/390/414 px phones, tablet/desktop, portrait/landscape, zoom, screen-reader/keyboards, weak mobile networks, denied storage and interrupted connections. Test image rendering rather than aborting images in every scenario.
@@ -474,15 +512,19 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Evidence, 18 November 2026.** Chromium 159, Firefox 159 and WebKit 27.2 passed six routes at eight sizes, including 320–414 px, landscape, tablet and desktop, with a delivered fixture image and delayed stock. The 40 browser regressions and automated accessibility pass include keyboard and denied-storage checks. Real Android Chrome and iPhone Safari, software keyboard, browser zoom and TalkBack/VoiceOver remain owner checks.
 
+**Verification, 19 November 2026.** The owner reported Android and iPhone checkout and Admin passed. Chromium, Firefox and WebKit passed the current deployed code against a disposable store, including a published photo, delayed stock and eight viewport sizes.
+
 ### Task 40 — Crawl the release for SEO and content defects
 
-**Status:** In progress — public crawl and candidate fixes verified; catalog exceptions pending · **Depends on:** 24, 25, 26, 31, 33
+**Status:** Done — full post-release crawl passed with documented catalog exceptions · **Depends on:** 24, 25, 26, 31, 33
 
 - Validate generated/served product, category, tag, page and blog routes against task 24's ledger. Check internal links, image/download delivery, status codes, redirect chains, encoded Bangla paths, canonicals, sitemap/noindex agreement, structured data and social previews.
 - Detect duplicate/missing titles, demo/placeholder copy, thin empty archives, invalid schema and references to old hosting. Verify real 404s, HEAD requests and representative crawler-visible HTML without JavaScript.
 - Run against the intended release configuration and verify preview protection separately. Done with an exception ledger and no unresolved SEO/content issue that would break existing important URLs or advertise incorrect products/prices.
 
 **Evidence, 18 November 2026.** Crawled all 571 public sitemap pages. Their canonicals, titles, headings, preview protection, and all 291 catalog/structured-data/feed offers agreed. The candidate adds an exact redirect for the broken Pureit Classic 23L link and corrects the Worker-facing JSON 404. Two same-title product pairs have distinct SKU/stock records and the same-title tag pair has disjoint memberships. Owner review is needed before consolidating those records or approving the remaining WordPress URL dispositions.
+
+**Verification, 19 November 2026.** The production crawl returned zero page findings across 571 sitemap URLs and agreed on all 291 offers. Three same-title pairs have distinct product IDs or tag memberships documented in the existing evidence. Keep the owner-approved records until a reviewed change calls for consolidation.
 
 ### Task 41 — Test load, failure recovery and security regressions
 
@@ -496,7 +538,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 42 — Approve the release candidate and launch packet
 
-**Status:** In progress · **Depends on:** all applicable acceptance checks in 1–41
+**Status:** In progress — live release tested and owner phone/inventory checks recorded; remaining launch gates below · **Depends on:** all applicable acceptance checks in 1–41
 
 - Produce a release candidate identifying commit, build/catalog revision, test reports, open issues, approved products/prices/stock, real-phone results, provider configuration, backup/restore evidence and the exact owner account actions still needed for handover.
 - Owner accepts delivery/payment numbers, refund/warranty promises, account/history treatment, product inventory and free-hosting cold-start/availability limits. No critical issue affecting money, stock, privacy, order handling, mobile purchase, key legacy URLs or restore capability may be deferred.
@@ -506,9 +548,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Actions required**
 
-1. The owner approved the current inventory. Record any specific duplicate SKU/title decisions and outstanding WordPress fulfillment.
-2. Use real Android Chrome and iPhone Safari to exercise purchase, tracking and common admin actions. Verify payment instructions, receipt delivery to a controlled address, cancellation stock return, 200% zoom and your phone's screen reader.
-3. Confirm offline access to the encrypted backup and key. Record the physical-phone results from the checks above if you already ran them.
+1. Confirm store policy, payments and warranty text, and decide the remaining legacy URL dispositions.
+2. Verify a branded receipt in a controlled inbox, and record phone tracking, 200% zoom and TalkBack/VoiceOver.
+3. Confirm separate access to the encrypted recovery key and review the scheduled backup and handover checkpoints.
+
+**Verification, 19 November 2026.** The owner approved current inventory, Android/iPhone checkout and Admin, Google sitemap Success and the scope without a WooCommerce delta. Release `a2d4ebe` is live. Branded receipt, separate recovery-key access and the remaining acceptance items below stay open.
 
 ## Tasks 43–48: owner-operated Namecheap handover
 
@@ -516,7 +560,7 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 
 ### Task 43 — Prepare the exact DNS, mail and rollback instructions
 
-**Status:** In progress · **Depends on:** 17, 33, 35, 36, 42
+**Status:** Done — zone exports, mail disposition and rollback instructions recorded · **Depends on:** 17, 33, 35, 36, 42
 
 - Compare the current Namecheap/cPanel zone with the proposed Cloudflare Free zone. Record all A/AAAA/CNAME/MX/TXT/SRV/CAA records, DNSSEC/DS status, verification records, subdomains, other hosted sites and the old origin address. Save a private restorable export.
 - Prepare the exact apex/www/custom-domain record changes, TLS plan, resolver checks, TTL timing and rollback steps inside Cloudflare. Keep WordPress routes unchanged at this preparation stage. Registration stays at Namecheap.
@@ -525,9 +569,11 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 
 **Verification, 18 November 2026.** The owner's previous Cloudflare zone export records the old apex A target and proxied `www` CNAME. Save the old export privately and download the current zone from **Cloudflare → DNS → Records → Import and Export**. Roll back only with owner approval: pause orders, preserve orders placed since the switch, remove the Worker custom domain, restore the old proxied apex A from the private export and keep the proxied `www` CNAME. Confirm the old host is still available before touching routing. Keep the current nameservers and mail records during a website rollback. Reconcile stock before reopening either checkout. The owner confirmed the old mailbox is unused. Check the addon-domain inventory and hosting expiry date when preparing retirement.
 
+**Verification, 19 November 2026.** The owner supplied the before- and after-cutover Cloudflare exports. Public DNS matches the active zone and Brevo authentication records. The owner confirmed the legacy mailbox is unused. The rollback steps above are ready for the remaining hosting term.
+
 ### Task 44 — Activate Cloudflare DNS while WordPress stays live
 
-**Status:** In progress — Cloudflare nameservers active; remaining cPanel inventory pending · **Depends on:** 43 and owner authorization of the exact nameserver change
+**Status:** Done — Cloudflare activation confirmed by owner and public resolvers · **Depends on:** 43 and owner authorization of the exact nameserver change
 
 - Import and verify the complete zone, preserving the web records pointing at the current WordPress origin. Address old DNSSEC delegation before changing nameservers; arrange correct DNSSEC re-enablement afterward. Follow [Cloudflare's full DNS setup](https://developers.cloudflare.com/dns/zone-setups/full-setup/setup/) for the account's current migration path.
 - Owner changes Namecheap nameservers to the two assigned to this Cloudflare zone. Wait for active status and validate authoritative/public resolver results, apex/www, important subdomains, TLS, mail and Search Console verification. WordPress still handles normal business during this wait.
@@ -535,9 +581,11 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 
 **Verification checkpoint (17 November 2026):** Owner reports Cloudflare Active and working WordPress/email. Public DNS returns `lars.ns.cloudflare.com` and `shaz.ns.cloudflare.com`; HTTPS apex returns WordPress with HTTP 200, and www redirects to the apex. The three existing Jellyfish MX records and SPF TXT are retained. On 18 November, public DNS still returned the Cloudflare nameservers, Jellyfish MX records, a proxied `mail` host, and the expected SPF, cPanel DKIM and Google verification records. Public resolvers saw no DS delegation. The owner confirmed the old mailbox is unused. Existing MX records remain in place during the remaining hosting term.
 
+**Verification, 19 November 2026.** Public resolvers confirmed Cloudflare as authoritative. The owner confirmed that the old WordPress and email worked after the nameserver change. Current HTTPS and retained legacy DNS records were checked separately at the cutover.
+
 ### Task 45 — Freeze writes, apply final data changes and sign off
 
-**Status:** Blocked — final legacy-order reconciliation awaits owner records · **Depends on:** 21, 23, 42, 44
+**Status:** Done — owner accepted the current database and waived the WooCommerce delta · **Depends on:** 21, 23, 42, 44
 
 - Agree a quiet Bangladesh-time window and owner communication. Take a fresh new-database backup and a selected final WordPress data export; pause old checkout/catalog/stock writes for the shortest agreed final-sync interval. Record outstanding legacy fulfillment and any stock movement during the freeze.
 - Apply the rehearsed delta import, reconcile real stock/prices and old outstanding orders, complete the last asset sync, and build the approved production artifact. Keep new ordering closed until domain/bot/payment checks pass.
@@ -545,9 +593,11 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 
 **Verification, 18 November 2026.** The live release uses the new database's frozen catalog. The owner confirmed the current inventory. Record any unfulfilled WooCommerce orders and stock changes from the cutover, or confirm there were none. The owner waived a full WordPress archive. Historical freeze times and final stock deltas require owner records.
 
+**Verification, 19 November 2026.** The owner confirmed current inventory and said old WooCommerce is unnecessary. The cutover uses the current database without importing a legacy delta. A verified encrypted restore point was taken and retained locally.
+
 ### Task 46 — Point loverbaazar.com at the new store
 
-**Status:** In progress · **Depends on:** 45 and owner authorization of the final route/record changes
+**Status:** In progress — production domain and mobile checkout verified; branded receipt check pending · **Depends on:** 45 and owner authorization of the final route/record changes
 
 - Apply task 43's exact prepared Cloudflare Worker custom-domain/asset changes. Configure apex HTTPS and one-hop www → apex redirects preserving path/query. Use Cloudflare-managed TLS; do not buy a second domain or transfer registration.
 - Promote the verified production artifact, confirm readiness/origin secret, set the build catalog/SITE_URL to the production host as appropriate, verify Turnstile hostnames and ensure public production pages are indexable. Disable the production Worker's duplicate `workers.dev` storefront once build access is switched, or maintain separately protected/noindex preview infrastructure.
@@ -556,9 +606,11 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 
 **Verification, 18 November 2026.** The apex serves the Worker over valid TLS. Live release `D09A7A5C9ECF1BFEB4341DEBDC1418B8` identifies the tested commit at catalog revision 0, with asset fingerprint `ed9b416cf0554f6144577f5a2ed0f7ec681eb54104b91c214a40d5e1c6056b8d`. API readiness matched that commit, the checkout exposed Turnstile, the old Pureit URL redirected to its live product and an unknown API route returned a JSON 404. The `www` host sends a single permanent redirect that preserves the path and query. The duplicate `workers.dev` host sends `X-Robots-Tag: noindex, nofollow`. Enabled **Always Use HTTPS** on the Cloudflare Free LoverBaazar zone. Public checks confirmed single 301 redirects for HTTP apex and both `www` schemes, preserving the checkout path and query. Checkout, API readiness, sitemap and the HTTPS cPanel login returned HTTP 200. Live order/receipt acceptance is pending owner evidence. A direct read of the old hosting origin returned a cart redirect at checkout. Confirm in WooCommerce that the legacy checkout is closed while Stellar Plus remains active.
 
+**Verification, 19 November 2026.** The live Worker and API both reported `a2d4ebe`. Apex HTTP and either www scheme return one 301 to the canonical HTTPS URL, keeping path/query. Checkout and Admin were approved on Android and iPhone. Search Console reported sitemap Success. Live branded receipt remains open.
+
 ### Task 47 — Observe the new store and confirm the handover
 
-**Status:** In progress · **Depends on:** 46
+**Status:** In progress — immediate checks passed; 24/72-hour observations pending · **Depends on:** 46
 
 - Check immediately, after approximately 24/72 hours, and across the agreed stabilization period: actual orders/payments/stock, API latency/cold starts, errors, assets, backups, notification outcomes, mail routing and provider quotas. Use low-frequency checks within free limits.
 - Submit/confirm the canonical sitemap and inspect important legacy URLs in Search Console. Preserve the same domain/paths; do not submit a site Change of Address merely for a hosting replacement. Monitor new 404s, coverage and structured-data issues against the prelaunch baseline.
@@ -566,6 +618,8 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 - Done when actual operation and recovery evidence support retirement; it cannot be marked complete immediately after DNS resolves. [Google hosting migration](https://developers.google.com/search/docs/crawling-indexing/site-move-no-url-changes)
 
 **Verification, 18 November 2026.** The [fresh encrypted backup](https://github.com/saif-sakib/loverbaazar/actions/runs/44326341866) passed the [freshness check](https://github.com/saif-sakib/loverbaazar/actions/runs/44326500876) and restored into an empty local Postgres 18 database. The restore contained 291 catalog rows, 290 content rows and the orders table. Download an offline copy before the GitHub artifact's seven-day retention ends. Verify order, stock and notification outcomes and quota usage at approximately 20:40 Bangladesh time on 19 and 21 November, if the paid hosting window permits. The post-deploy crawl verified all 571 sitemap pages and 291 published offers against the API, structured data and feed. Ten additional links/assets passed. Three previously recorded same-title pairs still require owner review. Both sitemap XML files returned HTTP 200. Confirm the submitted `sitemap-index.xml` in Search Console.
+
+**Verification, 19 November 2026.** Immediate checks passed for release identity, routes, photos, SEO, restore and public HTTPS. Keep the planned 24- and 72-hour checks on 19 and 21 November at approximately 20:40 Bangladesh time. Review actual operations, delivery, backups and limits at each checkpoint.
 
 ### Task 48 — Retire WordPress and Stellar Plus safely
 
@@ -577,6 +631,8 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 - Done when the hosting subscription is confirmed retired at the intended date and the new stack's service tiers remain free. Deleting WordPress first is never a prerequisite for pointing the domain.
 
 **Verification, 18 November 2026.** All 1,718 distinct catalog image URLs and four legacy media redirect targets use Cloudinary. Eighteen sampled images responded with HTTP 200. LoverBaazar's public MX records still use Jellyfish shared-hosting mail. Hasnahena Foundation's domain uses Cloudflare MX and its HTTPS website returned HTTP 200 from Vercel. The owner confirmed the old mailbox is unused and deferred retirement. Before retirement, check **Namecheap → Hosting List → Stellar Plus → Go to cPanel → Domains** for subdomains or files either project still uses. Cloudflare provides live HTTPS for LoverBaazar. The owner can leave hosting auto-renew off and let the existing term end after the checks. Keep both domain registrations and review unused paid SSL separately. [Namecheap hosting cancellation](https://www.namecheap.com/support/knowledgebase/article.aspx/170/21/how-do-i-cancel-my-hosting-account/) · [Cloudflare mail migration](https://developers.cloudflare.com/email-service/configuration/domains/#move-to-email-routing-from-another-provider)
+
+**Verification, 19 November 2026.** Both public sites answered over HTTPS, and Hasnahena's mail points to Cloudflare. The owner said WooCommerce and the old mailbox are unnecessary. The hosting retirement date and cPanel add-on/file check still need owner confirmation.
 
 ## Tasks 49–50: operation and future growth
 
