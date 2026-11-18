@@ -148,10 +148,14 @@ func deliverMail(ctx context.Context, message mailPayload, tag string) (state, o
 	for _, address := range message.To {
 		to = append(to, map[string]string{"email": address})
 	}
-	b, _ := json.Marshal(map[string]any{
+	payload := map[string]any{
 		"sender": map[string]string{"email": strings.TrimSpace(os.Getenv("SHOP_EMAIL"))},
 		"to":     to, "subject": message.Subject, "textContent": message.Text, "tags": []string{tag},
-	})
+	}
+	if replyTo := strings.TrimSpace(os.Getenv("SHOP_REPLY_TO")); emailRe.MatchString(replyTo) {
+		payload["replyTo"] = map[string]string{"email": replyTo}
+	}
+	b, _ := json.Marshal(payload)
 	req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.brevo.com/v3/smtp/email", bytes.NewReader(b))
 	req.Header.Set("api-key", os.Getenv("BREVO_KEY"))
 	req.Header.Set("Content-Type", "application/json")

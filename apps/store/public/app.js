@@ -28,6 +28,9 @@
     $("main")?.prepend(el);
   }
   const taka = (n) => "৳" + Number(n).toLocaleString("en-IN");
+  const deliveryCharge = (zone, settings, goods, quantity) =>
+    settings.freeOver > 0 && goods >= settings.freeOver ? 0 : zone.fee * quantity;
+  const heavyDeliveryNote = (quantity) => `These products are heavy, so the delivery charge is multiplied by ${quantity}.`;
   const esc = (s) =>
     String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const toast = (m) => {
@@ -520,7 +523,7 @@
       select.innerHTML =
         (hint ? `<option value="">${esc(hint)}</option>` : "") +
         list
-          .map((o) => `<option value="${esc(o.id)}">${esc(o.label)}${o.fee === undefined ? "" : ` (${o.fee ? `${taka(o.fee)} per piece` : "Free"})`}</option>`)
+          .map((o) => `<option value="${esc(o.id)}">${esc(o.label)}${o.fee === undefined ? "" : ` (${o.fee ? taka(o.fee) : "Free"})`}</option>`)
           .join("");
       if (list.some((o) => o.id === keep)) select.value = keep;
     };
@@ -534,19 +537,19 @@
       $("[data-empty]").hidden = !empty;
       f.hidden = empty;
       if (empty) return;
+      discount = Math.min(discount, data.sub);
+      const goods = data.sub - discount;
+      const pieces = lines.reduce((count, line) => count + line.qty, 0);
+      const delivery = s.delivery.map((zone) => ({ ...zone, fee: deliveryCharge(zone, s, goods, pieces) }));
       // No area is chosen for the customer: the first one may be free, and a guess would be wrong.
-      options(f.area, s.delivery, s.delivery.length > 1 ? "Choose your area" : "");
+      options(f.area, delivery, delivery.length > 1 ? "Choose your area" : "");
       options(
         f.payment,
         s.payments.filter((p) => p.enabled),
       );
-      const zone = s.delivery.find((z) => z.id === f.area.value);
+      const zone = delivery.find((z) => z.id === f.area.value);
       const pay = s.payments.find((p) => p.id === f.payment.value);
-      discount = Math.min(discount, data.sub);
-      const goods = data.sub - discount;
-      // The charge is per piece, as the server counts it: the goods are heavy to carry.
-      const pieces = lines.reduce((a, l) => a + l.qty, 0);
-      const fee = !zone || (s.freeOver > 0 && goods >= s.freeOver) ? 0 : zone.fee * pieces;
+      const fee = zone?.fee || 0;
       total = agreed || goods + fee;
       $("[data-sum]").innerHTML =
         lines
@@ -556,7 +559,9 @@
           )
           .join("") +
         (discount ? `<div class="row"><span>Discount (${esc(code)})</span><b>−${taka(discount)}</b></div>` : "") +
-        `<div class="row"><span>Delivery charge${fee && pieces > 1 ? ` (${taka(zone.fee)} × ${pieces})` : ""}</span><b>${!zone ? "Choose your area" : fee ? taka(fee) : "Free"}</b></div><div class="row total"><span>Total</span><span>${taka(total)}</span></div>`;
+        `<div class="row"><span>Delivery charge</span><b>${!zone ? "Choose your area" : fee ? taka(fee) : "Free"}</b></div>` +
+        (fee > 0 && pieces > 1 ? `<p class="meta">${heavyDeliveryNote(pieces)}</p>` : "") +
+        `<div class="row total"><span>Total</span><span>${taka(total)}</span></div>`;
       $("[data-eta]").textContent = zone?.days ? `Usually arrives in ${zone.days}.` : "";
       $("[data-txn]").hidden = !pay?.number;
       f.txnid.required = !!pay?.number;
@@ -725,9 +730,15 @@
   function applyDelivery() {
     const el = $("[data-delivery]");
     if (!el || !live) return;
+    const product = el.closest("[data-product]");
+    const selected = Math.max(1, Math.floor(+$("[data-qty]", product).value) || 1);
+    const quantity = Math.min(maxFor(product.dataset.product) || 1, selected);
+    const price = stock[product.dataset.product]?.[0] ?? +product.dataset.price;
+    const delivery = live.delivery.map((zone) => ({ ...zone, fee: deliveryCharge(zone, live, price * quantity, quantity) }));
     const free = live.freeOver > 0 ? `<li>Free delivery on orders of ${taka(live.freeOver)} or more</li>` : "";
+    const heavy = quantity > 1 && delivery.some((zone) => zone.fee > 0) ? `<li>${heavyDeliveryNote(quantity)}</li>` : "";
     el.innerHTML =
-      live.delivery.map((z) => `<li>${esc(z.label)}: <b>${z.fee ? `${taka(z.fee)} per piece` : "Free"}</b>${z.days ? `, ${esc(z.days)}` : ""}</li>`).join("") + free;
+      delivery.map((z) => `<li>${esc(z.label)}: <b>${z.fee ? taka(z.fee) : "Free"}</b>${z.days ? `, ${esc(z.days)}` : ""}</li>`).join("") + free + heavy;
   }
 
   function rememberProduct() {
@@ -1034,5 +1045,6 @@
     simpleForm(f, "/reviews", REVIEW_THANKS, { product: +f.dataset.review }),
   );
   renderDynamic();
+  $("[data-qty]")?.addEventListener("input", applyDelivery);
   loadStock();
 })();

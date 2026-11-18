@@ -1739,7 +1739,7 @@
 
         </section>
         <section class="panel">
-          ${secHead("Delivery areas & order rules", "Configure delivery areas and fees shown on product pages and checkout. Fees are charged per piece because appliances are heavy.", "Product pages, Cart & Checkout", "live")}
+          ${secHead("Delivery areas & order rules", "Configure delivery areas and base charges shown on product pages and checkout.", "Product pages, Cart & Checkout", "live")}
           <div id="zones"></div>
           <details class="advanced optional-fields"><summary>Optional order rules <small>Free delivery &amp; minimum order</small></summary>
           <div class="fields2">
@@ -1848,7 +1848,7 @@
         L.delivery,
         [
           { k: "label", label: "Area name", placeholder: "e.g. Inside Jashore" },
-          { k: "fee", label: "Charge per piece (৳)", type: "number", min: 0, help: "0 for free delivery" },
+          { k: "fee", label: "Base delivery charge (৳)", type: "number", min: 0, help: "Amount for one item. Enter 0 for free delivery." },
           { k: "days", label: "Delivery time (optional)", placeholder: "e.g. 2 to 3 days" },
         ],
         { label: "", fee: 0, days: "" },

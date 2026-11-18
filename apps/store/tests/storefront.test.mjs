@@ -69,6 +69,26 @@ test('checkout blocks a quantity greater than remaining stock', () => shop(async
   assert.equal(await page.locator('button[type="submit"]').isDisabled(), true);
 }, { cart: { 1: 2 }, stock: { 1: [1000, 1200, 1] } }));
 
+test('delivery shows the order fee and explains quantity only for paid multi-item orders', async () => {
+  for (const { cart, freeOver, charge, explanation } of [
+    { cart: { 1: 1 }, freeOver: 0, charge: '৳60', explanation: false },
+    { cart: { 1: 2 }, freeOver: 0, charge: '৳120', explanation: true },
+    { cart: { 1: 1, 2: 1 }, freeOver: 0, charge: '৳120', explanation: true },
+    { cart: { 1: 2 }, freeOver: 1500, charge: 'Free', explanation: false },
+  ]) {
+    await shop(async page => {
+      await ready(page, '/checkout/');
+      assert.equal(await page.locator('[name="area"] option:checked').textContent(), `Local (${charge})`);
+      const summary = page.locator('[data-sum]');
+      const delivery = summary.locator('.row').filter({ hasText: 'Delivery charge' });
+      assert.equal(await delivery.locator('b').textContent(), charge);
+      const text = await summary.textContent();
+      assert.doesNotMatch(text, /per piece/i);
+      assert.equal(text.includes('delivery charge is multiplied by 2'), explanation);
+    }, { cart, live: { freeOver } });
+  }
+});
+
 test('manual payments require a transaction reference; duplicate submits send one request', () => shop(async (page, context) => {
   let requests = 0;
   let finish;

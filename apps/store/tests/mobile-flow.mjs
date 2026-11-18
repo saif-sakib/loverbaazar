@@ -102,6 +102,24 @@ try {
   await shot(buyer, 'filters-375');
   await buyer.goto(`/product/${product.slug}/`);
   await buyer.waitForFunction(() => document.querySelector('[data-main]')?.naturalWidth === 2);
+  const stock = await request('GET', '/api/stock', undefined, false);
+  const paidZone = stock.settings.delivery.find(zone => zone.fee > 0);
+  assert.ok(paidZone, 'Fixture requires a paid delivery zone');
+  const delivery = buyer.locator('[data-delivery]');
+  const quantity = buyer.locator('[data-qty]');
+  assert.doesNotMatch(await delivery.textContent(), /per piece|multiplied by/i);
+  await quantity.fill('2');
+  const freeForTwo = stock.settings.freeOver > 0 && 2000 >= stock.settings.freeOver;
+  const deliveryAmount = freeForTwo ? 'Free' : '৳' + (paidZone.fee * 2).toLocaleString('en-IN');
+  await buyer.waitForFunction(({ label, amount }) =>
+    [...document.querySelectorAll('[data-delivery] li')].some(row =>
+      row.textContent.startsWith(label + ':') && row.querySelector('b')?.textContent === amount),
+  { label: paidZone.label, amount: deliveryAmount });
+  const zoneRow = delivery.locator('li').filter({ hasText: paidZone.label });
+  assert.equal(await zoneRow.locator('b').textContent(), deliveryAmount);
+  assert.equal((await delivery.textContent()).includes('delivery charge is multiplied by 2'), !freeForTwo);
+  await quantity.fill('1');
+  assert.doesNotMatch(await delivery.textContent(), /per piece|multiplied by/i);
   await buyer.locator('.buy button[data-add]:not([data-buy])').click();
   await buyer.goto('/cart/');
   await buyer.locator('[data-cart]').getByText('Mobile fixture cooker', { exact: true }).waitFor();
@@ -110,7 +128,6 @@ try {
   await buyer.locator('[name="name"]').fill('Mobile fixture buyer');
   await buyer.locator('[name="phone"]').fill('০১৭১০০০০০০০');
   await buyer.locator('[name="address"]').fill('Fixture address, Jashore, Bangladesh');
-  const stock = await request('GET', '/api/stock', undefined, false);
   const area = stock.settings.delivery[0];
   const cod = stock.settings.payments.find(p => p.enabled && !p.number);
   assert.ok(cod, 'Local fixture must have a non-prepaid method');
