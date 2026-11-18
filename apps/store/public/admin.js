@@ -879,33 +879,54 @@
     if (!dialog) return say("Reload Admin to preview the invoice.");
     const preview = $("#invoice-preview", dialog);
     const shop = site || {};
+    const shopName = esc(shop.name || "LoverBaazar");
     const date = new Date(o.created_at).toLocaleDateString("en-GB", {
       timeZone: "Asia/Dhaka", day: "numeric", month: "short", year: "numeric",
     });
 
-    preview.innerHTML = `<h2 id="invoice-title">Invoice ${esc(o.number)}</h2>
-      <p class="invoice-date"><time datetime="${esc(o.created_at)}">${esc(date)}</time> · <span class="invoice-status">${esc(o.status)}</span></p>
-      <div class="invoice-parties">
+    preview.innerHTML = `<header class="invoice-header">
         <div class="invoice-shop">
-          <img src="${esc(shop.logo || "/favicon.svg")}" alt="" width="42" height="42">
-          <div><strong>${esc(shop.name || "LoverBaazar")}</strong><br>${esc(shop.phone)}${shop.address ? `<br>${esc(shop.address)}` : ""}</div>
+          <img src="${esc(shop.logo || "/favicon.svg")}" alt="" width="48" height="48">
+          <div><strong>${shopName}</strong><br>${esc(shop.phone)}${shop.address ? `<br>${esc(shop.address)}` : ""}</div>
         </div>
-        <div><strong>${esc(o.name)}</strong><br>${esc(o.phone)}${o.email ? `<br>${esc(o.email)}` : ""}<br>${esc(o.address)} (${esc(o.area)})</div>
-      </div>
+        <div class="invoice-heading">
+          <h2 id="invoice-title">Invoice <span>${esc(o.number)}</span></h2>
+          <p class="invoice-date"><time datetime="${esc(o.created_at)}">${esc(date)}</time> · <span class="invoice-status">${esc(o.status)}</span></p>
+        </div>
+      </header>
+      <section class="invoice-customer">
+        <h3>Bill to</h3>
+        <p><strong>${esc(o.name)}</strong><br>${esc(o.phone)}${o.email ? `<br>${esc(o.email)}` : ""}<br>${esc(o.address)} (${esc(o.area)})</p>
+      </section>
       <table class="invoice-items">
-        <thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Amount</th></tr></thead>
-        <tbody>${(o.items || []).map((item) => `<tr><td>${esc(item.name)}</td><td>${esc(item.qty)}</td><td>${money(item.price * item.qty)}</td></tr>`).join("")}</tbody>
+        <thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Amount</th></tr></thead>
+        <tbody>${(o.items || []).map((item) => `<tr><td>${esc(item.name)}</td><td>${esc(item.qty)}</td><td>${money(item.price)}</td><td>${money(item.price * item.qty)}</td></tr>`).join("")}</tbody>
       </table>
-      <dl class="invoice-totals">
-        <div><dt>Subtotal</dt><dd>${money(o.subtotal)}</dd></div>
-        ${o.discount ? `<div><dt>Discount (${esc(o.coupon)})</dt><dd>−${money(o.discount)}</dd></div>` : ""}
-        <div><dt>Delivery charge</dt><dd>${o.shipping ? money(o.shipping) : "Free"}</dd></div>
-        <div class="invoice-total"><dt>Total</dt><dd>${money(o.total)}</dd></div>
-      </dl>
-      <p class="invoice-payment">Payment method: ${esc(o.payment)}${o.txn_id ? `<br>Transaction reference: ${esc(o.txn_id)}` : ""}</p>`;
+      <div class="invoice-end">
+        <div class="invoice-summary">
+          <div class="invoice-payment">
+            <h3>Payment method</h3>
+            <p>${esc(o.payment)}${o.txn_id ? `<br>Transaction reference<br>${esc(o.txn_id)}` : ""}</p>
+          </div>
+          <dl class="invoice-totals">
+            <div><dt>Subtotal</dt><dd>${money(o.subtotal)}</dd></div>
+            ${o.discount ? `<div><dt>Discount (${esc(o.coupon)})</dt><dd>−${money(o.discount)}</dd></div>` : ""}
+            <div><dt>Delivery charge</dt><dd>${o.shipping ? money(o.shipping) : "Free"}</dd></div>
+            <div class="invoice-total"><dt>Total</dt><dd>${money(o.total)}</dd></div>
+          </dl>
+        </div>
+        <p class="invoice-thanks">Thanks for shopping from ${shopName}!</p>
+      </div>`;
 
+    const paper = preview.cloneNode(true);
+    paper.id = "invoice-print";
+    $("#invoice-title", paper).removeAttribute("id");
+    dialog.after(paper);
     $("[data-print-invoice]", dialog).onclick = () => window.print();
-    dialog.onclose = () => preview.replaceChildren();
+    dialog.onclose = () => {
+      preview.replaceChildren();
+      paper.remove();
+    };
     dialog.showModal();
   }
 

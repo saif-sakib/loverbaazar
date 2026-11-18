@@ -213,24 +213,45 @@ try {
   const formattedTotal = '৳' + saved[0].total.toLocaleString('en-IN');
   assert.equal(await invoice.locator('.invoice-total dd').textContent(), formattedTotal);
   assert.match(await invoice.locator('.invoice-totals').textContent(), /Discount \(FIXTURE\)−৳50/);
-  assert.match(await invoice.locator('.invoice-payment').textContent(), /Transaction reference: FIXTURE-TXN-42/);
+  assert.match(await invoice.locator('.invoice-payment').innerText(), /Transaction reference\s+FIXTURE-TXN-42/);
+  assert.equal(await invoice.locator('.invoice-thanks').textContent(), 'Thanks for shopping from LoverBaazar!');
+  assert.equal(await invoice.getByRole('columnheader', { name: 'Unit price' }).isVisible(), true);
   for (const width of [320, 360, 375, 390, 414]) {
     await admin.setViewportSize({ width, height: 812 });
     assert.equal(await invoice.evaluate(box => box.scrollWidth <= box.clientWidth), true, `Invoice overflows at ${width}px`);
   }
   await admin.setViewportSize({ width: 375, height: 812 });
   await shot(admin, 'invoice-375');
+  await admin.setViewportSize({ width: 1440, height: 900 });
+  assert.equal(await invoice.evaluate(box => box.scrollWidth <= box.clientWidth), true);
+  await shot(admin, 'invoice-desktop');
+  const paper = admin.locator('#invoice-print');
+  assert.equal(await paper.isVisible(), false);
   await admin.evaluate(() => { window.print = () => { document.body.dataset.testPrintCalled = 'yes'; }; });
   await invoice.getByRole('button', { name: 'Print / Save PDF' }).click();
   assert.equal(await admin.locator('body').getAttribute('data-test-print-called'), 'yes');
   await admin.emulateMedia({ media: 'print' });
   assert.equal(await admin.locator('body > .wrap').isVisible(), false);
-  assert.equal(await invoice.locator('.invoice-controls').isVisible(), false);
-  assert.equal(await invoice.locator('.invoice-total').isVisible(), true);
-  if (shotDir) await admin.pdf({ path: `${shotDir}/invoice-fixture.pdf`, format: 'A4' });
+  assert.equal(await admin.locator('#order-invoice').isVisible(), false);
+  assert.equal(await paper.locator('.invoice-total').isVisible(), true);
+  assert.equal(await paper.locator('.invoice-thanks').isVisible(), true);
+  if (shotDir) {
+    await admin.pdf({ path: `${shotDir}/invoice-fixture.pdf`, preferCSSPageSize: true });
+    await paper.locator('tbody').evaluate(table => {
+      const row = table.firstElementChild;
+      for (let number = 2; number <= 60; number++) {
+        const copy = row.cloneNode(true);
+        copy.firstElementChild.textContent = `Fixture item ${number}`;
+        table.append(copy);
+      }
+    });
+    await admin.pdf({ path: `${shotDir}/invoice-multipage-fixture.pdf`, preferCSSPageSize: true });
+  }
   await admin.emulateMedia({ media: null });
+  await admin.setViewportSize({ width: 375, height: 812 });
   await invoice.getByRole('button', { name: 'Close' }).click();
   await admin.waitForFunction(() => document.querySelector('#invoice-preview').childElementCount === 0);
+  assert.equal(await paper.count(), 0);
   assert.equal(await invoiceButton.evaluate(button => button === document.activeElement), true);
   const coupon = await request('GET', '/api/admin/coupons');
   assert.equal(coupon.find(c => c.code === 'FIXTURE').used, 1);

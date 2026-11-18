@@ -214,7 +214,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 8, 9
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md). Follow-up verified invoice previews at all five phone widths and generated a PDF from a disposable order. The PDF included the stored subtotal, discount, delivery charge, total and transaction reference.
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md). Verified invoice previews at five phone widths and at 1440 px. Single-page and multipage fixture PDFs use A4 margins, repeat item headings across pages and include the saved amounts and the thank-you line.
 
 - Make products, images, stock deltas, prices, categories, pages, site/live settings, coupons, orders, tracking, messages and customer support usable from a phone. Use contained table scrolling or readable row layouts as appropriate.
 - Preserve unsaved edits, prevent duplicate saves, distinguish live effects from Publish-required effects and display task 8's real publication status. Provide clear order/payment verification and safe CSV export behavior.
