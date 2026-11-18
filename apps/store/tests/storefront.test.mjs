@@ -289,15 +289,47 @@ test('saved stock is retried once so a newly published product becomes available
   assert.equal(requests, 2);
 }));
 
-test('queued publication keeps pending changes until deployment is confirmed',()=>shop(async(page,context)=>{
- await page.addInitScript(()=>sessionStorage.setItem('t','local-admin-token-for-this-computer-only'));
- let state='queued';
- await context.route('**/api/admin/publish',r=>r.fulfill({json:r.request().method()==='POST'?{message:'Queued'}:{dirty:state!=='published',latest:{state}}}));
- await ready(page,'/admin/');
- await page.locator('#pub2').click();
- assert.equal(await page.locator('#dirtybar').isVisible(),true);
- state='published';
- await page.waitForFunction(()=>document.querySelector('#dirtybar').hidden,null,{timeout:10000});
+test('publication confirms a watched deployment once and keeps pending edits visible', () => shop(async (page, context) => {
+  await page.addInitScript(() => sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'));
+  let latest = { id: 'older-release', state: 'published' };
+  let dirty = true;
+  await context.route('**/api/admin/publish', route => {
+    if (route.request().method() === 'POST') {
+      latest = { id: 'new-release', state: 'queued' };
+      return route.fulfill({ json: { id: latest.id, message: 'Queued' } });
+    }
+    return route.fulfill({ json: { dirty, latest } });
+  });
+  await ready(page, '/admin/');
+  assert.equal(await page.locator('#dirtybar').isVisible(), true);
+  assert.equal(await page.locator('#ok').isVisible(), false, 'An older release is silent on sign-in');
+  await page.locator('#pub2').click();
+  await page.getByText(/Publication queued\. Saved changes/).waitFor();
+  assert.equal(await page.locator('#dirtybar').isVisible(), true);
+  latest.state = 'published';
+  dirty = false;
+  await page.getByText('Publication confirmed.', { exact: true }).waitFor();
+  assert.equal(await page.locator('#dirtybar').isVisible(), false);
+  await page.waitForFunction(() => document.querySelector('#ok').hidden, null, { timeout: 12000 });
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  assert.equal(await page.locator('#ok').isVisible(), false, 'Reloading does not repeat the confirmation');
+}));
+
+test('a publication that finishes before the first status check still confirms', () => shop(async (page, context) => {
+  await page.addInitScript(() => sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'));
+  let latest = { id: 'older-release', state: 'published' };
+  await context.route('**/api/admin/publish', route => {
+    if (route.request().method() === 'POST') {
+      latest = { id: 'fast-release', state: 'published' };
+      return route.fulfill({ json: { id: latest.id, message: 'Queued' } });
+    }
+    return route.fulfill({ json: { dirty: false, latest } });
+  });
+  await ready(page, '/admin/');
+  assert.equal(await page.locator('#ok').isVisible(), false);
+  await page.locator('#pub2').click();
+  await page.getByText('Publication confirmed.', { exact: true }).waitFor();
 }));
 
 test('a stale publication status response cannot clear newly saved edits',()=>shop(async(page,context)=>{
