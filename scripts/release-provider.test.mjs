@@ -59,3 +59,5 @@ test("artifact fingerprint is stable, ignores its own manifest and changes with 
     assert.notEqual(await fingerprint(dir),first);
   } finally { await rm(dir,{recursive:true,force:true}); }
 });
+
+test("intentional release gate verification", () => assert.fail("Deliberate CI failure on the disposable verification branch"));
