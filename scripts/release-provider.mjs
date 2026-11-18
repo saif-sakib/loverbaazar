@@ -36,7 +36,7 @@ export async function deployRender(service, key, commit, { fetchImpl = fetch, pa
   const url = `https://api.render.com/v1/services/${service}`;
   const headers = { Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
   const config = await json(url, {headers}, fetchImpl);
-  if (config.autoDeploy !== "no" || config.serviceDetails?.plan !== "free") throw new Error("Render requires Free compute with Auto-Deploy Off");
+  if ((config.autoDeployTrigger ?? (config.autoDeploy === "no" ? "off" : "")) !== "off" || config.serviceDetails?.plan !== "free") throw new Error("Render requires Free compute with Auto-Deploy Off");
   const deployed = await json(url + "/deploys", { method: "POST", headers, body: JSON.stringify({ commitId: commit }) }, fetchImpl);
   if (!/^dep-[a-z0-9]+$/.test(deployed.id ?? "")) throw new Error("Render did not return a deploy ID");
   const active = new Set(["created", "build_in_progress", "pre_deploy_in_progress", "update_in_progress", "queued"]);
@@ -96,11 +96,15 @@ export async function promote({ previous, candidate, current, deploy, rollback, 
 function wrangler(args, env = process.env) {
   return run(process.execPath, ["node_modules/wrangler/bin/wrangler.js", ...args], {env, maxBuffer: 2_000_000});
 }
-async function currentVersion() {
-  const { stdout } = await wrangler(["deployments", "list", "--json"]);
-  const deployed = JSON.parse(stdout)[0]?.versions;
+export function versionFromDeployments(deployments) {
+  const deployed = deployments.at(-1)?.versions; // Wrangler lists deployments oldest first.
   if (deployed?.length !== 1 || deployed[0].percentage !== 100 || !uuid.test(deployed[0].version_id)) throw new Error("Expected one current Cloudflare version at 100%");
   return deployed[0].version_id;
+}
+
+async function currentVersion() {
+  const { stdout } = await wrangler(["deployments", "list", "--json"]);
+  return versionFromDeployments(JSON.parse(stdout));
 }
 
 async function main() {

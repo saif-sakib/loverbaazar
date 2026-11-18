@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { deployRender, verifyAPI, fingerprint, promote } from "./release-provider.mjs";
+import { deployRender, verifyAPI, fingerprint, promote, versionFromDeployments } from "./release-provider.mjs";
 
 const commit = "a".repeat(40);
 const pause = async () => {};
@@ -58,4 +58,12 @@ test("artifact fingerprint is stable, ignores its own manifest and changes with 
     await writeFile(join(dir,"index.html"),"two");
     assert.notEqual(await fingerprint(dir),first);
   } finally { await rm(dir,{recursive:true,force:true}); }
+});
+
+test("read the latest Wrangler deployment and reject a split rollout", () => {
+  const old = "a".repeat(8) + "-aaaa-aaaa-aaaa-" + "a".repeat(12);
+  const current = "b".repeat(8) + "-bbbb-bbbb-bbbb-" + "b".repeat(12);
+  const deploy = id => ({versions:[{version_id: id,percentage:100}]});
+  assert.equal(versionFromDeployments([deploy(old),deploy(current)]),current);
+  assert.throws(() => versionFromDeployments([deploy(old),{versions:[{version_id:current,percentage:50}]}]),/100%/);
 });
