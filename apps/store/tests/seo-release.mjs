@@ -38,7 +38,7 @@ const build = async (environment, dir) => {
     SITE_ORIGIN: "https://loverbaazar.com", NO_COLOR: "1", PUBLIC_TURNSTILE_SITE: "test-site-key",
     CATALOG_URL: `http://127.0.0.1:${server.address().port}/api/catalog` };
   try {
-    await run(process.execPath, ["node_modules/astro/astro.js", "build", "--outDir", join(work, dir)], { cwd: assets, env, maxBuffer: 3_000_000 });
+    await run(process.execPath, ["node_modules/.bin/astro", "build", "--outDir", join(work, dir)], { cwd: assets, env, maxBuffer: 3_000_000 });
   } catch (error) {
     throw new Error(error.stdout?.split("\n").slice(-12).join("\n") + "\n" + error.stderr);
   }

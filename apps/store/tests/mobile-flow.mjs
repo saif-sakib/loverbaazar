@@ -11,6 +11,7 @@ const browser = await chromium.launch({ ...(process.env.CHROME_PATH ? { executab
 const context = await browser.newContext({ baseURL, viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
 const headers = { 'X-Admin-Token': 'local-admin-token-for-this-computer-only' };
 const errors = [];
+const photo = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGOYo2wHRAwQCgAdMgP1kQ5QGAAAAABJRU5ErkJggg==', 'base64');
 context.on('page', p => p.on('pageerror', e => errors.push(e.message)));
 const shotDir = process.env.LB_SCREENSHOTS;
 if (shotDir) await fs.mkdir(shotDir, { recursive: true });
@@ -23,11 +24,24 @@ const request = async (method, path, data, admin = true) => {
 };
 try {
   await context.addInitScript(() => { if (location.protocol === 'http:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
+  const missingAPI = await context.request.get('/api/not-a-fixture-route');
+  assert.equal(missingAPI.status(), 404);
+  assert.equal(missingAPI.headers()['cache-control'], 'no-store');
+  assert.deepEqual(await missingAPI.json(), { error: 'not found' });
+
   const admin = await context.newPage();
+  await request('PUT', '/api/admin/content/cat/fixture-kitchen', { name: 'Fixture Kitchen' });
+  await request('PUT', '/api/admin/content/page/fixture-warranty', { title: 'Fixture warranty', html: '<p>Local warranty fixture.</p>' });
+  const unpublished = await context.request.get('/fixture-warranty/');
+  assert.equal(unpublished.status(), 404);
   await admin.goto('/admin/#new-product');
   await admin.locator('#pf [name="name"]').fill('Mobile fixture cooker');
   await admin.locator('#pf [name="price"]').fill('1000');
   await admin.locator('#pf [name="stock"]').fill('2');
+  await admin.locator('#pf input[name="cat"][value="fixture-kitchen"]').check();
+  await admin.locator('#up').setInputFiles({ name: 'fixture-photo.png', mimeType: 'image/png', buffer: photo });
+  await admin.waitForFunction(() => document.querySelector('#imgs img')?.naturalWidth === 2);
+  assert.match(await admin.locator('#imgs img').getAttribute('src'), /^blob:/);
   await shot(admin, 'admin-editor-375');
   await admin.locator('#pf .stick button').first().click();
   await admin.waitForSelector('#rows');
@@ -35,6 +49,7 @@ try {
   const products = Array.isArray(catalog) ? catalog : catalog.products;
   const product = products.find(p => p.name === 'Mobile fixture cooker');
   assert.ok(product);
+  assert.match(product.images[0].src, /^\/uploads\//);
   await shot(admin, 'admin-product-375');
   // Controlled, genuine fixture attributes exercise filters without altering real products.
   await request('PUT', `/api/admin/products/${product.id}`, { ...product, attrs: [{ name: 'Brand', values: ['Fixture A'] }], stockDelta: 0 });
@@ -43,6 +58,19 @@ try {
   await admin.waitForFunction(() => document.querySelector('#dirtybar').hidden, null, { timeout: 90000 });
   const publication = await request('GET', '/api/admin/publish');
   assert.equal(publication.latest.state, 'published');
+  const deployed = await request('GET', '/release.json', undefined, false);
+  assert.equal(deployed.id, publication.latest.id);
+  assert.equal(deployed.environment, 'local');
+  const uploaded = await context.request.get(product.images[0].src);
+  assert.equal(uploaded.status(), 200);
+  assert.match(uploaded.headers()['content-type'], /^image\/png/);
+  assert.deepEqual(await uploaded.body(), photo);
+  const warranty = await context.request.get('/fixture-warranty/');
+  assert.equal(warranty.status(), 200);
+  assert.match(await warranty.text(), /Local warranty fixture/);
+  const group = await context.request.get('/product-category/fixture-kitchen/');
+  assert.equal(group.status(), 200);
+  assert.match(await group.text(), /Mobile fixture cooker/);
   const buyer = await context.newPage();
   await buyer.goto('/shop/');
   await buyer.locator('.filter-panel summary').click();
@@ -50,7 +78,11 @@ try {
   assert.equal(await buyer.locator('[data-card]:visible').count(), 1);
   await shot(buyer, 'filters-375');
   await buyer.goto(`/product/${product.slug}/`);
-  await buyer.locator('.buy [data-buy]').click();
+  await buyer.waitForFunction(() => document.querySelector('[data-main]')?.naturalWidth === 2);
+  await buyer.locator('.buy button[data-add]:not([data-buy])').click();
+  await buyer.goto('/cart/');
+  await buyer.locator('[data-cart]').getByText('Mobile fixture cooker', { exact: true }).waitFor();
+  await buyer.locator('a[href="/checkout/"]:visible').first().click();
   await buyer.waitForURL('**/checkout/');
   await buyer.locator('[name="name"]').fill('Mobile fixture buyer');
   await buyer.locator('[name="phone"]').fill('০১৭১০০০০০০০');
@@ -107,13 +139,69 @@ try {
   assert.equal((Array.isArray(afterCancel) ? afterCancel : afterCancel.products).find(p => p.id === product.id).stock, 4);
   const csv = await context.request.get('/api/admin/orders.csv', { headers });
   assert.equal(csv.status(), 200); assert.match(await csv.text(), new RegExp(number));
+  // An authenticated customer applies a real coupon, then loses the response after the server commits.
+  await request('PUT', '/api/admin/coupons/FIXTURE', { kind: 'amount', value: 50, minOrder: 0, maxUses: 1, expires: '', active: true });
+  await buyer.goto('/my-account/');
+  const signup = buyer.locator('[data-form="register"]');
+  await signup.locator('[name="name"]').fill('Signed-in fixture buyer');
+  await signup.locator('[name="phone"]').fill('01710000201');
+  await signup.locator('[name="password"]').fill('disposable-test-password');
+  await signup.getByRole('button', {name:'Create account'}).click();
+  await buyer.getByRole('heading', {name:'Hello, Signed-in fixture buyer'}).waitFor();
+  await buyer.goto('/product/mobile-fixture-kettle/');
+  await buyer.locator('.buy [data-buy]').click();
+  await buyer.waitForURL('**/checkout/');
+  await buyer.waitForFunction(() => document.querySelector('[data-checkout] [name="phone"]').value === '01710000201');
+  const pay = stock.settings.payments.find(p => p.enabled && p.number);
+  const outside = stock.settings.delivery.find(z => z.fee > 0);
+  assert.ok(pay && outside, 'Fixture requires manual payment and a paid delivery zone');
+  await buyer.locator('[name="address"]').fill('Isolated retry fixture address, Bangladesh');
+  await buyer.locator('[name="area"]').selectOption(outside.id);
+  await buyer.locator('[name="payment"]').selectOption(pay.id);
+  assert.match(await buyer.locator('[data-pay]').textContent(), /must verify this payment/);
+  await buyer.locator('[name="txnid"]').fill('FIXTURE-TXN-42');
+  await buyer.locator('[name="coupon"]').fill('fixture');
+  await buyer.locator('[data-apply]').click();
+  await buyer.locator('[data-coupon-msg]').getByText(/Coupon applied/).waitFor();
+  let committed;
+  await buyer.route('**/api/checkout', async route => {
+    const response = await route.fetch();
+    committed = { status: response.status(), body: await response.json() };
+    await route.abort('failed');
+  }, { times: 1 });
+  await buyer.getByRole('button', {name:'Place order'}).click();
+  const retry = buyer.getByRole('button', {name:'Check order status'});
+  await retry.waitFor();
+  assert.equal(committed.status, 200);
+  const paidOrder = committed.body;
+  assert.equal(paidOrder.total, 450 + (stock.settings.freeOver && 450 >= stock.settings.freeOver ? 0 : outside.fee));
+  await retry.click();
+  await buyer.waitForURL('**/track/**');
+  await buyer.locator('[data-order] .order').waitFor();
+  assert.equal(new URL(buyer.url()).searchParams.get('order'), paidOrder.number);
+  await buyer.goto('/my-account/');
+  await buyer.getByRole('heading', {name:paidOrder.number}).waitFor();
+  const confirmed = await request('GET', '/api/admin/orders');
+  const saved = confirmed.orders.filter(o => o.phone === '01710000201');
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].discount, 50);
+  assert.equal(saved[0].status, 'pending');
+  const coupon = await request('GET', '/api/admin/coupons');
+  assert.equal(coupon.find(c => c.code === 'FIXTURE').used, 1);
+  const paidProducts = await request('GET', '/api/admin/products');
+  assert.equal((Array.isArray(paidProducts) ? paidProducts : paidProducts.products).find(p => p.slug === 'mobile-fixture-kettle').stock, 0);
+
   const lastUnit = await request('POST', '/api/admin/products', { name: 'Last unit fixture', slug: 'last-unit-fixture', price: 1250, regular: 1250, stock: 1 });
   const race = await Promise.all(Array.from({ length: 20 }, async (_, i) => {
+    const start = performance.now();
     const r = await context.request.post('/api/checkout', { data: { items: [{ id: lastUnit.id, qty: 1, price: 1 }], name: 'Race fixture', phone: `01710000${String(i + 100).padStart(3, '0')}`, address: 'Disposable race fixture address', area: area.id, payment: cod.id } });
-    return { status: r.status(), out: await r.json() };
+    return { status: r.status(), out: await r.json(), ms: performance.now() - start };
   }));
   assert.equal(race.filter(r => r.status === 200).length, 1);
   assert.equal(race.filter(r => r.status === 409).length, 19);
+  const durations = race.map(result => result.ms).sort((a, b) => a - b);
+  const p95 = durations[Math.ceil(durations.length * .95) - 1];
+  console.log(`Warm checkout race at 20 concurrent requests: p95 ${Math.round(p95)} ms, max ${Math.round(durations.at(-1))} ms.`);
   const winner = race.find(r => r.status === 200).out;
   assert.equal(winner.total, 1250 + (stock.settings.freeOver && 1250 >= stock.settings.freeOver ? 0 : area.fee));
   await request('PUT', `/api/admin/orders/${winner.number}`, { status: 'cancelled' });
@@ -125,5 +213,5 @@ try {
   await admin.getByRole('heading', { name: 'API and checkout' }).waitFor();
   assert.match(await admin.locator('#view').textContent(), /API ready/);
   assert.match(await admin.locator('#view').textContent(), /Order email paused or unavailable/);
-  console.log('PASS: real phone-width admin create/Publish, attribute filtering, guest purchase, server total, tracking privacy, fulfillment, concurrent stock delta, repeated cancellation, CSV, database-priced final-unit race (one 200 / nineteen 409).');
+  console.log('PASS: isolated photo, product, category and page publication, guest cart and checkout, logged-in coupon/manual payment with a lost response and safe retry, fulfillment, cancellation, stock and a one-winner last-unit race.');
 } finally { await context.close(); await browser.close(); }

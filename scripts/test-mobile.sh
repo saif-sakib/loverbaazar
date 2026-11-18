@@ -32,9 +32,13 @@ for attempt in {1..150}; do
   sleep 1
 done
 $fixture_ready || { tail -40 "$fixture_log"; echo 'Fixture startup timed out' >&2; exit 1; }
-if [[ ${1:-} == --ci ]]; then
+if [[ ${1:-} == --ci || ${1:-} == --acceptance ]]; then
   node apps/store/tests/seo-release.mjs
   (cd apps/store && npm run test:ui)
   node apps/store/tests/accessibility.mjs
 fi
 node apps/store/tests/mobile-flow.mjs
+
+if [[ ${1:-} == --acceptance ]]; then
+  node apps/store/tests/browser-acceptance.mjs
+fi

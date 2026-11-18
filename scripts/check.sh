@@ -3,7 +3,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 for tool in docker go node npm curl python3; do command -v "$tool" >/dev/null || { echo "Install $tool first" >&2; exit 1; }; done
 docker info >/dev/null
-node -e 'if (+process.versions.node.split(".")[0]<22) process.exit(1)'
+node -e '
+const encode = value => value.trim().split(".").reduce((n, part) => n * 1000 + Number(part), 0);
+const minimum = require("node:fs").readFileSync(".nvmrc", "utf8");
+if (encode(process.versions.node) < encode(minimum)) {
+  console.error("Install Node " + minimum.trim() + " or newer.");
+  process.exit(1);
+}'
 (cd apps/store && npm ci --no-audit --no-fund)
 if [[ ${1:-} == --browsers ]]; then (cd apps/store && npx playwright install chromium); fi
 (cd apps/api && test -z "$(gofmt -l .)" && go vet .)

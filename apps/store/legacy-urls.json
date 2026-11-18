@@ -11,7 +11,8 @@
     "/best-price-blog/": "/blog/",
     "/sign-up/": "/my-account/",
     "/feed/": "/blog/feed.xml",
-    "/product/feed/": "/feed.xml"
+    "/product/feed/": "/feed.xml",
+    "/product/pureit-classic-23l/": "/product/pureit-water-filter-for-drinking-water/"
   },
   "ids": {}
 }
