@@ -36,6 +36,7 @@ Admin covers orders, products, categories, coupons, customers, reviews, messages
 - Verified WordPress migration: [docs/migration.md](docs/migration.md)
 - Export WordPress privately: [docs/wordpress-export.md](docs/wordpress-export.md)
 - Go live for $0: [docs/go-live.md](docs/go-live.md)
+- Storefront SEO, mobile performance and accessibility: [docs/seo-performance.md](docs/seo-performance.md)
 - Numbered implementation and launch tasks: [docs/roadmap.md](docs/roadmap.md)
 - Architecture audit and verified baseline: [docs/architecture-audit.md](docs/architecture-audit.md)
 - Why this stack: [PLAN.md](PLAN.md)

@@ -140,7 +140,7 @@ func TestFrozenPublicationAndImageProtection(t *testing.T) {
 		t.Fatal("late failure replaced success")
 	}
 	// Code-only releases use published editorial content, even with pending edits.
-	_, _ = db.Exec(bg, `UPDATE products SET data=data||'{"name":"Unpublished"}',price=1234 WHERE id=1`)
+	_, _ = db.Exec(bg, `UPDATE products SET data=data||'{"name":"Unpublished"}',price=1234,stock=0 WHERE id=1`)
 	id3, key3, e := frozenRelease(bg, false)
 	if e != nil {
 		t.Fatal(e)
@@ -150,8 +150,29 @@ func TestFrozenPublicationAndImageProtection(t *testing.T) {
 	}
 	var data string
 	db.QueryRow(bg, `SELECT payload::text FROM releases WHERE id=$1`, id3).Scan(&data)
-	if strings.Contains(data, "Unpublished") || !strings.Contains(data, "1234") {
-		t.Fatal(data)
+	var refreshed struct {
+		Products []struct {
+			ID      int64
+			Name    string
+			Price   int64
+			InStock bool
+		}
+	}
+	if err := json.Unmarshal([]byte(data), &refreshed); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, product := range refreshed.Products {
+		if product.ID == 1 {
+			found = true
+			if product.Name != "Later edit" || product.Price != 1234 || product.InStock {
+				t.Fatal("refresh released an editorial edit or retained stale offers", product)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Fatal("sold-out published product missing after refresh")
 	}
 	older, olderKey, e := frozenRelease(bg, true)
 	if e != nil {
@@ -210,5 +231,40 @@ func TestEnvironmentAndChallengeHost(t *testing.T) {
 	sendMail([]string{"test@example.com"}, "subject", "body")
 	if logged.Len() != 0 {
 		t.Fatal("preview attempted email")
+	}
+}
+
+func TestCheckoutMeasurementCountsCommittedOrdersOnce(t *testing.T) {
+	reset(t)
+	clearLimits()
+	old := dev
+	defer func() { dev = old }()
+	dev = false
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("CHECKOUT_METRICS_HOST", "shop.test")
+	t.Setenv("BREVO_KEY", "")
+	t.Setenv("TURNSTILE_SECRET", "fixture-secret")
+	logs := answer(t, 200, `{"success":true,"hostname":"shop.test"}`)
+	handler := router()
+	body := `{"items":[{"id":1,"qty":1}],"name":"Private fixture name","phone":"১৭১১১১১১১১","address":"গোপন ঠিকানা, যশোর","area":"jashore","payment":"cod","key":"fixture-idempotency"}`
+	send := func(host, data string, expected int) {
+		t.Helper()
+		r := httptest.NewRequest("POST", "https://"+host+"/api/checkout", strings.NewReader(data))
+		r.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		if w.Code != expected {
+			t.Fatalf("checkout got %d want %d: %s", w.Code, expected, w.Body.String())
+		}
+	}
+	send("shop.test", body, 200)
+	send("shop.test", body, 200)
+	send("shop.test", "{}", 400)
+	send("preview.test", "{}", 400)
+	text := logs.String()
+	if strings.Count(text, "event=order_created") != 1 || strings.Count(text, "event=request status=200") != 2 ||
+		strings.Count(text, "event=request status=400") != 1 || strings.Contains(text, "Private fixture name") ||
+		strings.Contains(text, "fixture-idempotency") || strings.Contains(text, "গোপন") {
+		t.Fatal("incorrect checkout aggregate logs", text)
 	}
 }

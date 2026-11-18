@@ -393,6 +393,25 @@
   const secHead = (title, desc) =>
     `<div class="sec-head"><div><h2>${esc(title)}</h2>${desc ? `<p class="sec-desc">${esc(desc)}</p>` : ""}</div></div>`;
 
+  const seoFields = (value) => {
+    const seo = value ?? {};
+    return `<details class="advanced"><summary>Search and social settings</summary>
+    ${field("Search title", "seo_title", seo.title, "maxlength=200", "text", "Leave blank for the page title.")}
+    ${field("Search description", "seo_description", seo.description, "maxlength=300", "text", "Leave blank to use a summary of this page.")}
+    ${field("Canonical URL", "seo_canonical", seo.canonical_url, "maxlength=500", "text", "Leave blank to use this page’s address. Use an existing shop URL for a duplicate page.")}
+    ${field("Social title", "seo_social_title", seo.facebook_title, "maxlength=200")}
+    ${field("Social description", "seo_social_description", seo.facebook_description, "maxlength=300")}
+    ${field("Social image URL", "seo_social_image", seo.facebook_image, "maxlength=500", "text", "Use a public HTTPS image.")}
+    ${toggle("Exclude from search indexing", "seo_noindex", [seo.robots].flat().some(value => typeof value === "string" && /\bnoindex\b/i.test(value)))}
+  </details>`;
+  };
+  const readSEO = (form, previous = {}) => {
+    const fields = new FormData(form);
+    return { ...previous, title: fields.get("seo_title").trim(), description: fields.get("seo_description").trim(),
+      canonical_url: fields.get("seo_canonical").trim(), facebook_title: fields.get("seo_social_title").trim(),
+      facebook_description: fields.get("seo_social_description").trim(), facebook_image: fields.get("seo_social_image").trim(), robots: fields.has("seo_noindex") ? ["noindex"] : [] };
+  };
+
   // Editable rows: delivery areas, payment methods, homepage sections and so on.
   function rows(host, items, fields, blank, opts = {}) {
     const normVal = (f, raw) => {
@@ -947,9 +966,12 @@
         <input id="imgurl" placeholder="Or paste an image address and press Enter" aria-label="Image address"></div>
       <details class="advanced optional-fields"><summary>More product details <small>Specifications, product code &amp; search tags</small></summary>
       ${field("Product code (SKU)", "sku", p.sku, "", "text", "Optional product code shown on the product page and searchable.")}
+      ${field("GTIN / barcode", "gtin", p.gtin, "maxlength=14 inputmode=numeric", "text", "Enter only the official barcode digits, including any leading zero.")}
+      ${field("Manufacturer part number", "mpn", p.mpn, "maxlength=80", "text", "Use the manufacturer’s own part number if known.")}
       <div class="field"><span class="flabel">Specifications</span><small class="fhelp">Optional key details shown under Buy buttons, such as Colour, Capacity, or Warranty.</small><div id="attrs"></div></div>
       <label class="field"><span class="flabel">Search tags (comma-separated)</span><small class="fhelp">Extra keywords for search engines and /product-tag/ pages.</small><input name="tagnames" value="${esc((p.tags || []).map((t) => allTags.find((x) => x.slug === t)?.name || t).join(", "))}"></label>
       </details>
+      ${seoFields(p.seo)}
       <div class="field"><span class="flabel">Full description</span><small class="fhelp">Detailed features and product info shown below the main section. (Needs Publish)</small><div id="desc"></div></div>
       ${toggle("Visible in shop", "active", p.active, "Turn off to hide this product from customers without deleting it. (Live in ~2 min)")}
       <div class="stick"><button class="btn">Save product</button> <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button> <button type="button" class="btn ghost" id="back">Back</button>${isNew ? "" : ` <button type="button" class="link danger" id="del">Delete product</button>`}<span class="stick-hint">Price, stock & visibility go live in ~2 min. Other edits need Publish.</span></div></form>`;
@@ -1098,6 +1120,9 @@
         price: +d.get("price"),
         regular: +d.get("regular"),
         sku: d.get("sku").trim(),
+        gtin: d.get("gtin").trim(),
+        mpn: d.get("mpn").trim(),
+        seo: readSEO(f, p.seo),
         short: d.get("short").trim(),
         desc: desc(),
         active: !!d.get("active"),
@@ -1187,6 +1212,7 @@
             `<label class="field"><span class="flabel">Parent category (optional)</span><small class="fhelp">Nests this category's URL under an existing category.</small><select name="parent"><option value="">None (top-level category)</option>${categories.map((x) => `<option value="${esc(x.path)}">${esc(x.path)}</option>`).join("")}</select></label>`
           : `<p class="meta"><b>Web address:</b> <code class="code-pill">/product-category/${esc(c.path)}/</code></p>`
       }
+      ${seoFields(c.seo)}
       <div class="stick"><button class="btn">Save category</button> <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
     const f = $("#cf");
     const nameEl = $('[name="name"]', f);
@@ -1200,7 +1226,7 @@
       const parent = isNew ? f.parent.value : parentPath;
       await api("/content/cat/" + encodeURIComponent(slug), {
         method: "PUT",
-        body: { ...c, name: nameEl.value.trim(), path: parent ? `${parent}/${slug}` : slug },
+        body: { ...c, seo: readSEO(f, c.seo), name: nameEl.value.trim(), path: parent ? `${parent}/${slug}` : slug },
       });
       await loadCategories(true);
       await cats();
@@ -1458,6 +1484,7 @@
         ${isNew ? field("Web address (URL slug)", "slug", "", "required", "text", "Filled automatically from the title. Cannot be changed later.") : `<p class="meta"><b>Web address:</b> <code class="code-pill">/${esc(d.slug)}/</code></p>`}
         ${kind === "post" ? field("Publish date", "date", d.date, "", "date", "Posts are ordered newest first.") + field("Short summary", "excerpt", d.excerpt, "maxlength=180", "text", "Shown below the title on /blog/ and in Google search results.") : ""}
         <div class="field"><span class="flabel">Content</span><div id="body"></div></div>
+        ${seoFields(d.seo)}
         ${toggle("Draft (keep hidden)", "draft", d.draft, "Hidden from customers even after Publish until unchecked.")}
         <div class="stick"><button class="btn">Save ${word}</button> <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button> <button type="button" class="btn ghost" id="back">Back</button><span class="stick-hint">Save keeps your edits here. Publish makes them visible on the website.</span></div></form>`;
       const f = $("#df");
@@ -1469,7 +1496,7 @@
       $("#back").onclick = back(list);
       bindSavePublish(f, async () => {
         const slug = isNew ? f.slug.value.trim() : d.slug;
-        const out = { ...d, title: f.title.value.trim(), html: body(), draft: f.draft.checked };
+        const out = { ...d, seo: readSEO(f, d.seo), title: f.title.value.trim(), html: body(), draft: f.draft.checked };
         if (kind === "post") {
           out.date = f.date.value;
           out.excerpt = f.excerpt.value.trim();

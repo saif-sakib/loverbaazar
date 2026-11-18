@@ -1,0 +1,17 @@
+{
+  "paths": {
+    "/sitemap_index.xml": "/sitemap-index.xml",
+    "/wp-sitemap.xml": "/sitemap-index.xml",
+    "/contact-us-2/": "/contact-us/",
+    "/privacy-policy-2/": "/privacy-policy/",
+    "/wishlist-2/": "/wishlist/",
+    "/checkout-2/": "/checkout/",
+    "/cart-2/": "/cart/",
+    "/shop-2/": "/shop/",
+    "/best-price-blog/": "/blog/",
+    "/sign-up/": "/my-account/",
+    "/feed/": "/blog/feed.xml",
+    "/product/feed/": "/feed.xml"
+  },
+  "ids": {}
+}

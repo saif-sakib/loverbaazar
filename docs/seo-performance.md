@@ -1,0 +1,77 @@
+# Storefront SEO, performance and accessibility
+
+Applies to [roadmap tasks 24–30](roadmap.md#tasks-2430-seo-performance-and-accessibility). The storefront remains a static Astro build. A build uses the frozen publication bundle. Canonical, search and feed checks use that same artifact.
+
+## 24. Legacy URL ledger
+
+1. Make the [private WordPress export](wordpress-export.md). Include Search Console Performance pages and Links target pages if available. For a referrer/backlink report, export only public destination paths in a CSV using a column named `URL`, `Page`, `Top pages` or `Target URL`. Keep the files outside Git.
+2. Compare that evidence with the actual candidate's build output. For the initial public pass, omit `--source` and `--extra`.
+
+   ```bash
+   python3 scripts/url-ledger.py --wordpress \
+     --source "$HOME/private/loverbaazar/source" \
+     --extra "$HOME/private/loverbaazar/search-console-pages.csv" \
+     --build /absolute/path/to/candidate \
+     --output "$HOME/private/loverbaazar/candidate-url-ledger.json"
+   ```
+
+3. Review each unresolved path, Rank Math rule, changed permalink and numeric post ID. Prefer the same canonical route. Add exact relevant same-site paths in `apps/store/legacy-urls.json` only when the target exists and is equivalent. If a confirmed high-value `?p=`, `?page_id=` or `?product_id=` link needs support, use the old public numeric ID and its reviewed canonical path in `ids`. Never publish a private export. Move hosting-only assets through the [asset migration](migration.md) and test each redirect against its verified Cloudinary target.
+4. Run `--strict` after the decisions. Supply `--dispositions` with a private JSON object keyed by exact source path. For a verified intentional 404, use `{"decision":"intentional-404","evidence":"approved and confirmed GET/HEAD 404"}`. For an asset, use `{"decision":"asset-verified","destination":"https://res.cloudinary.com/…","evidence":"verified direct delivery and checksum"}`. Review the separate count of unsupported URL records manually. Perform GET and HEAD checks on the candidate through Wrangler or the preview hostname, including encoded Bangla, nested categories, slash normalization, aliases and unknown paths. Use `curl -sSI URL` to see the first hop and `curl -sSL -o /dev/null -w '%{http_code} %{num_redirects}\n' URL` to see the result.
+
+The build rejects redirect collisions and chains. Asset redirects are exact. Old WordPress homepage searches (`?s=`) go to store search with the search text. Unmapped numeric old links, old login endpoints and unsupported pagination return 404. The standard aliases keep equivalent shop paths and split blog RSS from the product feed.
+
+At cutover, use HTTPS on the apex and a single path-and-query-preserving permanent redirect from www to the apex. Canonicals for filters drop the query string. Configure www redirect, alternate public host protection and HTTP upgrade separately in the owner-operated handover. Keep the production build from being served on the public workers.dev URL by retiring that public entry point or restricting it when the apex goes live. Verify direct access over both production hostnames before retirement. [Cloudflare static redirect behavior](https://developers.cloudflare.com/workers/static-assets/redirects/), [Google hosting migration guide](https://developers.google.com/search/docs/crawling-indexing/site-move-no-url-changes)
+
+## 25. Titles, metadata and indexing
+
+- Product, category, page and post editors expose **Search and social settings**. Use a truthful page-specific title and description. Leave fields empty for an automatic fallback. Imported literal Rank Math fields are read as plain text. Familiar template fields fall back to the app's own text when a WordPress token is present. Canonicals use same-store paths and must resolve to a directly indexable page in production. Use the private ledger to review external or obsolete imported canonicals.
+- Utility pages emit noindex. Drafts have no built URL. Empty categories/tags and intentional noindex entries stay outside the production sitemap. The production sitemap is generated from the actual built page heads and includes only indexable self-canonicals. Preview robots disallow crawling, the HTML emits noindex/nofollow, asset responses carry the same X-Robots-Tag and the preview sitemap is absent. Use separate access controls for any preview that contains private material.
+- Keep any existing Search Console DNS verification record. Verify final titles and descriptions against the approved product data, one visible page H1, actual indexable canonicals, social images with a real HTTPS 200/image response and useful links among products, categories and approved pages. Recheck old WordPress-hosted social media URLs as part of asset migration.
+
+## 26. Product data and refresh
+
+`/feed.xml` is RSS with a merchant namespace and whole-taka BDT offers. The current selling price is the sale price when below regular price. Noncanonical and intentionally hidden products, nonpositive offers and products without a usable image are excluded. Unknown SKU, brand, GTIN and model fields stay empty. GTIN runs through a checksum check and retains leading zeros. Product structured data shows the frozen price and stock in the initial HTML. Reviews originate from approved reviews visible on that page. Delivery and returns remain visible shop details until real policies are approved. Blog RSS is at `/blog/feed.xml`.
+
+- Browser inventory updates via the existing in-memory stock API. On a code-only build the publisher merges current price, regular price and availability into the last published content. It excludes currently hidden products and does not introduce pending names, descriptions, categories, photos or new products. Admin **Publish** is still the path for editorial changes.
+- After preview verification, enable GitHub repository variable `SEO_REFRESH_ENABLED=true` when `STORE_ENV=production`. The existing **Publish store** workflow can then refresh daily at 06:23 Dhaka time. Use **Actions → Publish store → Run workflow** when a high-impact offer needs an immediate refresh without releasing pending edits. Successful daily operation targets up to roughly 24 hours of source-to-artifact lag. Inspect `/release.json` `builtAt` and check the public offer/feed after material changes. Dispatch manually and investigate if the artifact is older than 26 hours. GitHub can delay or drop scheduled runs and pause schedules on inactive public repositories. Enable failed workflow notifications and check that the schedule actor receives them. [GitHub schedule behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule), [Workflow notifications](https://docs.github.com/en/actions/concepts/workflows-and-actions/notifications-for-workflow-runs)
+- After the actual catalog is approved, validate representative product, breadcrumb, Store and article markup. Use Rich Results Test code input for noindex preview HTML and the URL test for the final storefront. Compare the displayed offer, HTML JSON-LD and XML after one price/availability change and a published-only refresh. Merchant Center is optional. Check storefront country eligibility in the actual Merchant Center account before enabling a channel. Google lists different country coverage for general free listings and its Shopify integration. [Product data guide](https://developers.google.com/search/docs/appearance/structured-data/product/), [General free listings eligibility](https://support.google.com/merchants/answer/13692890?hl=en), [Shopify integration coverage](https://support.google.com/merchants/answer/13693394?hl=en)
+
+## 27–28. Images, fonts and mobile budgets
+
+- Cloudinary images follow four width buckets (160, 320, 640 and 960 pixels), `c_limit`, `q_auto`, `f_auto` and responsive sizes. Width never upscales the source. The product's initial gallery image gets high priority, hero pictures only use desktop sources, below-fold cards use lazy loading and the zoom view can request the largest approved variant. Legacy WordPress URLs and unrecognized transformation chains keep their existing assets until reviewed. [Cloudinary optimization](https://cloudinary.com/documentation/image_optimization)
+- Keep an eye on derived transformations, bandwidth and storage on Cloudinary Free during asset transfer and the first real mobile check. Verify widths, single main image priority, zoom quality, broken-image fallback, banner dimensions and no residual WordPress image URLs. Use the approved real image manifest. The lab baseline still contains legacy hosting images.
+- Phone budget for ordinary storefront pages per cold visit: 1,000,000 B total, 75,000 B of first-party JS, 40,000 B of CSS, 700,000 B of images, and 90,000 B of fonts. Bangla is a separate 400-weight self-hosted subset and is loaded only when needed. Latin remains a self-hosted variable face. No client-side framework was added. Record real mobile p75 LCP ≤2.5 s, INP ≤200 ms and CLS ≤0.1 once field counts warrant it. The Chromium lab interaction value is the slowest observed scripted interaction, rather than field INP. [Core Web Vitals](https://web.dev/articles/vitals)
+
+## 29. Search Console and private measurement
+
+1. Open **Search Console → Add property → Domain** and enter `loverbaazar.com`. Reuse the verified property if present. If Google asks for a TXT entry, add the value it gives you to the already authoritative Cloudflare DNS at `@` and click **Verify**. Keep the TXT for continued verification. Submit `sitemap-index.xml` once it responds on the live replacement store. [Google DNS verification](https://support.google.com/webmasters/answer/9008080)
+2. For the first baseline, export Search Console **Performance → Pages** and record clicks and leading landing URLs weekly. In **Pages** and **Sitemaps**, check 404s, excluded URLs and last fetch. Use the ledger crawl for missing URLs that Search Console has yet to discover. The free dashboard reports and crawl do not provide a comprehensive per-request 404 count.
+3. Once owner production test orders are done, optionally set Render `CHECKOUT_METRICS_HOST=loverbaazar.com` with `APP_ENV=production`. The request event carries a status only. Count `checkout_metric event=request` for submissions reaching the API and `checkout_metric event=order_created` for unique committed orders, excluding duplicate retries. Count 409/429/5xx separately and compare the totals with the admin order dashboard. Treat created divided by requests as the share of requests that committed a new order. An order retry counts as a request. Render logs have plan-limited retention. Save only aggregate numbers for the reporting period. Preview traffic on its own host and local tests are excluded. Clear the optional variable to stop logging.
+4. The storefront ships without an analytics beacon. Use Search Console Web Vitals when field data is available and record **insufficient data** until then. If more real-user measurement is needed, review Cloudflare Free Web Analytics on the production hostname with the owner first. Restrict it to public discovery pages, respect the store's privacy and consent choices and verify shopping with the beacon blocked. Leave account, tracking, checkout, admin and search query URLs out of optional client collection. [Cloudflare Web Analytics](https://developers.cloudflare.com/web-analytics/)
+
+## 30. Accessibility and bilingual acceptance
+
+Run the Playwright scans against one isolated fixture through `dev.sh`. The login step uses only the disposable admin. Complete keyboard and 200% browser zoom checks with real user controls, then run TalkBack on Android and VoiceOver on iPhone.
+
+1. On each phone, open a product with Bangla and English text. Check pronunciation at the heading and navigation, font legibility, line wrapping, price, availability and photo alt text. Open and close the category drawer and the photo zoom. Confirm focus returns to the opener.
+2. With the software keyboard, order a fixture item with a Bangla-digit phone number and long Bangla address. Make one validation error, then correct it. Check that the error is announced and that receipt/tracking order numbers and taka amounts remain legible. Repeat with optional payment controls, cart edits and an out-of-stock item. Use a preview test order, not an order on the live shop.
+3. Check tab focus and form labels in the admin order list and product editor, including saving Search and social settings. Confirm you can complete the controls at 200% zoom. Record browser, OS, assistive technology and defects in [mobile verification](mobile-results.md). [WCAG 2.2 guidance](https://www.w3.org/WAI/WCAG22/quickref/)
+
+## Verification commands
+
+Start an isolated fixture in one terminal. The API and browser checks below are independent of hosted accounts.
+
+```bash
+LB_ISOLATED=1 LB_API_PORT=18081 LB_STORE_PORT=18788 LB_DB_PORT=55436 ./scripts/dev.sh
+```
+
+```bash
+SHOP_URL=http://127.0.0.1:18788 node apps/store/tests/seo-release.mjs
+SHOP_URL=http://127.0.0.1:18788 node apps/store/tests/performance.mjs
+LB_ISOLATED=1 SHOP_URL=http://127.0.0.1:18788 node apps/store/tests/accessibility.mjs
+(cd apps/store && SHOP_URL=http://127.0.0.1:18788 npm run test:ui)
+./scripts/test-api.sh
+node --test edge/worker.test.mjs scripts/release-verification.test.mjs
+```
+
+Stop the fixture before running `./scripts/test-mobile.sh`, which owns the same default ports and completes checkout and publication with real disposable database writes.

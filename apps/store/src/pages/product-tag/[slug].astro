@@ -1,10 +1,12 @@
 ---
+import { jsonLd, recordSEO } from "../../lib/seo";
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
 import { tags, products, fileSlug, SITE, siteUrl } from "../../lib/shop";
 export const getStaticPaths = () => tags.map((t) => ({ params: { slug: fileSlug(t.slug) }, props: { t } }));
 const { t } = Astro.props;
 const items = products.filter((p) => p.tags.includes(t.slug));
+const seo = recordSEO(t, `Browse products tagged ${t.name} at ${SITE.name}. Compare prices and availability.`);
 const crumbs = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
@@ -14,16 +16,15 @@ const crumbs = {
     { "@type": "ListItem", position: 3, name: t.name },
   ],
 };
-const json = (o: any) => JSON.stringify(o).replace(/</g, "\\u003c");
 ---
 
 <Base
   title={t.name}
-  description={`${t.name} products and prices in Bangladesh at ${SITE.name}. Order online with cash on delivery.`}
-  noindex={!items.length}
+  {...seo}
+  noindex={seo.noindex || !items.length}
 >
   <Fragment slot="head">
-    <script type="application/ld+json" set:html={json(crumbs)} />
+    <script type="application/ld+json" set:html={jsonLd(crumbs)} />
   </Fragment>
   <div class="wrap">
     <p class="crumbs">

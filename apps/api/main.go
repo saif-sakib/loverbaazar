@@ -319,7 +319,7 @@ func router() http.Handler {
 	r.Get("/api/build/{id}", buildFile)
 	r.Post("/api/publish/prepare", prepareRelease)
 	r.Post("/api/build/{id}/result", buildResult)
-	r.With(limit(30, 10*time.Minute)).Post("/api/checkout", checkout)
+	r.With(measureCheckout, limit(30, 10*time.Minute)).Post("/api/checkout", checkout)
 	r.With(limit(30, 10*time.Minute)).Post("/api/coupon", couponPreview)
 	r.With(limit(30, 5*time.Minute)).Get("/api/track", track)
 	r.With(limit(5, 10*time.Minute)).Post("/api/contact", contact)
@@ -415,6 +415,19 @@ func allow(key string, max int, per time.Duration) bool {
 	}
 	hits[key] = append(kept, now)
 	return true
+}
+
+// Checkout request counts include retries. Only a new transaction emits order_created.
+func measureCheckout(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !countCheckout(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		response := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+		next.ServeHTTP(response, r)
+		log.Printf("checkout_metric event=request status=%d", response.Status())
+	})
 }
 
 func limit(max int, per time.Duration) func(http.Handler) http.Handler {

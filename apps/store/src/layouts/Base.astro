@@ -1,17 +1,19 @@
 ---
-import "@fontsource-variable/plus-jakarta-sans";
+import "../styles/fonts.css";
 import "../styles/site.css";
+import { jsonLd, publicImage } from "../lib/seo";
 import "../styles/mobile.css";
 import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf } from "../lib/shop";
-const { title, description = SITE.description, image, noindex, type = "website", language = languageOf(`${title || ""} ${description}`) } = Astro.props;
-const full = title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`;
-const canon = new URL(Astro.url.pathname, Astro.site);
+const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", language = languageOf(`${title || ""} ${description}`) } = Astro.props;
+const full = seoTitle || (title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`);
+const canon = canonical || siteUrl(Astro.url.pathname);
+const preview = import.meta.env.BUILD_ENV !== "production";
 const parts = SITE.name.split(/(?=[A-Z])/);
 const logoEnd = parts.length > 1 ? parts.pop() : "";
 const logoStart = parts.join("");
+const logoMark = !SITE.logo || SITE.logo === "/logo/primary-logo.jpg" ? "/logo/primary-logo-80.webp" : SITE.logo;
 const absUrl = (u: string) => (u.startsWith("http") ? u : siteUrl(u));
-const defaultOg = !image && !SITE.logo;
-const ogImage = image ? absUrl(image) : absUrl(SITE.logo || "/og-image.jpg");
+const ogImage = publicImage(image) || siteUrl("/og-image.jpg");
 const payments = LIVE.payments.filter((p: any) => p.enabled);
 const org = {
   "@context": "https://schema.org",
@@ -22,14 +24,12 @@ const org = {
   image: ogImage,
   telephone: telOf(SITE.phone),
   email: SITE.email,
-  priceRange: "৳৳",
   currenciesAccepted: "BDT",
   paymentAccepted: payments.map((p: any) => p.label).join(", ") || undefined,
   address: SITE.address
     ? {
         "@type": "PostalAddress",
         streetAddress: SITE.address,
-        addressLocality: "Jashore",
         addressCountry: "BD",
       }
     : undefined,
@@ -40,11 +40,7 @@ const webSiteLd = {
   "@type": "WebSite",
   name: SITE.name,
   url: siteUrl("/"),
-  potentialAction: {
-    "@type": "SearchAction",
-    target: `${siteUrl("/search/")}?q={search_term_string}`,
-    "query-input": "required name=search_term_string",
-  },
+
 };
 const standardSlugs = new Set(["about-us", "how-to-buy", "contact-us", "privacy-policy", "terms-conditions"]);
 const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slug));
@@ -59,21 +55,18 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     <meta name="description" content={description} />
     <meta
       name="robots"
-      content={noindex || import.meta.env.BUILD_ENV!=="production"
-        ? "noindex, nofollow"
+      content={preview ? "noindex, nofollow" : noindex ? "noindex, follow"
         : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}
     />
     <link rel="canonical" href={canon} />
     <meta property="og:locale" content={language.replace("-", "_")} />
-    <meta property="og:title" content={full} />
-    <meta property="og:description" content={description} />
+    <meta property="og:title" content={socialTitle || full} />
+    <meta property="og:description" content={socialDescription || description} />
     <meta property="og:site_name" content={SITE.name} />
     <meta property="og:type" content={type} />
     <meta property="og:url" content={canon} />
     <meta property="og:image" content={ogImage} />
     <meta property="og:image:alt" content={full} />
-    {defaultOg && <meta property="og:image:width" content="1200" />}
-    {defaultOg && <meta property="og:image:height" content="630" />}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={full} />
     <meta name="twitter:description" content={description} />
@@ -82,17 +75,18 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="alternate" type="application/rss+xml" title={`${SITE.name} Product Feed`} href={siteUrl("/feed.xml")} />
-    <script type="application/ld+json" set:html={JSON.stringify(org).replace(/</g, "\\u003c")} />
-    <script type="application/ld+json" set:html={JSON.stringify(webSiteLd).replace(/</g, "\\u003c")} />
+    <link rel="alternate" type="application/rss+xml" title={`${SITE.name} Blog`} href={siteUrl("/blog/feed.xml")} />
+    <script type="application/ld+json" set:html={jsonLd(org)} />
+    <script type="application/ld+json" set:html={jsonLd(webSiteLd)} />
     <slot name="head" />
     <script is:inline src="/app.js" defer></script>
   </head>
   <body>
-    <a class="skip" href="#main">
+    <a class="skip" href="#main" lang="en-BD">
       Skip to content
     </a>
     <div class="notice" data-notice hidden role="status"></div>
-    <div class="ticker">
+    <div class="ticker" lang="en-BD">
       <div>
         <span>Wholesale prices on home appliances</span>
         <span>Delivery charge shown before you order</span>
@@ -100,10 +94,10 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
         <span>Call {SITE.phone}</span>
       </div>
     </div>
-    <header class="top">
+    <header class="top" lang="en-BD">
       <div class="wrap bar">
-        <a href="/" class="logo" aria-label={`${SITE.name} home`}>
-          <img class="logo-mark" src={SITE.logo || "/favicon.svg"} alt="" width="40" height="40" />
+        <a href="/" class="logo">
+          <img class="logo-mark" src={logoMark} alt="" width="40" height="40" />
           <span class="logo-txt">
             <span class="logo-name">{logoStart}<em>{logoEnd}</em></span>
             <small class="logo-sub">Kitchen &amp; Home</small>
@@ -169,7 +163,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
             <summary>{g.title}</summary>
             <div>
               {g.items.map((c: any) => (
-                <a href={catUrl(c)}>{c.name}</a>
+                <a href={catUrl(c)} lang={languageOf(c.name)}>{c.name}</a>
               ))}
             </div>
           </details>
@@ -182,7 +176,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
         <a href="/contact-us/">Contact</a>
       </nav>
     </header>
-    <dialog class="category-drawer" id="category-drawer" aria-labelledby="category-title">
+    <dialog lang="en-BD" class="category-drawer" id="category-drawer" aria-labelledby="category-title">
       <div class="drawer-head"><h2 id="category-title">Shop by category</h2><button type="button" class="btn ghost" data-close-categories>Close</button></div>
       <a class="btn" href="/shop/">Browse all products</a>
       <div class="drawer-help">
@@ -190,16 +184,16 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
         {SITE.whatsapp && <a class="btn ghost" href={waOf(SITE.whatsapp)} rel="noopener">WhatsApp</a>}
         <a class="link" href="/contact-us/">Contact us</a>
       </div>
-      {MENU.map((group: any)=><section><h3>{group.title}</h3><div class="drawer-links">{group.items.map((c: any)=><a href={catUrl(c)}>{c.name}<span aria-hidden="true">→</span></a>)}</div></section>)}
+      {MENU.map((group: any)=><section><h3>{group.title}</h3><div class="drawer-links">{group.items.map((c: any)=><a href={catUrl(c)} lang={languageOf(c.name)}>{c.name}<span aria-hidden="true">→</span></a>)}</div></section>)}
     </dialog>
-    <main id="main">
+    <main id="main" tabindex="-1">
       <slot />
     </main>
-    <footer>
+    <footer lang="en-BD">
       <div class="wrap cols">
         <div>
-          <a href="/" class="logo" aria-label={`${SITE.name} home`}>
-            <img class="logo-mark" src={SITE.logo || "/favicon.svg"} alt="" width="38" height="38" />
+          <a href="/" class="logo">
+            <img class="logo-mark" src={logoMark} alt="" width="38" height="38" />
             <span class="logo-txt">
               <span class="logo-name">{logoStart}<em>{logoEnd}</em></span>
               <small class="logo-sub">Kitchen &amp; Home</small>
@@ -273,7 +267,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
         </svg>
       </a>
     </div>
-    <nav class="mobile-nav" aria-label="Quick shopping links">
+    <nav lang="en-BD" class="mobile-nav" aria-label="Quick shopping links">
       <a href="/shop/"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Shop</span></a>
       <a href="/wishlist/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20S3 15 3 9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6-9 11-9 11Z"/></svg><span>Wishlist</span><i data-wish-count hidden></i></a>
       <a href="/track/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5v9l-9 5-9-5V8l9-5Zm0 10v9M3 8l9 5 9-5M7.5 5.5l9 5v5"/></svg><span>Track order</span></a>
