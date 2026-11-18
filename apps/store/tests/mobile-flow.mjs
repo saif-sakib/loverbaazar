@@ -73,6 +73,23 @@ try {
   assert.match(await group.text(), /Mobile fixture cooker/);
   const buyer = await context.newPage();
   await buyer.goto('/shop/');
+  const mobileLinks = ['/shop/', '/wishlist/', '/track/', '/cart/'];
+  for (const width of [320, 360, 375, 390, 414, 860]) {
+    await buyer.setViewportSize({ width, height: 812 });
+    const bar = buyer.locator('.mobile-nav a:visible');
+    assert.deepEqual(await bar.evaluateAll(links => links.map(link => link.getAttribute('href'))), mobileLinks);
+    for (const href of mobileLinks) {
+      assert.equal(await buyer.locator(`header a[href="${href}"]:visible, footer a[href="${href}"]:visible`).count(), 0, `${href} is duplicated at ${width}px`);
+    }
+    assert.equal(await buyer.locator('header a[href="/my-account/"]').isVisible(), true);
+    assert.equal(await buyer.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  }
+  await buyer.setViewportSize({ width: 1024, height: 812 });
+  assert.equal(await buyer.locator('.mobile-nav').isVisible(), false);
+  for (const href of mobileLinks) {
+    assert.equal(await buyer.locator(`header a[href="${href}"]`).isVisible(), true);
+  }
+  await buyer.setViewportSize({ width: 375, height: 812 });
   await buyer.locator('.filter-panel summary').click();
   await buyer.locator('[data-brand]').selectOption('Fixture A');
   assert.equal(await buyer.locator('[data-card]:visible').count(), 1);
@@ -155,7 +172,7 @@ try {
   const pay = stock.settings.payments.find(p => p.enabled && p.number);
   const outside = stock.settings.delivery.find(z => z.fee > 0);
   assert.ok(pay && outside, 'Fixture requires manual payment and a paid delivery zone');
-  await buyer.locator('[name="address"]').fill('Isolated retry fixture address, Bangladesh');
+  await buyer.locator('[name="address"]').fill('Isolated retry fixture address <unit>, Bangladesh');
   await buyer.locator('[name="area"]').selectOption(outside.id);
   await buyer.locator('[name="payment"]').selectOption(pay.id);
   assert.match(await buyer.locator('[data-pay]').textContent(), /must verify this payment/);
@@ -186,6 +203,35 @@ try {
   assert.equal(saved.length, 1);
   assert.equal(saved[0].discount, 50);
   assert.equal(saved[0].status, 'pending');
+  await admin.goto('/admin/#orders');
+  const invoiceButton = admin.locator('[data-order-row]', { hasText: paidOrder.number }).getByRole('button', { name: 'Invoice' });
+  await invoiceButton.click();
+  const invoice = admin.getByRole('dialog', { name: `Invoice ${paidOrder.number}` });
+  await invoice.waitFor();
+  assert.match(await invoice.textContent(), /Isolated retry fixture address <unit>, Bangladesh/);
+  assert.match(await invoice.getByRole('row', { name: /Mobile fixture kettle/ }).textContent(), /৳500/);
+  const formattedTotal = '৳' + saved[0].total.toLocaleString('en-IN');
+  assert.equal(await invoice.locator('.invoice-total dd').textContent(), formattedTotal);
+  assert.match(await invoice.locator('.invoice-totals').textContent(), /Discount \(FIXTURE\)−৳50/);
+  assert.match(await invoice.locator('.invoice-payment').textContent(), /Transaction reference: FIXTURE-TXN-42/);
+  for (const width of [320, 360, 375, 390, 414]) {
+    await admin.setViewportSize({ width, height: 812 });
+    assert.equal(await invoice.evaluate(box => box.scrollWidth <= box.clientWidth), true, `Invoice overflows at ${width}px`);
+  }
+  await admin.setViewportSize({ width: 375, height: 812 });
+  await shot(admin, 'invoice-375');
+  await admin.evaluate(() => { window.print = () => { document.body.dataset.testPrintCalled = 'yes'; }; });
+  await invoice.getByRole('button', { name: 'Print / Save PDF' }).click();
+  assert.equal(await admin.locator('body').getAttribute('data-test-print-called'), 'yes');
+  await admin.emulateMedia({ media: 'print' });
+  assert.equal(await admin.locator('body > .wrap').isVisible(), false);
+  assert.equal(await invoice.locator('.invoice-controls').isVisible(), false);
+  assert.equal(await invoice.locator('.invoice-total').isVisible(), true);
+  if (shotDir) await admin.pdf({ path: `${shotDir}/invoice-fixture.pdf`, format: 'A4' });
+  await admin.emulateMedia({ media: null });
+  await invoice.getByRole('button', { name: 'Close' }).click();
+  await admin.waitForFunction(() => document.querySelector('#invoice-preview').childElementCount === 0);
+  assert.equal(await invoiceButton.evaluate(button => button === document.activeElement), true);
   const coupon = await request('GET', '/api/admin/coupons');
   assert.equal(coupon.find(c => c.code === 'FIXTURE').used, 1);
   const paidProducts = await request('GET', '/api/admin/products');
@@ -213,5 +259,5 @@ try {
   await admin.getByRole('heading', { name: 'API and checkout' }).waitFor();
   assert.match(await admin.locator('#view').textContent(), /API ready/);
   assert.match(await admin.locator('#view').textContent(), /Order email paused or unavailable/);
-  console.log('PASS: isolated photo, product, category and page publication, guest cart and checkout, logged-in coupon/manual payment with a lost response and safe retry, fulfillment, cancellation, stock and a one-winner last-unit race.');
+  console.log('PASS: isolated publication, mobile navigation, guest checkout, logged-in coupon/manual payment with a safe retry, printable invoice, fulfillment, cancellation, stock and last-unit race.');
 } finally { await context.close(); await browser.close(); }

@@ -154,7 +154,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 9
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md). Follow-up verified the four bottom navigation links without header or footer duplicates at phone widths. The Account link stays in the header and the desktop navigation remains available.
 
 - Make categories, product discovery, search, offers, cart and contact easy to reach with one hand. Reduce unnecessary first-screen hero height and competing sticky/floating controls while keeping the current visual identity.
 - Support touch/keyboard category navigation, clear active states, useful search suggestions and honest delivery/payment messages driven by settings.
@@ -214,7 +214,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 8, 9
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md). Follow-up verified invoice previews at all five phone widths and generated a PDF from a disposable order. The PDF included the stored subtotal, discount, delivery charge, total and transaction reference.
 
 - Make products, images, stock deltas, prices, categories, pages, site/live settings, coupons, orders, tracking, messages and customer support usable from a phone. Use contained table scrolling or readable row layouts as appropriate.
 - Preserve unsaved edits, prevent duplicate saves, distinguish live effects from Publish-required effects and display task 8's real publication status. Provide clear order/payment verification and safe CSV export behavior.
@@ -264,11 +264,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 21 — Reconcile and approve the sellable product database
 
-**Status:** In progress — protected review/apply workflow ready; actual stock approval pending · **Depends on:** 16, 18, 20
+**Status:** In progress — live inventory approved; catalog exceptions pending · **Depends on:** 16, 18, 20
 
 **Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
 
-**Live audit, 18 November 2026.** The isolated restore of the production archive contained 291 active catalog entries. Of those, 267 had exactly 100 units, the historical seed quantity. Confirm these against actual stock before relying on them for sales.
+**Live audit, 18 November 2026.** The isolated restore of the production archive contained 291 active catalog entries. Of those, 267 had exactly 100 units, the historical seed quantity. The owner confirmed the current inventory and asked to retain its quantities.
 
 - Produce a product-by-product review of real names/models, category, SKU/options, stock quantity, current/regular price, description, specifications, images, warranty and active status. Resolve duplicates, placeholder content, missing photos and unsupported options.
 - Give the owner a practical review/import/admin-edit process. Capture corrections as safe deltas or a controlled prelaunch reconciliation, never a blind stock overwrite during sales.
@@ -427,7 +427,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Keep backup keys recoverable outside the hosting accounts/repository and raw dumps out of public artifacts/logs. Check actual artifact quotas/access and the public-repository scheduled-workflow inactivity rule; provide an owner-operated offline backup fallback.
 - Verify dump/encryption failures, a corrupt/empty artifact and expiry cleanup. Proposed baseline recovery point objective is ≤24 hours of data loss, subject to owner acceptance; do not imply nightly backups provide zero-loss recovery.
 
-**Evidence, 18 November 2026.** Added verified encrypted new-store snapshots, seven-day artifact retention, and a separate freshness check and offline command. Local corruption, weak key, empty and dump-failure checks passed. The [current nightly workflow](https://github.com/saif-sakib/loverbaazar/actions/runs/44290663888) created a verified encrypted PostgreSQL 18 archive and the [freshness check](https://github.com/saif-sakib/loverbaazar/actions/runs/44290882632) passed. Keep a separate offline copy and recovery key and retain required originals.
+**Evidence, 18 November 2026.** Added verified encrypted new-store snapshots, seven-day artifact retention, and a separate freshness check and offline command. Local corruption, weak key, empty and dump-failure checks passed. The [current nightly workflow](https://github.com/saif-sakib/loverbaazar/actions/runs/44290663888) created a verified encrypted PostgreSQL 18 archive and the [freshness check](https://github.com/saif-sakib/loverbaazar/actions/runs/44290882632) passed. Keep a separate offline copy and recovery key and retain required originals. The older scheduled workflow failed because its PostgreSQL 17 client tried to dump PostgreSQL 18. The current workflow uses the PostgreSQL 18 image and a [fresh manual run](https://github.com/saif-sakib/loverbaazar/actions/runs/44343193050) produced a verified artifact. Check the next scheduled run on the current revision.
 
 
 ### Task 36 — Rehearse restore, rollback and incident recovery
@@ -496,77 +496,87 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 42 — Approve the release candidate and launch packet
 
-**Status:** Blocked — owner inventory, phone checks and approval pending · **Depends on:** all applicable acceptance checks in 1–41
+**Status:** In progress · **Depends on:** all applicable acceptance checks in 1–41
 
 - Produce a release candidate identifying commit, build/catalog revision, test reports, open issues, approved products/prices/stock, real-phone results, provider configuration, backup/restore evidence and the exact owner account actions still needed for handover.
 - Owner accepts delivery/payment numbers, refund/warranty promises, account/history treatment, product inventory and free-hosting cold-start/availability limits. No critical issue affecting money, stock, privacy, order handling, mobile purchase, key legacy URLs or restore capability may be deferred.
 - Done only when all launch gates below pass and the owner approves this concrete candidate. A missing owner export, unchecked stock sheet or unavailable integration is a pending requirement, not an assumed pass.
 
-**Candidate evidence, 18 November 2026.** Source commit `b29bff2768e52306d6ecc1555588b48414b015ae` built successfully on Node 22.23.4. Local artifact fingerprint `9f7d663fba1bb4417da8e841d5c6dfdb31b074abc843a41720a7d6da97d563de` includes 571 indexable URLs and was built from a read-only capture of the hosted catalog at observed revision 0. Checkout fixtures and all three browser engines passed. The [existing hosted encrypted backup](https://github.com/saif-sakib/loverbaazar/actions/runs/44290663888) was restored independently, and a fresh fixture restore passed. The candidate is awaiting a live rollout.
+**Candidate evidence, 18 November 2026.** Source commit `b29bff2768e52306d6ecc1555588b48414b015ae` built successfully on Node 22.23.4. Local artifact fingerprint `9f7d663fba1bb4417da8e841d5c6dfdb31b074abc843a41720a7d6da97d563de` includes 571 indexable URLs and was built from a read-only capture of the hosted catalog at observed revision 0. Checkout fixtures and all three browser engines passed. The [existing hosted encrypted backup](https://github.com/saif-sakib/loverbaazar/actions/runs/44290663888) was restored independently, and a fresh fixture restore passed. The owner reported that the checks were satisfactory and approved the rollout. [PR #18](https://github.com/saif-sakib/loverbaazar/pull/18) merged with CI green. The first attempt updated the API but did not promote the Worker. The [retry](https://github.com/saif-sakib/loverbaazar/actions/runs/44324732677/attempts/2) confirmed both services on commit `68a5b936e99b3930554a46721b1c861d4b06c1e3`. The owner confirmed the current inventory. Record the physical-device and offline key checks.
 
 **Actions required**
 
-1. In Admin, approve actual product quantities and prices, delivery charges, payment numbers and return/warranty text. Resolve duplicate SKU/title decisions and any outstanding WordPress fulfillment. The previous restored backup showed 267 active items at the historical 100-unit quantity.
+1. The owner approved the current inventory. Record any specific duplicate SKU/title decisions and outstanding WordPress fulfillment.
 2. Use real Android Chrome and iPhone Safari to exercise purchase, tracking and common admin actions. Verify payment instructions, receipt delivery to a controlled address, cancellation stock return, 200% zoom and your phone's screen reader.
-3. Confirm offline access to the encrypted backup and key, acknowledge the free-host cold-start behavior, then approve this candidate. Tasks 43–48 retain DNS, email and Namecheap actions.
+3. Confirm offline access to the encrypted backup and key. Record the physical-phone results from the checks above if you already ran them.
 
 ## Tasks 43–48: owner-operated Namecheap handover
 
-The local [go-live skill](../.claude/skills/go-live/SKILL.md) says: **"Never change nameservers or cancel hosting without the owner's confirmation."** These tasks prepare exact changes and checks first. The owner performs/authorizes the actual account changes after reviewing them. No such account action is requested or performed by this planning document.
+Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and Cloudflare account changes. The owner has moved the storefront and disabled Stellar Plus auto-renewal. Finish the remaining checks before the current hosting term ends.
 
 ### Task 43 — Prepare the exact DNS, mail and rollback instructions
 
-**Status:** Planned · **Depends on:** 17, 33, 35, 36, 42
+**Status:** In progress · **Depends on:** 17, 33, 35, 36, 42
 
 - Compare the current Namecheap/cPanel zone with the proposed Cloudflare Free zone. Record all A/AAAA/CNAME/MX/TXT/SRV/CAA records, DNSSEC/DS status, verification records, subdomains, other hosted sites and the old origin address. Save a private restorable export.
 - Prepare the exact apex/www/custom-domain record changes, TLS plan, resolver checks, TTL timing and rollback steps inside Cloudflare. Keep WordPress routes unchanged at this preparation stage. Registration stays at Namecheap.
 - Identify every mailbox and its free replacement/archive/forwarding decision. Cloudflare Email Routing is inbound forwarding, not a mailbox or outbound SMTP service; Brevo is transactional sending. Verify any planned replacement and SPF/DKIM/DMARC without blindly retaining conflicting MX/SPF records.
 - Done with a reviewed change packet and realistic propagation/rollback window; no nameserver or website traffic change yet. [Namecheap DNS guidance](https://www.namecheap.com/support/knowledgebase/article.aspx/767/10/how-to-change-dns-for-a-domain/)
 
+**Verification, 18 November 2026.** The owner's previous Cloudflare zone export records the old apex A target and proxied `www` CNAME. Save the old export privately and download the current zone from **Cloudflare → DNS → Records → Import and Export**. Roll back only with owner approval: pause orders, preserve orders placed since the switch, remove the Worker custom domain, restore the old proxied apex A from the private export and keep the proxied `www` CNAME. Confirm the old host is still available before touching routing. Keep the current nameservers and mail records during a website rollback. Reconcile stock before reopening either checkout. The owner confirmed the old mailbox is unused. Check the addon-domain inventory and hosting expiry date when preparing retirement.
+
 ### Task 44 — Activate Cloudflare DNS while WordPress stays live
 
-**Status:** In progress — Cloudflare nameservers active; mail-host proxy correction and remaining zone checks pending · **Depends on:** 43 and owner authorization of the exact nameserver change
+**Status:** In progress — Cloudflare nameservers active; remaining cPanel inventory pending · **Depends on:** 43 and owner authorization of the exact nameserver change
 
 - Import and verify the complete zone, preserving the web records pointing at the current WordPress origin. Address old DNSSEC delegation before changing nameservers; arrange correct DNSSEC re-enablement afterward. Follow [Cloudflare's full DNS setup](https://developers.cloudflare.com/dns/zone-setups/full-setup/setup/) for the account's current migration path.
 - Owner changes Namecheap nameservers to the two assigned to this Cloudflare zone. Wait for active status and validate authoritative/public resolver results, apex/www, important subdomains, TLS, mail and Search Console verification. WordPress still handles normal business during this wait.
 - Done when Cloudflare is authoritative and the existing shop/email behave as expected. If records fail, repair or roll back the prepared DNS change before continuing. This step does not cancel hosting or connect the new storefront.
 
-**Verification checkpoint (17 November 2026):** Owner reports Cloudflare Active and working WordPress/email. Public DNS returns `lars.ns.cloudflare.com` and `shaz.ns.cloudflare.com`; HTTPS apex returns WordPress with HTTP 200, and www redirects to the apex. The three existing Jellyfish MX records and SPF TXT are retained. `mail.loverbaazar.com` currently resolves to Cloudflare proxy IPs and needs an A record to the previously verified hosting address `66.29.132.200`, set to DNS only, before mail-client connectivity can be considered preserved. Complete cPanel-zone/DKIM/verification-record comparison and relevant subdomain checks remain unverified. This early DNS preparation does not mark the storefront launch gates complete or authorize retirement of hosting.
+**Verification checkpoint (17 November 2026):** Owner reports Cloudflare Active and working WordPress/email. Public DNS returns `lars.ns.cloudflare.com` and `shaz.ns.cloudflare.com`; HTTPS apex returns WordPress with HTTP 200, and www redirects to the apex. The three existing Jellyfish MX records and SPF TXT are retained. On 18 November, public DNS still returned the Cloudflare nameservers, Jellyfish MX records, a proxied `mail` host, and the expected SPF, cPanel DKIM and Google verification records. Public resolvers saw no DS delegation. The owner confirmed the old mailbox is unused. Existing MX records remain in place during the remaining hosting term.
 
 ### Task 45 — Freeze writes, apply final data changes and sign off
 
-**Status:** Planned · **Depends on:** 21, 23, 42, 44
+**Status:** Blocked — final legacy-order reconciliation awaits owner records · **Depends on:** 21, 23, 42, 44
 
 - Agree a quiet Bangladesh-time window and owner communication. Take a fresh new-database backup and a selected final WordPress data export; pause old checkout/catalog/stock writes for the shortest agreed final-sync interval. Record outstanding legacy fulfillment and any stock movement during the freeze.
 - Apply the rehearsed delta import, reconcile real stock/prices and old outstanding orders, complete the last asset sync, and build the approved production artifact. Keep new ordering closed until domain/bot/payment checks pass.
 - Verify counts/checksums, sampled exact totals, image independence, publish status and compatibility against the release candidate. Owner signs off the final data and exact website switch. Done only with a measured clean reconciliation; abort/reschedule instead of launching uncertain quantities.
 
+**Verification, 18 November 2026.** The live release uses the new database's frozen catalog. The owner confirmed the current inventory. Record any unfulfilled WooCommerce orders and stock changes from the cutover, or confirm there were none. The owner waived a full WordPress archive. Historical freeze times and final stock deltas require owner records.
+
 ### Task 46 — Point loverbaazar.com at the new store
 
-**Status:** Planned · **Depends on:** 45 and owner authorization of the final route/record changes
+**Status:** In progress · **Depends on:** 45 and owner authorization of the final route/record changes
 
 - Apply task 43's exact prepared Cloudflare Worker custom-domain/asset changes. Configure apex HTTPS and one-hop www → apex redirects preserving path/query. Use Cloudflare-managed TLS; do not buy a second domain or transfer registration.
 - Promote the verified production artifact, confirm readiness/origin secret, set the build catalog/SITE_URL to the production host as appropriate, verify Turnstile hostnames and ensure public production pages are indexable. Disable the production Worker's duplicate `workers.dev` storefront once build access is switched, or maintain separately protected/noindex preview infrastructure.
 - Smoke-test product/category/Bangla URLs, images, cart, a controlled real order, tracking, cancellation/stock return, email and admin over mobile networks. Confirm stale-DNS visitors cannot place orders in WordPress. Open ordering only after checks pass; stop/rollback using the prepared route plan if they fail.
 - Done when the owner accepts live production checks and both old/new orders remain accounted for. [Custom domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
 
+**Verification, 18 November 2026.** The apex serves the Worker over valid TLS. Live release `D09A7A5C9ECF1BFEB4341DEBDC1418B8` identifies the tested commit at catalog revision 0, with asset fingerprint `ed9b416cf0554f6144577f5a2ed0f7ec681eb54104b91c214a40d5e1c6056b8d`. API readiness matched that commit, the checkout exposed Turnstile, the old Pureit URL redirected to its live product and an unknown API route returned a JSON 404. The `www` host sends a single permanent redirect that preserves the path and query. The duplicate `workers.dev` host sends `X-Robots-Tag: noindex, nofollow`. Enabled **Always Use HTTPS** on the Cloudflare Free LoverBaazar zone. Public checks confirmed single 301 redirects for HTTP apex and both `www` schemes, preserving the checkout path and query. Checkout, API readiness, sitemap and the HTTPS cPanel login returned HTTP 200. Live order/receipt acceptance is pending owner evidence. A direct read of the old hosting origin returned a cart redirect at checkout. Confirm in WooCommerce that the legacy checkout is closed while Stellar Plus remains active.
+
 ### Task 47 — Observe the new store and confirm the handover
 
-**Status:** Planned · **Depends on:** 46
+**Status:** In progress · **Depends on:** 46
 
 - Check immediately, after approximately 24/72 hours, and across the agreed stabilization period: actual orders/payments/stock, API latency/cold starts, errors, assets, backups, notification outcomes, mail routing and provider quotas. Use low-frequency checks within free limits.
 - Submit/confirm the canonical sitemap and inspect important legacy URLs in Search Console. Preserve the same domain/paths; do not submit a site Change of Address merely for a hosting replacement. Monitor new 404s, coverage and structured-data issues against the prelaunch baseline.
 - Keep old WordPress frozen and available for prepared rollback within the already-paid hosting term. If rolling back after new orders, close ordering, preserve/export them and reconcile stock before re-enabling either shop.
 - Done when actual operation and recovery evidence support retirement; it cannot be marked complete immediately after DNS resolves. [Google hosting migration](https://developers.google.com/search/docs/crawling-indexing/site-move-no-url-changes)
 
+**Verification, 18 November 2026.** The [fresh encrypted backup](https://github.com/saif-sakib/loverbaazar/actions/runs/44326341866) passed the [freshness check](https://github.com/saif-sakib/loverbaazar/actions/runs/44326500876) and restored into an empty local Postgres 18 database. The restore contained 291 catalog rows, 290 content rows and the orders table. Download an offline copy before the GitHub artifact's seven-day retention ends. Verify order, stock and notification outcomes and quota usage at approximately 20:40 Bangladesh time on 19 and 21 November, if the paid hosting window permits. The post-deploy crawl verified all 571 sitemap pages and 291 published offers against the API, structured data and feed. Ten additional links/assets passed. Three previously recorded same-title pairs still require owner review. Both sitemap XML files returned HTTP 200. Confirm the submitted `sitemap-index.xml` in Search Console.
+
 ### Task 48 — Retire WordPress and Stellar Plus safely
 
-**Status:** Planned · **Depends on:** 35, 36, 47 and owner confirmation
+**Status:** Planned — owner deferred retirement · **Depends on:** 35, 36, 47 and owner confirmation
 
 - Confirm no required website, image, download, email account, subdomain or other site still depends on Stellar Plus. Preserve required mail, approved catalog/media exports and DNS/config records. The owner waived archiving the full WordPress site.
 - Use a 14–30 day observation/rollback overlap where the current paid term permits; do not incur a renewal to manufacture this overlap. If expiry is earlier, record the shorter window and get the owner's decision before it expires. Check whether cancellation deletes service immediately versus at term end.
 - Owner disables/cancels **hosting** renewal only after reviewing the retirement checklist; keep **domain** renewal and registration active at Namecheap. Remove unused keys/integrations and verify apex/www, inbound mail and backups afterward.
 - Done when the hosting subscription is confirmed retired at the intended date and the new stack's service tiers remain free. Deleting WordPress first is never a prerequisite for pointing the domain.
+
+**Verification, 18 November 2026.** All 1,718 distinct catalog image URLs and four legacy media redirect targets use Cloudinary. Eighteen sampled images responded with HTTP 200. LoverBaazar's public MX records still use Jellyfish shared-hosting mail. Hasnahena Foundation's domain uses Cloudflare MX and its HTTPS website returned HTTP 200 from Vercel. The owner confirmed the old mailbox is unused and deferred retirement. Before retirement, check **Namecheap → Hosting List → Stellar Plus → Go to cPanel → Domains** for subdomains or files either project still uses. Cloudflare provides live HTTPS for LoverBaazar. The owner can leave hosting auto-renew off and let the existing term end after the checks. Keep both domain registrations and review unused paid SSL separately. [Namecheap hosting cancellation](https://www.namecheap.com/support/knowledgebase/article.aspx/170/21/how-do-i-cancel-my-hosting-account/) · [Cloudflare mail migration](https://developers.cloudflare.com/email-service/configuration/domains/#move-to-email-routing-from-another-provider)
 
 ## Tasks 49–50: operation and future growth
 
