@@ -185,6 +185,9 @@ func TestFrozenPublicationAndImageProtection(t *testing.T) {
 	if e = finishRelease(bg, newer, newerKey, "published", "new"); e != nil {
 		t.Fatal(e)
 	}
+	if e = finishRelease(bg, older, olderKey, "running", "old"); e == nil {
+		t.Fatal("superseded release is still eligible for promotion")
+	}
 	if e = finishRelease(bg, older, olderKey, "published", "old"); e != nil {
 		t.Fatal(e)
 	}
@@ -254,7 +257,7 @@ func TestCheckoutMeasurementCountsCommittedOrdersOnce(t *testing.T) {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, r)
 		if w.Code != expected {
-			t.Fatalf("checkout got %d want %d: %s", w.Code, expected, w.Body.String())
+			t.Fatalf("checkout got %d want %d: %s %s", w.Code, expected, w.Body.String(), logs.String())
 		}
 	}
 	send("shop.test", body, 200)

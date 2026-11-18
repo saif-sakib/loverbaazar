@@ -91,7 +91,11 @@
         credentials: "same-origin", signal: controller.signal,
       });
       const j = await r.json().catch(() => null);
-      if (!r.ok) throw Object.assign(new Error(j?.error || `Service is busy. Please call ${PHONE}.`), { status: r.status });
+      if (!r.ok) {
+        const id = r.headers.get("X-Request-ID") || "";
+        const reference = r.status >= 500 && /^[a-f0-9]{32}$/i.test(id) ? ` Reference: ${id}.` : "";
+        throw Object.assign(new Error((j?.error || `Service is busy. Please call ${PHONE}.`) + reference), { status: r.status });
+      }
       if (!j) throw new Error("The shop response was interrupted. Please try again.");
       return j;
     } catch (e) {

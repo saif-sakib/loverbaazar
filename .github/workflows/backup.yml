@@ -1,18 +1,27 @@
 name: Nightly backup
 on:
-  schedule: [{ cron: "0 20 * * *" }] # 02:00 Bangladesh time
+  schedule: [{ cron: "17 20 * * *" }] # 02:17 Bangladesh time
   workflow_dispatch:
+concurrency: { group: backup, cancel-in-progress: false }
 permissions: { contents: read }
 jobs:
   backup:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Dump and encrypt
-        env: { DB: "${{ secrets.BACKUP_DATABASE_URL }}", PASS: "${{ secrets.BACKUP_PASSPHRASE }}" }
-        run: |
-          set -o pipefail
-          docker run --rm postgres:17-alpine pg_dump "$DB" -Fc | gpg --batch --yes --pinentry-mode loopback --passphrase "$PASS" --symmetric -o backup.dump.gpg
-          test -s backup.dump.gpg
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { persist-credentials: false }
+      - name: Capture and verify encrypted database backup
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          BACKUP_PG_DOCKER: "1"
+        run: python3 scripts/backup-store.py create "$RUNNER_TEMP/loverbaazar.tar.gpg"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with: { name: "backup-${{ github.run_number }}", path: backup.dump.gpg, retention-days: 30 }
+        with:
+          name: loverbaazar-verified-backup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/loverbaazar.tar.gpg
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error

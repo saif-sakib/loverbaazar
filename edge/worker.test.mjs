@@ -114,3 +114,45 @@ test("WordPress search and approved numeric links redirect without forwarding to
   assert.equal((await get("/?p=999")).status, 404);
   assert.deepEqual(paths, ["/legacy-ids.json", "/legacy-ids.json", "/index.php"]);
 });
+
+test("API errors include a Worker-assigned request reference and safe retry guidance", async () => {
+  const { worker } = await fixture();
+  let forwarded;
+  globalThis.fetch = async (_url, options) => {
+    forwarded = options.headers.get("X-Request-ID");
+    return new Response("private provider error body", { status: 502, headers: { "Content-Type": "text/html" } });
+  };
+  const request = new Request("https://shop.test/api/ready", { headers: {"X-Request-ID":"untrusted"} });
+  const res = await worker.fetch(request, { API_ORIGIN:"https://api.test", ORIGIN_SECRET:"fixture" }, {});
+  assert.equal(res.status,503);
+  assert.equal(res.headers.get("Retry-After"),"60");
+  assert.match(forwarded,/^[a-f0-9]{32}$/);
+  assert.equal(res.headers.get("X-Request-ID"),forwarded);
+  assert.doesNotMatch(await res.text(),/private provider/);
+});
+
+test("publication invalidates stock cache without letting URL queries choose the cache key", async () => {
+  const { worker } = await fixture();
+  let release = "a".repeat(32);
+  const env = {
+    API_ORIGIN: "https://api.test", ORIGIN_SECRET:"fixture",
+    ASSETS: { fetch: async () => Response.json({id: release}) },
+  };
+  let upstream = 0;
+  globalThis.fetch = async (url) => {
+    assert.equal(new URL(url).search, "");
+    return Response.json({products:{1:[++upstream,100,5]}},{headers:{"Cache-Control":"public, max-age=60"}});
+  };
+  const request = query => worker.fetch(new Request("https://shop.test/api/stock" + query),env,{});
+  assert.equal((await (await request("?release=spoof")).json()).products[1][0],1);
+  assert.equal((await (await request("?release=another")).json()).products[1][0],1);
+  release = "b".repeat(32);
+  assert.equal((await (await request("")).json()).products[1][0],2);
+});
+
+test("a sleeping origin's success-status HTML is not cached as stock", async () => {
+  const f = await fixture();
+  globalThis.fetch = async () => new Response("<html>Starting</html>", {headers:{"Content-Type":"text/html"}});
+  assert.equal((await f.request()).status, 503);
+  assert.equal(f.entries.size, 0);
+});

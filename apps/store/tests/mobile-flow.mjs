@@ -121,5 +121,9 @@ try {
   const finalProducts = await request('GET', '/api/admin/products');
   assert.equal((Array.isArray(finalProducts) ? finalProducts : finalProducts.products).find(p => p.id === lastUnit.id).stock, 1);
   assert.deepEqual(errors, []);
+  await admin.goto('/admin/#operations');
+  await admin.getByRole('heading', { name: 'API and checkout' }).waitFor();
+  assert.match(await admin.locator('#view').textContent(), /API ready/);
+  assert.match(await admin.locator('#view').textContent(), /Order email paused or unavailable/);
   console.log('PASS: real phone-width admin create/Publish, attribute filtering, guest purchase, server total, tracking privacy, fulfillment, concurrent stock delta, repeated cancellation, CSV, database-priced final-unit race (one 200 / nineteen 409).');
 } finally { await context.close(); await browser.close(); }

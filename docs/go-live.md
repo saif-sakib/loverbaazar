@@ -40,14 +40,9 @@ You'll collect several secret values. Keep them in a password manager, or in one
 
 On a Linux computer, you can run every command below in a terminal, from the project folder unless a step says otherwise.
 
-## Step 1: Back up the old site
+## Step 1. Record the old host and export selected data
 
-1. Log in to Namecheap, open your hosting, and open **cPanel**.
-2. Open **Backup** or **Backup Wizard**, and download a **Full Backup**. If that isn't offered, download the database from **phpMyAdmin** (Export) and the `wp-content` folder from **File Manager** (Compress, then Download).
-3. Keep one copy on your computer and one in Google Drive.
-4. In cPanel, open **Email Accounts** and write down every mailbox. Download any mail you want to keep.
-
-**Check:** you can open the backup file on your computer, and it isn't empty.
+The owner waived a full WordPress backup. Use the [selective export steps](wordpress-export.md) for data you want to retain or migrate. Record hosted mailboxes and check the paid-through date before the handover.
 
 ## Step 2: Put the code on GitHub
 
@@ -117,7 +112,7 @@ Save the first result as `ADMIN_TOKEN` and the second as `ORIGIN_SECRET`. Each o
 
 6. Open **Advanced**, and set **Health Check Path** to `/api/health`.
 7. Click **Deploy Web Service**, and wait for the log to say the service is live. The first build takes a few minutes.
-   Then open **Settings** and check that **Auto-Deploy** is on. If it's off, new code on GitHub never reaches your live API until you click **Manual Deploy → Deploy latest commit**.
+   Then open **Settings** and set **Auto-Deploy** to **Off**. GitHub coordinates tested exact-commit deploys. Reuse the existing service and review the [reference settings](../render.yaml).
 8. Copy the address at the top of the page, such as `https://loverbaazar-api.onrender.com`. Save it as **Render URL**.
 
 Only ever create **one** Render service. The free 750 hours cover one service for a full month.
@@ -149,7 +144,7 @@ All images go in one Cloudinary folder called `loverbaazar`, sorted like `produc
 ## Step 7: Store (Cloudflare)
 
 1. Go to [cloudflare.com](https://cloudflare.com), and sign up on the **Free** plan.
-2. In `apps/store/wrangler.jsonc`, replace `https://REPLACE-ME.onrender.com` in `API_ORIGIN` with your Render URL. Don't add a slash at the end.
+2. Check that `API_ORIGIN` in `apps/store/wrangler.jsonc` matches the existing Render service. Don't add a slash at the end.
 3. Log in to Cloudflare from the terminal. A browser window opens, so click **Allow**:
 
        cd apps/store
@@ -160,32 +155,14 @@ All images go in one Cloudinary folder called `loverbaazar`, sorted like `produc
 
        npx wrangler secret put ORIGIN_SECRET
 
-5. Deploy once to create the Worker. This first version uses the imported data:
-
-       npx astro build
-       npx wrangler deploy
-
-   Wrangler prints an address ending in `workers.dev`. Save it.
-
-6. Build again from the live database, using that address. The API only answers the Worker, so this must be the `workers.dev` address, not the Render URL. It may wait up to a minute for Render to wake:
-
-       CATALOG_URL=https://YOUR-SHOP.workers.dev/api/catalog npx astro build
-       npx wrangler deploy
-       cd ../..
-
-7. Complete [the asset migration workflow](migration.md#assets-before-hosting-retirement): plan, bounded download, verified Free-account upload, source/destination verification, reviewed catalog rewrite and public legacy-asset map. Regenerate the catalog approval after rewriting images. The tool no longer replays stale full-product saves through the admin API. Keep WordPress hosting until every required dependency is verified.
-
-8. Save your `wrangler.jsonc` change:
-
-       git add apps/store/wrangler.jsonc
-       git commit -m "Set API and image addresses"
-       git push
+5. For the existing Worker, use **Publish store** to make coordinated releases. Initial Worker provisioning for a new installation needs a preview-only bootstrap and an authenticated initial Admin Publish. Reuse the existing Worker in this project.
+6. Complete the [asset migration workflow](migration.md#assets-before-hosting-retirement). Review the original media and catalog rewrite before retiring their previous host. Remove the old keep-awake cron in the Worker's dashboard. Free API cold starts are expected.
 
 **Check:**
 
 1. The `workers.dev` address opens the shop, and images show.
 2. `/admin/` on that address accepts your `ADMIN_TOKEN`.
-3. Place one test order, find it in admin under **Orders**, then set it to **cancelled**.
+3. Check an authorized test order in admin and cancel it after verification.
 
 ## Step 8: Automatic publishing (GitHub)
 
@@ -216,13 +193,15 @@ This makes the **Publish** buttons in admin work.
 
 **Check:** in admin, click **Publish now** at the bottom of the left menu. In the GitHub repo's **Actions** tab, **Publish store** should start within a few seconds and turn green in about 3 minutes.
 
+Before enabling coordinated deploys, create a Render workspace API key and copy the existing service ID. Add GitHub Actions secret `RENDER_API_KEY` and variables `RENDER_SERVICE_ID` and `COORDINATED_RELEASES=true`. Verify `STORE_URL`, `CATALOG_URL`, and preview variables, then run **Publish store** from `main`. Require the PR check **Store CI** on `main`. CI skips production data and credentials. The release confirms the Render SHA and publishes a hashed Worker artifact with the frozen revision. **Publish changes** uses the already running code revision.
+
 ## Step 9: Backups, order emails and bot protection
 
 Do these three parts in order. Every value here is secret except the Turnstile site key.
 
 ### Part A: Nightly backups
 
-1. Make up a long passphrase, at least 5 random words, and save it in your notes file.
+1. Generate a strong backup key with `openssl rand -hex 32`. Keep it in a password manager or offline recovery store outside GitHub. Keep access to earlier keys for existing archives.
 2. In the GitHub repo, open **Settings → Secrets and variables → Actions**. On the **Secrets** tab, add:
 
    | Name | Value |
@@ -233,11 +212,11 @@ Do these three parts in order. Every value here is secret except the Turnstile s
 3. Open the **Actions** tab, click **Nightly backup** in the left list, then **Run workflow → Run workflow**.
 4. Wait about a minute, then refresh.
 
-**Check:** the run has a green tick. After that it runs by itself at 02:00 Bangladesh time. Each backup is encrypted, so it's safe even if the repo is public, as long as your passphrase is strong.
+**Check:** the run shows an encrypted, verified artifact retained for seven days. Scheduled runs start at 02:17 Bangladesh time, followed by a 04:37 freshness check. Download verified copies privately. Check the workflow schedule weekly since GitHub can pause inactive public repositories. For an offline copy use `python3 scripts/backup-store.py create /private/loverbaazar.tar.gpg` with the same two environment variables.
 
 ### Part B: Order emails (Brevo)
 
-Brevo emails **you** whenever an order or a contact message arrives. Customers get nothing from it. It's optional: the shop works without it, and every order is always in admin.
+Production checkout queues an owner notification and an optional customer receipt when the buyer supplies an email. Set `CUSTOMER_ORDER_EMAIL=false` to pause new customer receipts. Open **Admin → Operations** to see delivery attempts or retry a failed message. The queue sends on startup and order activity, with bounded retries and no polling. A Brevo acceptance still needs delivery confirmation in Brevo.
 
 The menus below come from Brevo's help pages. If a name doesn't match exactly, look for the closest one.
 
@@ -270,14 +249,9 @@ If you use a Gmail address, Brevo may send from an address ending in `@brevosend
 
 **Check:** the key starts with `xkeysib-`. If it starts with `xsmtpsib-`, that's an SMTP key and it won't work.
 
-**4. Stop Brevo blocking Render**
+**4. Check Brevo API access**
 
-Render's free plan has no fixed address, and Brevo can reject calls from addresses it doesn't know.
-
-1. Open the account menu, then **Settings → Security → Authorized IPs**.
-2. Turn off the option that blocks unknown IP addresses.
-
-If you can't find it, carry on. If the test below fails with `401`, come back here, or click the link in any security email Brevo sends you.
+If Brevo rejects the Render connection, inspect **Settings → Security → Authorized IPs** and the transactional test result. Keep order emails paused if the account's restrictions cannot permit the shared Render service. Orders remain visible in Admin.
 
 **5. Give the key to the shop**
 
@@ -293,17 +267,7 @@ If you can't find it, carry on. If the test below fails with `401`, come back he
 
 **6. Test it**
 
-1. Open your shop's **Contact** page, and send yourself a short message.
-2. Wait 2 minutes, and look in your inbox and your Spam folder.
-3. If it's in Spam, open it and click **Not spam**. Do this once and later ones should arrive normally.
-
-**Check:** the message arrives. If it doesn't, on Render open **Logs**, and find what's printed just after you sent it:
-
-| Render log | What it means | Fix |
-|---|---|---|
-| Nothing about Brevo | `BREVO_KEY` or `SHOP_EMAIL` is missing | Add both, then redeploy |
-| `brevo: status 401: ...` | The key is wrong, or Brevo blocked Render. The end of the line says which | Paste the `xkeysib-` key again, and repeat part 4 |
-| `brevo: status 400: ...` | `SHOP_EMAIL` isn't your verified sender | Make them match exactly |
+Set `ADMIN_EMAIL` to the owner inbox and `BREVO_TEST_EMAIL` to an inbox you control. Open **Admin → Operations → Send test email** and check that inbox plus **Brevo → Transactional → Logs**. Preview order mail stays suppressed. The test action sends fixed text. For an uncertain order notification, search the displayed message tag in Brevo before any retry.
 
 ### Part C: Bot protection (Turnstile)
 
@@ -414,7 +378,7 @@ The shop is unavailable for a few minutes here, so have everything ready first.
 
 ### Part 4: Finish up
 
-1. **Tell the shop its new address.** In GitHub, on the **Variables** tab, change `CATALOG_URL` to `https://loverbaazar.com/api/catalog`. Then open **Actions → Publish store → Run workflow**.
+1. **Set the production release addresses.** In GitHub variables set `STORE_URL` and `SITE_ORIGIN` to `https://loverbaazar.com`, `CATALOG_URL` to `https://loverbaazar.com/api/catalog`, and `STORE_ENV` to `production` during the approved handover. Run **Publish store**.
 2. **Make www work.** In Cloudflare **DNS → Records**, add a **CNAME** with name `www`, target `loverbaazar.com`, and the orange cloud on. Then open **Rules**, and create a redirect from `www.loverbaazar.com` to `loverbaazar.com` using the **Redirect from WWW to root** template.
 3. **Add a rate limit.** Open **Security → WAF → Rate limiting rules**, and create one rule. Set it to match when the URI path contains `/api/login` or `/api/checkout`, allow 20 requests per 10 seconds, and block after that. Keep it generous, because many customers in Bangladesh share one mobile address.
 4. **Tell Google.** In [Google Search Console](https://search.google.com/search-console), add `loverbaazar.com` as a **Domain** property, and follow its steps to prove you own it. Then open **Sitemaps**, and submit `https://loverbaazar.com/sitemap-index.xml`.
@@ -422,18 +386,16 @@ The shop is unavailable for a few minutes here, so have everything ready first.
 
 **Check:** images show, an old product address still works, `www.loverbaazar.com` lands on the shop, the Turnstile box shows, and your test order appears in admin.
 
-**If something is badly wrong:** in Namecheap, put the nameservers back to **Namecheap BasicDNS** or your hosting's nameservers. The old site returns within a few hours.
+**If routing fails:** use the approved Cloudflare apex/www rollback records and preserve the mail zone. Freeze orders on both stores and reconcile orders already placed before reopening either storefront.
 
-## Step 12: After launch
+## Step 12. Recovery and operating checks
 
-1. Keep the old hosting for 30 days, then **turn off its auto-renew** and let it end.
-2. Check Search Console weekly for 404 errors.
-3. Check Neon usage monthly. Keep it under 80 CU-hours.
-4. Check Cloudinary usage monthly. Stored images, delivered images and resizing share 25 credits a month.
-5. Every 3 months, test a backup. In GitHub Actions, download the newest backup, then restore it into a new Neon branch:
-
-       gpg -d backup.dump.gpg > backup.dump
-       pg_restore --no-owner -d 'BRANCH-STRING' backup.dump
+- **Backup and restore:** download the latest verified encrypted archive and test it locally. Start a fresh disposable Postgres with database `lb_restore`. Set `RESTORE_DATABASE_URL` to that loopback database and supply the offline key as `BACKUP_PASSPHRASE`. Run `python3 scripts/backup-store.py restore /private/loverbaazar.tar.gpg`. The command refuses remote and populated databases. Run `./scripts/test-backup.sh` for the disposable rehearsal. Keep a private copy of the originals and reviewed asset manifest independently of the database snapshot.
+- **Bad release or failed migration:** inspect the workflow and test `/api/ready` and `/release.json`. Restore the previous Worker version through **Deployments** and use Render **Rollback** to a compatible deployment if necessary. Keep the database and current orders. Inspect migration errors before trying a new revision.
+- **Neon outage or corrupt data:** pause ordering in Admin if reachable and confirm at checkout. Preserve the authoritative database and every order placed after the backup. Restore into an isolated target, then compare order totals/statuses, payment references, inventory changes and coupons with the current source. Reconcile the delta under a write freeze and verify before switching the database connection. Keep outbox messages disabled while examining a recovery copy.
+- **Missing images or content:** restore the saved original to its verified Cloudinary path or restore the previous Worker artifact. Review changes and Publish only the intended edition.
+- **Lost credentials:** use the provider recovery codes, rotate the affected key, update each matching dashboard entry, then test the dependent function. The backup key must be recoverable offline.
+- **Availability and quotas:** use low-frequency manual checks of `/api/health` and `/api/ready`. Review Cloudflare requests/CPU and assets, Render hours/bandwidth/build usage, Neon CU-hours/storage/egress, Cloudinary credits, Brevo sends and GitHub artifacts/runs. At 70% review usage, at 85% pause optional refreshes/media transfers/customer email as appropriate, and at 95% stop the affected nonessential operation and preserve verified copies. For exhausted checkout capacity, close ordering where possible and use supported contact channels.
 
 ## When something goes wrong
 
@@ -461,7 +423,7 @@ After changing a setting, click **Manual Deploy → Deploy latest commit**.
 | `/admin/` says the token is wrong | Paste `ADMIN_TOKEN` again, with no spaces |
 | Orders fail with a database error | Try the Neon **direct** string for `DATABASE_URL` |
 | Images are missing | Re-run the image script while the old site is online |
-| New code on GitHub isn't live | On Render, click **Manual Deploy → Deploy latest commit**, then **Publish now** in admin. Check **Auto-Deploy** is on |
+| New code on GitHub isn't live | Inspect **Actions → Publish store**, then run it on `main` after fixing the failed check. Render Auto-Deploy stays off |
 | A delivery charge, page or blog change doesn't show | Click **Publish now** in admin. Render must finish deploying first |
 | Every order says "bot check failed" | Remove `TURNSTILE_SECRET` from Render, then redo Step 9 Part C in order |
 | `wrangler` says the domain already has DNS records | Delete the A and CNAME records for `loverbaazar.com`, as in Step 11 Part 3 |
@@ -485,7 +447,7 @@ Do this if the password may ever have been seen by anyone else.
 |---|---|---|
 | Neon compute | Database stops; checkout shows the phone number | Wait for next month, or reduce use |
 | Render hours | Service stops | Wait for next month |
-| Worker requests | `/api` pauses; browsing continues | Resets at 06:00 Bangladesh time |
+| Worker requests | `/api` pauses; browsing continues | Review the daily limit and reset time in the Cloudflare dashboard |
 | Cloudinary | Image delivery or uploads may stop, so the shop could show no photos | Delete unused images, or wait for the next month |
 | GitHub Actions | Publish and backups stop | Wait for next month |
 
@@ -494,11 +456,11 @@ None of these can bill you without a card.
 ## Not yet confirmed
 
 - That each signup really needs no card (rule 2 covers this).
-- Render's Singapore region on Free, its limits, and whether its terms allow the 10-minute keep-awake ping. If not, remove the cron from `wrangler.jsonc`; checkout will sometimes wait about a minute.
+- Actual account region, quotas and cold-start duration from Bangladesh. The repository no longer sends keep-awake pings.
 - Real speed from Bangladesh.
 - That Cloudflare's edge cache works on a `workers.dev` address. It's only been tested locally. If not, `/api/stock` is still correct, and the cache starts working on your own domain.
 - Admin photo uploads from Render itself. They've been tested against the real Cloudinary account, but from a computer.
-- Brevo's exact menu names. Its help site couldn't be read directly when this was written.
+- Delivery to the controlled Brevo test recipient from the owner’s hosted service.
 
 ## Before taking online payments
 

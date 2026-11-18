@@ -8,7 +8,7 @@ Start with [the WordPress export instructions](wordpress-export.md). Keep raw ex
 
 | Task | Implemented | Still required |
 | --- | --- | --- |
-| 17 | Read-only paginated WordPress/WooCommerce CLI exporter; checksummed manifests with explicit zero counts; source version/time/currency/HPOS metadata; backup readability/checksum tool; public DNS capture | Fresh real structured export, SQL/files backups and restore evidence; complete private DNS/mailbox/other-site/renewal inventory; additional traffic/backlink URL sources where available |
+| 17 | Read-only paginated WordPress/WooCommerce CLI exporter; checksummed manifests with explicit zero counts; source version/time/currency/HPOS metadata; backup readability/checksum tool; public DNS capture | Fresh real structured export and recorded owner waiver for the full WordPress backup; complete private DNS/mailbox/other-site/renewal inventory; additional traffic/backlink URL sources where available |
 | 18 | Exact Decimal currency conversion; whole-taka validation; real quantities; duplicate/relationship/Bangla slug checks; create/reconcile policy; quarantine; full-target/settings-bound atomic importer; safe reruns and deletion protection | Run against the actual source and isolated target; resolve every launch-product exception |
 | 19 | Private SQLite archive with original IDs/statuses/timestamps/currency/totals/refunds/notes; source-stock-reduction summaries; Dhaka display; idempotent fulfillment/support journal; no checkout replay/account attachment | Owner-approved retention/coverage and real historical order/customer reconciliation, including outstanding obligations |
 | 20 | Inventory product/description/category/page/blog/site assets; bounded downloads; deterministic names; resume and new-version retention; Free-account quota/identity/delivery checks; catalog rewrite and exact legacy-asset redirects | Actual approved account usage and real source/destination transfer/verification; all hosting-only dependencies resolved |
@@ -28,8 +28,7 @@ Optional private backup evidence inventory:
 
 ```sh
 python3 scripts/import_wp.py inventory \
-  --sql-backup /private/backups/database.sql.gz \
-  --uploads-backup /private/backups/home-directory.tar.gz \
+  --owner-waived-full-backup \
   --dns-zone /private/backups/cloudflare-zone.txt \
   --hosting-inventory /private/backups/hosting-mailboxes.txt \
   --output /private/work/backup-evidence.json

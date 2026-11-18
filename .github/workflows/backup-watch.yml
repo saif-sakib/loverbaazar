@@ -1,0 +1,21 @@
+name: Backup freshness
+on:
+  schedule: [{ cron: "37 22 * * *" }] # 04:37 Bangladesh time
+  workflow_dispatch:
+permissions: { actions: read, contents: read }
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check for a recent successful verified backup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/backup.yml/runs?branch=main&status=success&per_page=10" |
+          python3 -c 'import sys,json; from datetime import datetime,timezone; data=json.load(sys.stdin); now=datetime.now(timezone.utc); print(next((r["id"] for r in data["workflow_runs"] if (now-datetime.fromisoformat(r["created_at"])).total_seconds()<26*3600), ""))' > "$RUNNER_TEMP/backup-run"
+          run_id=$(cat "$RUNNER_TEMP/backup-run")
+          test -n "$run_id" || { echo "::error::No verified backup job in the last 26 hours"; exit 1; }
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/artifacts" --jq '[.artifacts[] | select((.name | startswith("loverbaazar-verified-backup-")) and (.expired | not) and .size_in_bytes > 0)] | length')" -ge 1 ||
+            { echo "::error::Verified backup artifact is missing, empty or expired"; exit 1; }

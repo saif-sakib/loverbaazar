@@ -18,6 +18,7 @@ export default defineConfig({
         await writeFile(new URL("release.json", dir), JSON.stringify({
           id: process.env.BUILD_ID || "local", commit: process.env.GITHUB_SHA || "local", environment,
           builtAt: new Date().toISOString(),
+          revision: process.env.BUILD_REVISION ? Number(process.env.BUILD_REVISION) : null,
         }));
         if (environment !== "production") {
           const path = new URL("_headers", dir);

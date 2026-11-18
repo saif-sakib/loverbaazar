@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -93,7 +94,7 @@ func migrate(ctx context.Context) error {
 		if _, e := tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations(version INT PRIMARY KEY, checksum TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`); e != nil {
 			return e
 		}
-		for i, sql := range []string{schema, migrationSQL, catalogMigrationSQL} {
+		for i, sql := range []string{schema, migrationSQL, catalogMigrationSQL, notificationSQL} {
 			sum := hashTok(sql)
 			var old string
 			e := tx.QueryRow(ctx, `SELECT checksum FROM schema_migrations WHERE version=$1`, i+1).Scan(&old)
@@ -154,7 +155,7 @@ func publishStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var latest json.RawMessage
-	_ = db.QueryRow(r.Context(), `SELECT jsonb_build_object('id',id,'state',state,'revision',revision,'commit',commit_sha) FROM releases ORDER BY created_at DESC LIMIT 1`).Scan(&latest)
+	_ = db.QueryRow(r.Context(), `SELECT jsonb_build_object('id',id,'state',state,'revision',revision,'commit',commit_sha,'artifact',artifact_sha) FROM releases ORDER BY created_at DESC LIMIT 1`).Scan(&latest)
 	ok(w, map[string]any{"revision": revision, "published": published, "dirty": revision != published, "latest": latest})
 }
 func frozenRelease(ctx context.Context, editorial bool) (id, key string, err error) {
@@ -331,6 +332,15 @@ func prepareRelease(w http.ResponseWriter, r *http.Request) {
 }
 
 func finishRelease(ctx context.Context, id, key, state, commit string) error {
+	return finishArtifact(ctx, id, key, state, commit, "")
+}
+
+var artifactSHA = regexp.MustCompile(`^[a-f0-9]{64}$`)
+
+func finishArtifact(ctx context.Context, id, key, state, commit, artifact string) error {
+	if artifact != "" && (state != "published" || !artifactSHA.MatchString(artifact)) {
+		return userErr{400, "invalid artifact fingerprint"}
+	}
 	if state != "running" && state != "published" && state != "failed" {
 		return userErr{400, "invalid publication state"}
 	}
@@ -344,35 +354,46 @@ func finishRelease(ctx context.Context, id, key, state, commit string) error {
 			return userErr{404, "build not found"}
 		}
 		if old == "published" || old == "failed" || old == "superseded" {
+			if state == "running" {
+				return userErr{409, "release is already terminal"}
+			}
 			return nil
 		}
-		if state == "published" {
+		if state == "published" || state == "running" {
 			var newer bool
 			if e := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM releases WHERE state='published' AND created_at>(SELECT created_at FROM releases WHERE id=$1))`, id).Scan(&newer); e != nil {
 				return e
 			}
 			if newer {
+				if state == "running" {
+					return userErr{409, "release superseded by a newer publication"}
+				}
 				state = "superseded"
-			} else {
+			} else if state == "published" {
 				if _, e := tx.Exec(ctx, `UPDATE publication_state SET published=$1 WHERE id=1`, revision); e != nil {
 					return e
 				}
 			}
 		}
-		_, e := tx.Exec(ctx, `UPDATE releases SET state=$2,commit_sha=$3 WHERE id=$1`, id, state, clip(commit, 80))
+		_, e := tx.Exec(ctx, `UPDATE releases SET state=$2,commit_sha=$3,artifact_sha=$4 WHERE id=$1`, id, state, clip(commit, 80), artifact)
 		return e
 	})
 }
 func buildResult(w http.ResponseWriter, r *http.Request) {
-	var in struct{ State, Commit string }
+	var in struct{ State, Commit, Artifact string }
 	if !read(w, r, &in) {
 		return
 	}
-	if e := finishRelease(r.Context(), chi.URLParam(r, "id"), r.Header.Get("X-Build-Key"), in.State, in.Commit); e != nil {
+	if e := finishArtifact(r.Context(), chi.URLParam(r, "id"), r.Header.Get("X-Build-Key"), in.State, in.Commit, in.Artifact); e != nil {
 		oops(w, e)
 		return
 	}
-	done(w)
+	var state string
+	if e := db.QueryRow(r.Context(), `SELECT state FROM releases WHERE id=$1`, chi.URLParam(r, "id")).Scan(&state); e != nil {
+		oops(w, e)
+		return
+	}
+	ok(w, map[string]any{"ok": true, "state": state})
 }
 func queueImages(ctx context.Context, urls []string) {
 	for _, u := range urls {

@@ -8,9 +8,10 @@ from .core import Invalid, file_hash, private
 
 REQUIRED = {'sql_backup', 'uploads_backup', 'dns_zone', 'hosting_inventory'}
 
-def inspect_evidence(paths, max_unpacked=5 * 1024 ** 3):
-    if set(paths) != REQUIRED:
-        raise Invalid('Provide SQL, uploads/files, DNS and hosting/mailbox evidence explicitly')
+def inspect_evidence(paths, max_unpacked=5 * 1024 ** 3, *, owner_waived_full_backup=False):
+    accepted = {'dns_zone', 'hosting_inventory'} if owner_waived_full_backup else REQUIRED
+    if set(paths) != accepted:
+        raise Invalid('Provide DNS and hosting inventory along with both backup files or the explicit owner waiver')
     result = {}
     for kind, raw in paths.items():
         p = private(raw)
@@ -39,4 +40,4 @@ def inspect_evidence(paths, max_unpacked=5 * 1024 ** 3):
                     raise Invalid('Invalid or unsafe ZIP backup')
             check = 'ZIP CRC verified without extraction; restore still required'
         result[kind] = {'filename': p.name, 'bytes': p.stat().st_size, 'sha256': file_hash(p), 'modified_utc': datetime.fromtimestamp(p.stat().st_mtime, timezone.utc).isoformat(), 'readability': check}
-    return {'evidence': result, 'restore_verified': False, 'owner_approval': False}
+    return {'evidence': result, 'full_backup_waived': owner_waived_full_backup, 'restore_verified': False, 'owner_approval': False}

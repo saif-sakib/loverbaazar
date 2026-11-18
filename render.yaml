@@ -1,0 +1,19 @@
+# Reference for the existing service. Apply settings in place to avoid a second instance.
+services:
+  - type: web
+    name: loverbaazar-api
+    branch: main
+    runtime: docker
+    rootDir: apps/api
+    plan: free
+    autoDeployTrigger: "off"
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_TOKEN
+        sync: false
+      - key: ORIGIN_SECRET
+        sync: false
+      - key: PUBLISH_TOKEN
+        sync: false
