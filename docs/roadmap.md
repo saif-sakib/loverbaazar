@@ -315,7 +315,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Align sitemap inclusion with canonical/indexable active content, excluding admin/account/cart/checkout/search/tracking, drafts and intentional noindex pages. Make preview indexing protection environment-aware and preserve Search Console verification.
 - Verify unique meaningful titles/descriptions, one primary H1, canonical correctness, noindex/robots behavior and valid share images. Do not claim robots disallow makes private data secure or reliably removes an already indexed URL.
 
-**Evidence, 18 November 2026.** Editable product/category/page/post search properties, preview protection, canonical build checks and production sitemap generated from page heads. Local production-shaped build passed. The custom domain initially served a preview artifact with a sitemap 404. The production release must be verified on the domain and the owner must submit the production sitemap in Search Console. Business metadata approval remains pending. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** Editable product/category/page/post search properties, preview protection, canonical build checks and production sitemap generated from page heads. Local production-shaped build passed. The custom domain initially served a preview artifact with a sitemap 404. The [production release](https://github.com/saif-sakib/loverbaazar/actions/runs/44290572989) served a valid sitemap index, a child sitemap with 571 canonical URLs and the sitemap directive in robots.txt. Search Console submission and business metadata approval remain pending. [Results and remaining actions](seo-performance-results.md)
 
 
 ### Task 26 — Make product structured data and feeds trustworthy
@@ -388,13 +388,13 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 32 — Coordinate API and storefront releases
 
-**Status:** In progress · **Depends on:** 8, 31
+**Status:** Done · **Depends on:** 8, 31
 
 - Release only tested revisions, coordinating Render API deployment/readiness, backward-compatible schema changes and Cloudflare store/Worker deployment. Prevent independent auto-deploy from bypassing checks or racing incompatible frontend/API versions.
 - Build and validate a specific catalog/content revision; record commit, artifact hash, release ID and deployment status. Separate content-only publication from code release while reusing required artifact/data checks. Serialize final promotions so an old build cannot replace a newer one.
 - Verify failed API readiness, failed content fetch/build, cancelled publish and failed promotion keep the previous working release. Rehearse code/asset rollback without restoring or discarding current customer orders.
 
-**Evidence, 18 November 2026.** Added exact-commit Render/API readiness gates and serialized Cloudflare version upload, artifact fingerprint, promotion and guarded rollback. Local tests covered stale and failed candidates. The [coordinated photo release](https://github.com/saif-sakib/loverbaazar/actions/runs/44286387664) passed on the same Worker and Render revision. Record the production release and retain non-disruptive rollback evidence.
+**Evidence, 18 November 2026.** Added exact-commit Render/API readiness gates and serialized Cloudflare version upload, artifact fingerprint, promotion and guarded rollback. Local tests covered stale and failed candidates. The [coordinated photo release](https://github.com/saif-sakib/loverbaazar/actions/runs/44286387664) passed on the same Worker and Render revision. The [production release](https://github.com/saif-sakib/loverbaazar/actions/runs/44290572989) matched the API and Worker revisions and confirmed the live artifact. CI exercised guarded rollback without replacing orders.
 
 
 ### Task 33 — Configure and verify the free hosting accounts
