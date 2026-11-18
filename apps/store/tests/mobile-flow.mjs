@@ -61,7 +61,13 @@ try {
   const deployed = await request('GET', '/release.json', undefined, false);
   assert.equal(deployed.id, publication.latest.id);
   assert.equal(deployed.environment, 'local');
-  const uploaded = await context.request.get(product.images[0].src);
+  // The local asset watcher can reload new paths after release.json becomes visible.
+  let uploaded = await context.request.get(product.images[0].src);
+  for (let retry = 0; uploaded.status() === 404 && retry < 16; retry++) {
+    await uploaded.dispose();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    uploaded = await context.request.get(product.images[0].src);
+  }
   assert.equal(uploaded.status(), 200);
   assert.match(uploaded.headers()['content-type'], /^image\/png/);
   assert.deepEqual(await uploaded.body(), photo);
