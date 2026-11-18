@@ -214,7 +214,11 @@ try {
   assert.equal(await invoice.locator('.invoice-total dd').textContent(), formattedTotal);
   assert.match(await invoice.locator('.invoice-totals').textContent(), /Discount \(FIXTURE\)−৳50/);
   assert.match(await invoice.locator('.invoice-payment').textContent(), /Transaction reference: FIXTURE-TXN-42/);
-  assert.equal(await invoice.evaluate(box => box.scrollWidth <= box.clientWidth), true);
+  for (const width of [320, 360, 375, 390, 414]) {
+    await admin.setViewportSize({ width, height: 812 });
+    assert.equal(await invoice.evaluate(box => box.scrollWidth <= box.clientWidth), true, `Invoice overflows at ${width}px`);
+  }
+  await admin.setViewportSize({ width: 375, height: 812 });
   await shot(admin, 'invoice-375');
   await admin.evaluate(() => { window.print = () => { document.body.dataset.testPrintCalled = 'yes'; }; });
   await invoice.getByRole('button', { name: 'Print / Save PDF' }).click();

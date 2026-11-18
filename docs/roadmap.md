@@ -154,7 +154,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 9
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md). Follow-up verified the four bottom navigation links without header or footer duplicates at phone widths. The Account link stays in the header and the desktop navigation remains available.
 
 - Make categories, product discovery, search, offers, cart and contact easy to reach with one hand. Reduce unnecessary first-screen hero height and competing sticky/floating controls while keeping the current visual identity.
 - Support touch/keyboard category navigation, clear active states, useful search suggestions and honest delivery/payment messages driven by settings.
@@ -214,7 +214,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** In progress — implementation and local checks complete; real-phone acceptance pending · **Depends on:** 8, 9
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md). Follow-up verified invoice previews at all five phone widths and generated a PDF from a disposable order. The PDF included the stored subtotal, discount, delivery charge, total and transaction reference.
 
 - Make products, images, stock deltas, prices, categories, pages, site/live settings, coupons, orders, tracking, messages and customer support usable from a phone. Use contained table scrolling or readable row layouts as appropriate.
 - Preserve unsaved edits, prevent duplicate saves, distinguish live effects from Publish-required effects and display task 8's real publication status. Provide clear order/payment verification and safe CSV export behavior.
