@@ -2,7 +2,7 @@
 
 ## Local setup and isolation
 
-Use Node 22 (also recorded in `.nvmrc`), the Go version from `apps/api/go.mod`, Docker and Python 3. `./scripts/check.sh --browsers` installs locked npm dependencies and Chromium, checks Go formatting/vet, and runs Worker and API race tests. `./scripts/check.sh` skips browser downloading. To run browser checks start the complete shop through `./scripts/dev.sh`, then run `npm run test:ui` in `apps/store`; `CHROME_PATH` can select an already installed Chromium.
+Use the Node version in `.nvmrc`, the Go version from `apps/api/go.mod`, Docker and Python 3. `./scripts/check.sh --browsers` installs locked npm dependencies and Chromium, checks Go formatting/vet, and runs Worker and API race tests. `./scripts/check.sh` skips browser downloading. To run browser checks start the complete shop through `./scripts/dev.sh`, then run `npm run test:ui` in `apps/store`; `CHROME_PATH` can select an already installed Chromium.
 
 For a separate full-stack fixture while the normal shop stays running:
 

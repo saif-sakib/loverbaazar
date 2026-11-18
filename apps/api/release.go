@@ -258,7 +258,7 @@ func startPublish(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			defer os.RemoveAll(stage)
-			args := []string{filepath.Join(dir, "node_modules", "astro", "astro.js"), "build", "--outDir", stage}
+			args := []string{filepath.Join(dir, "node_modules", ".bin", "astro"), "build", "--outDir", stage}
 			cmd := exec.CommandContext(ctx, "node", args...)
 			cmd.Dir = dir
 			cmd.Env = append(cmd.Environ(), "CATALOG_URL=http://127.0.0.1:"+os.Getenv("PORT")+"/api/catalog", "BUILD_ID="+id, "BUILD_KEY="+key, "BUILD_ENV=local")

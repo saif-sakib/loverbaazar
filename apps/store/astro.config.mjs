@@ -7,7 +7,9 @@ if (site.protocol !== "https:" || site.href !== site.origin + "/") throw new Err
 
 export default defineConfig({
   site: site.href,
+  publicDir: process.env.BUILD_PUBLIC_DIR || "./public",
   trailingSlash: "always",
+  compressHTML: true,
   integrations: [{
     name: "release-metadata",
     hooks: {

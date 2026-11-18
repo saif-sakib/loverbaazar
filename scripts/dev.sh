@@ -55,7 +55,14 @@ seed_mode=seed
 if [[ ${LB_ISOLATED:-0} == 1 ]]; then seed_mode=seed-fixture; fi
 (cd "$ROOT/apps/api" && go build -o "$BIN" . && "$BIN" "$seed_mode" seed/products.json ../store/src/data/content.json)
 export BUILD_OUTPUT="$ROOT/apps/store/dist"
-if [[ ${LB_ISOLATED:-0} == 1 ]]; then export BUILD_OUTPUT="$task_dir/store"; fi
+if [[ ${LB_ISOLATED:-0} == 1 ]]; then
+ export BUILD_OUTPUT="$task_dir/store" BUILD_PUBLIC_DIR="$task_dir/public"
+ mkdir -p "$BUILD_PUBLIC_DIR"
+ for asset in "$ROOT/apps/store/public/"*; do
+  [[ ${asset##*/} == uploads ]] || cp -a "$asset" "$BUILD_PUBLIC_DIR/"
+ done
+ export LOCAL_UPLOADS="$BUILD_PUBLIC_DIR/uploads"
+fi
 "$BIN" & API=$!
 for attempt in {1..150}; do
  if curl --max-time 2 -sf "http://127.0.0.1:$api_port/api/ready" >/dev/null; then break; fi
@@ -63,7 +70,7 @@ for attempt in {1..150}; do
  kill -0 "$API" 2>/dev/null || exit 1; sleep 0.2
 done
 export BUILD_ENV=local CATALOG_URL="http://127.0.0.1:$api_port/api/catalog"
-node node_modules/astro/astro.js build --outDir "$BUILD_OUTPUT" >/dev/null
+node node_modules/.bin/astro build --outDir "$BUILD_OUTPUT" >/dev/null
 printf '\nShop: http://127.0.0.1:%s/\nAdmin: http://127.0.0.1:%s/admin/\n' "$store_port" "$store_port"
 WRANGLER_SEND_METRICS=false setsid npx wrangler dev --assets "$BUILD_OUTPUT" --port "$store_port" --ip 127.0.0.1 --var "API_ORIGIN:http://127.0.0.1:$api_port" --var ORIGIN_SECRET:dev & EDGE=$!
 wait "$EDGE"

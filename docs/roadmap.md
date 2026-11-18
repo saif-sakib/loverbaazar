@@ -456,43 +456,59 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 38 — Test complete purchase and publication workflows
 
-**Status:** Planned · **Depends on:** 14, 16, 23, 31, 34
+**Status:** Done · **Depends on:** 14, 16, 23, 31, 34
 
 - Add targeted full-stack browser scenarios through `dev.sh`/the Worker and a separate disposable database, beyond the existing mocked UI checks. Use controlled email/Turnstile test integration and real application endpoints.
 - Exercise browse → product → cart → guest/logged-in checkout → confirmation → tracking → admin fulfillment/cancellation; cover coupons/manual payment and notification failure. Exercise product/photo/category/page changes → save → Publish → actual release confirmation.
 - Verify persisted totals, stock, order events, public snapshots and release assets after each significant transition. Done when both purchase and publication work across their real components without production writes or external customer messages.
 
+**Evidence, 18 November 2026.** `./scripts/test-mobile.sh --ci` exercises real saves, photos, category and page publication, a matching Worker publication ID, guest checkout, tracking, fulfillment, and an authenticated coupon/manual-payment order with a lost response. The retry returns the same receipt with one stock and coupon deduction. Controlled Go provider simulations cover Turnstile and failed, uncertain and retried notifications. All writes used a disposable store.
+
 ### Task 39 — Complete browser and real-phone acceptance
 
-**Status:** Planned · **Depends on:** 27, 28, 30, 38
+**Status:** In progress — browser matrix passed; physical phones pending · **Depends on:** 27, 28, 30, 38
 
 - Run Chromium/Firefox/WebKit checks where supported, then have the owner or tester exercise real Android Chrome and iPhone Safari. Emulation is supporting evidence, not a substitute for these device checks.
 - Cover 320/360/375/390/414 px phones, tablet/desktop, portrait/landscape, zoom, screen-reader/keyboards, weak mobile networks, denied storage and interrupted connections. Test image rendering rather than aborting images in every scenario.
 - Record device/browser, scenario and result with sanitized screenshots. Done when buying, tracking and the owner's common admin actions pass with readable controls and no overlays, sideways page scroll or unresolved critical browser failures.
 
+**Evidence, 18 November 2026.** Chromium 159, Firefox 159 and WebKit 27.2 passed six routes at eight sizes, including 320–414 px, landscape, tablet and desktop, with a delivered fixture image and delayed stock. The 40 browser regressions and automated accessibility pass include keyboard and denied-storage checks. Real Android Chrome and iPhone Safari, software keyboard, browser zoom and TalkBack/VoiceOver remain owner checks.
+
 ### Task 40 — Crawl the release for SEO and content defects
 
-**Status:** Planned · **Depends on:** 24, 25, 26, 31, 33
+**Status:** In progress — public crawl and candidate fixes verified; catalog exceptions pending · **Depends on:** 24, 25, 26, 31, 33
 
 - Validate generated/served product, category, tag, page and blog routes against task 24's ledger. Check internal links, image/download delivery, status codes, redirect chains, encoded Bangla paths, canonicals, sitemap/noindex agreement, structured data and social previews.
 - Detect duplicate/missing titles, demo/placeholder copy, thin empty archives, invalid schema and references to old hosting. Verify real 404s, HEAD requests and representative crawler-visible HTML without JavaScript.
 - Run against the intended release configuration and verify preview protection separately. Done with an exception ledger and no unresolved SEO/content issue that would break existing important URLs or advertise incorrect products/prices.
 
+**Evidence, 18 November 2026.** Crawled all 571 public sitemap pages. Their canonicals, titles, headings, preview protection, and all 291 catalog/structured-data/feed offers agreed. The candidate adds an exact redirect for the broken Pureit Classic 23L link and corrects the Worker-facing JSON 404. Two same-title product pairs have distinct SKU/stock records and the same-title tag pair has disjoint memberships. Owner review is needed before consolidating those records or approving the remaining WordPress URL dispositions.
+
 ### Task 41 — Test load, failure recovery and security regressions
 
-**Status:** Planned · **Depends on:** 5, 6, 28, 36, 37, 38
+**Status:** Done · **Depends on:** 5, 6, 28, 36, 37, 38
 
 - Exercise bounded representative load locally: simultaneous last-unit sales, multi-item orders, duplicate keys/payment references, coupon limits, concurrent admin edits and logged-in pool contention. Measure memory, queueing, p95 latency and snapshot refresh work.
 - Simulate process restart, timeout after commit, database outage, stale cache, unavailable images/mail, failed publish and quota-like API rejection. Verify auth/CSRF/input/HTML/upload/private-cache boundaries and scan dependencies/secrets with free tools.
 - An initial warm checkout p95 target is ≤2 seconds under documented small-shop test load; report cold-start delay separately. Done when failures cause no oversell, duplicated payment/order, leaked private data or lost confirmed order. Do not load-test paid or free live providers to exhaustion.
 
+**Evidence, 18 November 2026.** A 20-request last-unit race returned one order, with warm checkout p95 98–191 ms locally. A controlled API and PostgreSQL restart retained the original receipt and stock, with read snapshots available during the outage. API race, Worker, release rollback, encrypted restore and repository secret scans passed. The Astro 7.4.12 candidate clears the Astro advisories and the Go scan found zero reachable issues. The package audit still lists one unpatched build-tool advisory in Picomatch, with no Astro build server in production.
+
 ### Task 42 — Approve the release candidate and launch packet
 
-**Status:** Planned · **Depends on:** all applicable acceptance checks in 1–41
+**Status:** Blocked — owner inventory, phone checks and approval pending · **Depends on:** all applicable acceptance checks in 1–41
 
 - Produce a release candidate identifying commit, build/catalog revision, test reports, open issues, approved products/prices/stock, real-phone results, provider configuration, backup/restore evidence and the exact owner account actions still needed for handover.
 - Owner accepts delivery/payment numbers, refund/warranty promises, account/history treatment, product inventory and free-hosting cold-start/availability limits. No critical issue affecting money, stock, privacy, order handling, mobile purchase, key legacy URLs or restore capability may be deferred.
 - Done only when all launch gates below pass and the owner approves this concrete candidate. A missing owner export, unchecked stock sheet or unavailable integration is a pending requirement, not an assumed pass.
+
+**Candidate evidence, 18 November 2026.** Source commit `b29bff2768e52306d6ecc1555588b48414b015ae` built successfully on Node 22.23.4. Local artifact fingerprint `9f7d663fba1bb4417da8e841d5c6dfdb31b074abc843a41720a7d6da97d563de` includes 571 indexable URLs and was built from a read-only capture of the hosted catalog at observed revision 0. Checkout fixtures and all three browser engines passed. The [existing hosted encrypted backup](https://github.com/saif-sakib/loverbaazar/actions/runs/44290663888) was restored independently, and a fresh fixture restore passed. The candidate is awaiting a live rollout.
+
+**Actions required**
+
+1. In Admin, approve actual product quantities and prices, delivery charges, payment numbers and return/warranty text. Resolve duplicate SKU/title decisions and any outstanding WordPress fulfillment. The previous restored backup showed 267 active items at the historical 100-unit quantity.
+2. Use real Android Chrome and iPhone Safari to exercise purchase, tracking and common admin actions. Verify payment instructions, receipt delivery to a controlled address, cancellation stock return, 200% zoom and your phone's screen reader.
+3. Confirm offline access to the encrypted backup and key, acknowledge the free-host cold-start behavior, then approve this candidate. Tasks 43–48 retain DNS, email and Namecheap actions.
 
 ## Tasks 43–48: owner-operated Namecheap handover
 

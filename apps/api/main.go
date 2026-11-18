@@ -313,6 +313,7 @@ func applyContentUpdates(ctx context.Context) error {
 func router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(observeRequests, middleware.Timeout(45*time.Second), originGuard, requestGuard)
+	r.NotFound(func(w http.ResponseWriter, _ *http.Request) { fail(w, http.StatusNotFound, "not found") })
 	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	r.With(middleware.Compress(5)).Get("/api/catalog", catalog)
 	r.With(middleware.Compress(5)).Get("/api/storefront", storefront)
