@@ -557,33 +557,52 @@ test('long Bangla product names, image failures and purchase controls fit all ta
   }
 }));
 
-test('phone image uploads preserve failed edits, allow reordering, and clean only abandoned uploads', () => shop(async (page, context) => {
+test('product photos stay local until Save and survive a rejected save without uploading discarded files', () => shop(async (page, context) => {
   await page.addInitScript(() => { if (location.protocol === 'http:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
-  let fail = true, number = 0;
-  const cleaned = [];
-  await context.route('**/api/admin/image?*', r => fail ? r.fulfill({ status: 400, json: { error: 'Fixture upload failed' } }) : r.fulfill({ json: { url: `/uploads/fixture-${++number}.png` } }));
-  await context.route('**/api/admin/image/cleanup', r => { cleaned.push(...r.request().postDataJSON().urls); return r.fulfill({ json: {} }); });
+  let uploads = 0;
+  let saves = [];
+  await context.route('**/api/admin/image?*', r => { uploads++; return r.abort(); });
+  await context.route('**/api/admin/products', async r => {
+    if (r.request().method() !== 'POST') return r.continue();
+    saves.push(r.request().postDataBuffer().toString('latin1'));
+    return saves.length === 1 ? r.fulfill({ status: 502, json: { error: 'Fixture save rejected' } }) : r.fulfill({ json: { ok: true, id: 123 } });
+  });
   await ready(page, '/admin/#new-product');
+  const abandoned = { name: 'abandoned.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=', 'base64') };
   await page.locator('#pf [name="name"]').fill('Unsaved photo fixture');
-  const file = { name: 'fixture.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=', 'base64') };
-  await page.locator('#up').setInputFiles(file);
-  await page.waitForFunction(() => document.querySelector('#err').textContent.includes('Fixture upload failed'));
-  assert.equal(await page.locator('#pf [name="name"]').inputValue(), 'Unsaved photo fixture');
-  fail = false;
-  await page.locator('#up').setInputFiles({ ...file, name: 'fixture-again.png' });
-  await page.waitForSelector('#imgs figure');
-  await page.locator('#up').setInputFiles({ ...file, name: 'fixture-next.png' });
-  await page.waitForFunction(() => document.querySelectorAll('#imgs figure').length === 2);
-  await page.locator('#imgs [data-r]').first().click();
-  assert.match(await page.locator('#imgs img').first().getAttribute('src'), /fixture-2/);
-  const touch = await page.locator('#imgs [data-x]').first().boundingBox();
-  assert.ok(touch.width >= 44 && touch.height >= 44);
-  await page.locator('#imgs [data-x]').first().click();
-  await page.waitForFunction(() => document.querySelectorAll('#imgs figure').length === 1);
+  await page.locator('#up').setInputFiles(abandoned);
+  assert.match(await page.locator('#imgs img').getAttribute('src'), /^blob:/);
   page.once('dialog', d => d.accept());
   await page.locator('#back').click();
   await page.waitForSelector('#rows');
-  assert.deepEqual([...new Set(cleaned)].sort(), ['/uploads/fixture-1.png', '/uploads/fixture-2.png']);
+  assert.equal(uploads, 0);
+  assert.equal(saves.length, 0);
+
+  await page.locator('#new').click();
+  await page.locator('#pf [name="name"]').fill('Saved photo fixture');
+  await page.locator('#pf [name="price"]').fill('1250');
+  await page.locator('#pf [name="stock"]').fill('1');
+  await page.locator('#up').setInputFiles([{ ...abandoned, name: 'discarded.png' }, { ...abandoned, name: 'retained.png' }]);
+  const last = await page.locator('#imgs img').last().getAttribute('src');
+  await page.locator('#imgs [data-r]').first().click();
+  assert.equal(await page.locator('#imgs img').first().getAttribute('src'), last);
+  const touch = await page.locator('#imgs [data-x]').last().boundingBox();
+  assert.ok(touch.width >= 44 && touch.height >= 44);
+  await page.locator('#imgs [data-x]').last().click();
+  await page.locator('#pf .stick button').first().click();
+  await page.waitForFunction(() => document.querySelector('#err').textContent.includes('Fixture save rejected'));
+  assert.equal(await page.locator('#imgs img').count(), 1);
+  assert.equal(await page.locator('#imgs img').getAttribute('src'), last);
+  await page.locator('#pf .stick button').first().click();
+  await page.waitForSelector('#rows');
+  assert.equal(uploads, 0);
+  assert.equal(saves.length, 2);
+  for (const body of saves) {
+    assert.match(body, /retained\.png/);
+    assert.doesNotMatch(body, /discarded\.png|abandoned\.png|blob:/);
+  }
+  const key = body => body.match(/name="saveKey"\r\n\r\n([a-f0-9]{32})/)[1];
+  assert.equal(key(saves[0]), key(saves[1]));
 }));
 
 test('returning to products during a slow catalog read finishes the latest navigation', () => shop(async (page, context) => {

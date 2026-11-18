@@ -103,6 +103,19 @@
   let savingChanges = false;
   const LEAVE = "You have changes you haven't saved. Leave without saving?";
   const pendingUploads = new Set();
+  const productPhotoPreviews = new Map();
+  function clearProductPhotoPreviews() {
+    for (const source of productPhotoPreviews.keys()) URL.revokeObjectURL(source);
+    productPhotoPreviews.clear();
+  }
+  function previewProductPhoto(file) {
+    if (!file.size || file.size > 5 * 1024 ** 2 || (file.type && !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type))) {
+      throw new Error("Choose a JPG, PNG, WebP or GIF photo under 5 MB.");
+    }
+    const url = URL.createObjectURL(file);
+    productPhotoPreviews.set(url, file);
+    return url;
+  }
   async function cleanupUploads(urls = [...pendingUploads]) {
     const list = [...new Set(urls)].filter((u) => typeof u === "string" && u.trim());
     if (!list.length) return;
@@ -118,6 +131,7 @@
   const back = (to) => () => {
     if (unsaved && !confirm(LEAVE)) return;
     unsaved = false;
+    clearProductPhotoPreviews();
     cleanupUploads();
     to();
   };
@@ -148,7 +162,7 @@
   async function apiRequest(path, opts = {}) {
     const headers = { "X-Admin-Token": token, ...(opts.headers || {}) };
     let body = opts.body;
-    if (body && !(body instanceof Blob)) {
+    if (body && !(body instanceof Blob) && !(body instanceof FormData)) {
       body = JSON.stringify(body);
       headers["Content-Type"] = "application/json";
     }
@@ -165,6 +179,7 @@
     $("#ok").hidden = !m;
   };
   const logout = (msg) => {
+    clearProductPhotoPreviews();
     cleanupUploads();
     session("t", null);
     try {
@@ -535,7 +550,7 @@
   }
 
   // A small word-processor box, with a switch to plain HTML.
-  function rich(host, html) {
+  function rich(host, html, selectImage = upload) {
     host.innerHTML = `<div class="rich"><div class="richbar">
       <button type="button" data-cmd="bold"><b>B</b></button><button type="button" data-cmd="italic"><i>I</i></button>
       <button type="button" data-block="h2">Heading</button><button type="button" data-block="p">Text</button>
@@ -563,8 +578,10 @@
     };
     $("input[type=file]", host).onchange = run(async (e) => {
       if (!e.target.files[0]) return;
-      say("Uploading…");
-      const url = await upload(e.target.files[0]);
+      if (selectImage === upload) say("Uploading…");
+      const file = e.target.files[0];
+      e.target.value = "";
+      const url = await selectImage(file);
       say("");
       if (src.hidden) cmd("insertImage", url);
       else src.value += `<img src="${esc(url)}" alt="">`;
@@ -609,7 +626,7 @@
   });
 
   const operations = run(async () => {
-    const [ops, mail] = await Promise.all([api("/operations"), api("/notifications")]);
+    const [ops, mail, photos] = await Promise.all([api("/operations"), api("/notifications"), api("/image/status")]);
     const count = ops.checkoutResponses;
     const states = { pending: "Pending", sending: "Sending", accepted: "Accepted by Brevo", failed: "Failed", uncertain: "Check Brevo before retrying" };
     view().innerHTML = `<div class="panel"><h3>API and checkout</h3>
@@ -624,6 +641,18 @@
         ${m.state === "uncertain" ? `<small>Brevo tag: lb-order-mail-${m.id}</small>` : ""}
       </td></tr>`).join("") || '<tr><td colspan="5">There are no order notifications yet.</td></tr>'}
       </tbody></table></div></div>`;
+    view().insertAdjacentHTML("beforeend", `<div class="panel"><h3>Product photo storage</h3>
+      <p>${photos.pending} upload reservations awaiting cleanup. ${photos.retired} retired photo references are tracked for review or rollback.</p>
+      <button type="button" id="sweep-photos" class="btn ghost">Check photo cleanup</button></div>`);
+    $("#sweep-photos").onclick = run(async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        await api("/image/cleanup", { body: {} });
+        await operations();
+        say("Photo cleanup checked. Published and shared photos are protected.");
+      } finally { button.disabled = false; }
+    });
     const test = $("#testmail");
     if (test) test.onclick = run(async () => {
       test.disabled = true;
@@ -984,6 +1013,8 @@
 
   function editProduct(p, isNew) {
     say("");
+    clearProductPhotoPreviews();
+    let previousPhotoSave = null;
     let images = (p.images || []).map((i) => ({ ...i }));
     view().innerHTML = `<form class="panel editor" id="pf">
       ${p.migrationBlocked ? `<p class="note" role="status">Migration review required: ${esc((p.migrationIssues || []).join(", "))}. Keep this product hidden until its source data is corrected and reviewed.</p>` : ""}
@@ -999,8 +1030,8 @@
       </div>
       ${field("Short description", "short", p.short, "maxlength=300", "text", "Shown right beside the main photo and used as the Google search snippet.")}
       <div class="field"><span class="flabel">Categories</span><small class="fhelp">Choose which category pages and home page rows include this product. (Needs Publish)</small><div id="pcatpick">${checkList("cat", p.cats || [], true)}</div><div class="inline-cats"><input id="quickcat" placeholder="Need a new category? Type name…" aria-label="New category name"><button type="button" class="btn ghost small" id="addquickcat">+ Add category</button></div></div>
-      <div class="field"><span class="flabel">Product photos</span><small class="fhelp">The first photo is the main thumbnail on product cards. Use ◀ / ▶ to reorder. (Needs Publish)</small><div id="imgs" class="imgs"></div>
-        <label class="btn ghost small upl">Upload photos<input id="up" type="file" accept="image/*" multiple hidden></label>
+      <div class="field"><span class="flabel">Product photos</span><small class="fhelp">Photos upload when you save the product. Use ◀ / ▶ to reorder. The first photo appears on product cards.</small><div id="imgs" class="imgs"></div>
+        <label class="btn ghost small upl">Choose photos<input id="up" type="file" accept="image/*" multiple hidden></label>
         <input id="imgurl" placeholder="Or paste an image address and press Enter" aria-label="Image address"></div>
       <details class="advanced optional-fields"><summary>More product details <small>Specifications, product code &amp; search tags</small></summary>
       ${field("Product code (SKU)", "sku", p.sku, "", "text", "Optional product code shown on the product page and searchable.")}
@@ -1042,6 +1073,7 @@
         if (!confirm(`Delete ${p.name}? This can't be undone. If it has been ordered before, it will be hidden instead.`)) return;
         const r = await api("/products/" + p.id, { method: "DELETE" });
         unsaved = false;
+        clearProductPhotoPreviews();
         await cleanupUploads();
         await ensureCatalog(true);
         await products();
@@ -1078,7 +1110,7 @@
       $$("[data-x]").forEach((b) => {
         b.onclick = () => {
           const [removed] = images.splice(+b.dataset.x, 1);
-          if (removed?.src && pendingUploads.has(removed.src)) cleanupUploads([removed.src]);
+          if (productPhotoPreviews.delete(removed?.src)) URL.revokeObjectURL(removed.src);
           drawImages();
           unsaved = true;
         };
@@ -1090,16 +1122,10 @@
       drawImages();
       unsaved = true;
     };
-    $("#up").onchange = run(async (e) => {
-      say("Uploading…");
-      const cat = (new FormData(f).getAll("cat").find((c) => !["latest-product", "popular-item"].includes(c)) || "other").replace(/[^a-z0-9-]/g, "");
-      const stem = asciiName(f.slug.value) || "product";
-      // Numbers carry on from existing photos: reusing one would overwrite that photo on Cloudinary.
-      const taken = images.map((i) => +(i.src.match(new RegExp(`${stem}-(\\d+)(?:\\.|$)`))?.[1] || 0));
-      let n = Math.max(0, ...taken);
-      for (const file of e.target.files) addImage(await upload(file, `products/${cat}`, `${stem}-${++n}`));
-      say("");
+    $("#up").onchange = run((e) => {
+      const files = [...e.target.files];
       e.target.value = "";
+      for (const file of files) addImage(previewProductPhoto(file));
     });
     $("#imgurl").onkeydown = (e) => {
       if (e.key !== "Enter") return;
@@ -1117,7 +1143,7 @@
       { name: "", values: "" },
       { addLabel: "+ Add specification", empty: "No specifications added yet (optional)." },
     );
-    const desc = rich($("#desc"), p.desc);
+    const desc = rich($("#desc"), p.desc, previewProductPhoto);
     const nameEl = $('[name="name"]', f);
     nameEl.addEventListener("input", () => {
       if (isNew) {
@@ -1178,14 +1204,50 @@
       };
       if (isNew) {
         out.stock = +d.get("stock");
-        await api("/products", { body: out });
       } else {
         delete out.stock;
-        out.stockDelta = +d.get("stock") - p.stock; // never an absolute number: orders may have come in since this form opened
-        await api("/products/" + p.id, { method: "PUT", body: out });
+        out.stockDelta = +d.get("stock") - p.stock; // Orders may have changed stock while editing.
       }
+
+      const selected = new Map();
+      const reference = (source) => {
+        if (!productPhotoPreviews.has(source)) return source;
+        if (!selected.has(source)) selected.set(source, `/__product-photo/${selected.size}`);
+        return selected.get(source);
+      };
+      out.images = images.map(img => {
+        const source = reference(img.src);
+        return source === img.src ? img : { ...img, src: source, thumb: source };
+      });
+      if (out.desc.includes("blob:")) {
+        const template = document.createElement("template");
+        template.innerHTML = out.desc;
+        for (const img of template.content.querySelectorAll("img[src]")) {
+          img.setAttribute("src", reference(img.getAttribute("src")));
+        }
+        out.desc = template.innerHTML;
+      }
+
+      let body = out;
+      if (selected.size) {
+        const files = [...selected.keys()].map(source => productPhotoPreviews.get(source));
+        if (files.length > 6 || files.reduce((size, file) => size + file.size, 0) > 25 * 1024 ** 2) {
+          throw new Error("Save up to six new photos and 25 MB at a time.");
+        }
+        const product = JSON.stringify(out);
+        const signature = product + [...selected.keys()].join("\n");
+        if (signature !== previousPhotoSave?.signature) {
+          previousPhotoSave = { signature, key: crypto.randomUUID().replaceAll("-", "") };
+        }
+        body = new FormData();
+        body.set("product", product);
+        body.set("saveKey", previousPhotoSave.key);
+        for (const file of files) body.append("photos", file);
+      }
+      await api(isNew ? "/products" : "/products/" + p.id, { method: isNew ? "POST" : "PUT", body });
       await ensureCatalog(true);
       await products();
+      clearProductPhotoPreviews();
       needsPublish("Product saved. Price, stock and visibility are live; click Publish changes for name, photo or text edits.");
     });
   }
@@ -1981,6 +2043,7 @@
     navigationGeneration++;
     catalogPromise = null;
     catsPromise = null;
+    clearProductPhotoPreviews();
     cleanupUploads();
     const [first, arg] = location.hash.slice(1).split("/");
     const tab = routes[first] ? first : "dashboard";
@@ -2100,7 +2163,7 @@
   addEventListener("beforeunload", (e) => {
     if (unsaved) e.preventDefault();
   });
-  addEventListener("pagehide", () => cleanupUploads());
+  addEventListener("pagehide", event => { if (!event.persisted) clearProductPhotoPreviews(); cleanupUploads(); });
   $("#out").onclick = () => logout();
   $("#login").onsubmit = (e) => {
     e.preventDefault();
