@@ -1,0 +1,14 @@
+{
+  "cloudflare.requests": null,
+  "cloudflare.cpu_ms": null,
+  "cloudflare.asset_files": null,
+  "render.hours": null,
+  "render.bandwidth": null,
+  "render.build_minutes": null,
+  "neon.compute_hours": null,
+  "neon.storage": null,
+  "neon.transfer": null,
+  "cloudinary.credits": null,
+  "brevo.sends": null,
+  "github.storage": null
+}

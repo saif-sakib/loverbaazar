@@ -638,12 +638,19 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 
 ### Task 49 — Establish routine maintenance and upgrade triggers
 
-**Status:** Planned · **Depends on:** 37, 47
+**Status:** In progress — runbooks and checker implemented; owner dashboard usage baseline pending · **Depends on:** 37, 47
 
 - Deliver an owner-friendly operating checklist: daily orders/payment exceptions/backup status; weekly broken links, notification failures and quotas; monthly dependency/security updates, access/token expiry and database/storage growth; quarterly restore drills and mobile journey checks. Earlier tasks begin these checks during launch.
 - Define decisions from measurements: repeated checkout failures/cold-start losses, p95 latency, sustained memory/CPU pressure, approaching database/image/Worker limits, backup recovery time and the commercial cost of downtime. Record who acts and how to pause features/orders safely without a bill.
 - Maintain the numbered backlog for optional growth features such as a verified payment gateway, phone-order entry, promotion popups, automated courier integration or self-service recovery. Gateways/SMS/other paid integrations require separate commercial approval and are not assumed part of the free launch.
 - Done with executable runbooks, baseline usage and a review cadence; no service is upgraded automatically.
+
+**Implementation evidence, 19 November 2026.** [Maintenance runbook](maintenance.md) defines daily/weekly/monthly/quarterly reviews, responsible operators, free quota remedies at 70/85/95%, checkout/cold-start/resource/recovery/business decision thresholds and pause/resume, notification, backup, release/media and access recovery steps. [Measured baseline and branch cleanup](maintenance-baseline.md) records matching live API/store commits, active schedules, a fresh verified encrypted artifact and its expiry. `scripts/maintenance-check.py` performs only bounded public/GitHub GETs, reports unknown/stale dashboard usage and checks manually supplied actual allowances. Its 12 isolated safety checks pass and run in Store CI. Removed 13 obsolete local and 16 remote branches; preserved superseded handover history in a verified private Git bundle and included merged PR #22. The owner reports work through 48 complete and explicitly left provider readings as an owner action; no historical account verification is inferred.
+
+**Actions required**
+
+1. Fill the private [usage template](maintenance-usage.example.json) from actual provider dashboards and run the [maintenance checker](maintenance.md#run-the-read-only-check). Record CPU/memory, natural checkout timing/losses and the actual account limits/reset windows.
+2. Add the review reminders and record the backup operator/offline archive and key access. Keep task 49 In progress until the baseline and initial review are recorded.
 
 ### Task 50 — Evaluate and execute a future VPS migration
 
@@ -654,6 +661,43 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 - Reuse CI/CD, explicit secrets, backup/restore and code rollback. Test realistic load, reboot/redeploy, cold/warm behavior and database connectivity on the candidate before switching API origin. Preserve all domain paths, orders and published content; no storefront rewrite is required.
 - If adding multiple API instances, first redesign in-memory snapshot invalidation and rate-limit consistency; cloning the current process is insufficient. For database migration, freeze writes, copy/verify data, switch once and reconcile before reopening.
 - Done with owner-approved costs, verified deployment/recovery and a successful observed handover. Until then, task 50 authorizes no purchase, card, paid plan or infrastructure change.
+
+## Optional growth backlog
+
+### Task 51 — Evaluate a verified payment gateway
+
+**Status:** Planned — optional; separate commercial approval required · **Depends on:** 49 and owner-approved provider/fees
+
+- Compare Bangladesh merchant eligibility, fees/settlement/refunds and recovery responsibilities at the time of approval. Prepare sandbox verification, signed callback validation, idempotent payment/order handling and explicit pending/failure states before live use.
+- Done with owner-approved commercial terms and verified reconciliation/refund behavior. No gateway signup, fee, SMS or paid plan is authorized by this backlog entry.
+
+### Task 52 — Add controlled phone-order entry
+
+**Status:** Planned — optional · **Depends on:** 49 and owner-prioritized workflow
+
+- Define the staff order-entry journey with server-computed totals, relative stock updates, duplicate prevention, audit history, consent and payment verification. Never bypass normal order/stock rules or attach legacy orders by phone matches.
+- Done with a usable mobile admin flow and isolated transaction/authorization checks.
+
+### Task 53 — Evaluate promotion notices and popups
+
+**Status:** Planned — optional · **Depends on:** 49 and owner-approved offer/content
+
+- Measure a specific commercial objective before adding UI. Keep guest checkout short, phone controls accessible, notices dismissible, motion preferences respected and optional measurement off by default.
+- Done with an owner-approved promotion, tested 320–414 px layouts and a measured review/stop date.
+
+### Task 54 — Evaluate courier integration
+
+**Status:** Planned — optional; separate approval for costs/contracts · **Depends on:** 49 and owner-approved courier terms
+
+- Prepare sandbox shipment creation, idempotency, authorization, customer-data minimization and manual fulfillment fallback. Confirm per-shipment/API fees before any live connection.
+- Done with verified shipment/status reconciliation and an owner-approved commercial arrangement.
+
+### Task 55 — Evaluate self-service account recovery
+
+**Status:** Planned — optional; paid SMS requires separate approval · **Depends on:** 49 and an approved identity/recovery policy
+
+- Design recovery around verified identities and the actually available free channel, with rate limits, expiry, single-use tokens and privacy-preserving responses. Phone knowledge alone must not reveal orders or authorize access.
+- Done with isolated abuse/privacy checks and a real recovery-channel acceptance test; retain guest checkout.
 
 ## Launch gates
 
