@@ -5,10 +5,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ -f "$ROOT/.env" ]]; then set -a; source "$ROOT/.env"; set +a; fi
 for tool in docker go node npm curl python3 setsid; do command -v "$tool" >/dev/null || { echo "Install $tool first" >&2; exit 1; }; done
 api_port=${LB_API_PORT:-8080}; store_port=${LB_STORE_PORT:-8787}; db_port=${LB_DB_PORT:-55432}
-python3 - "$api_port" "$store_port" "$db_port" <<'PY'
+python3 - "$api_port" "$store_port" "$db_port" "${LB_ISOLATED:-0}" <<'PY'
 import socket,sys
-ports=[int(p) for p in sys.argv[1:]]
-if len(set(ports))!=3 or any(p<1024 or p>65535 for p in ports): raise SystemExit('Choose three distinct local ports above 1023')
+ports=[int(p) for p in sys.argv[1:4]]
+if sys.argv[4] == "1" and ports[2] == 0:
+    ports.pop()
+if len(set(ports))!=len(ports) or any(p<1024 or p>65535 for p in ports): raise SystemExit('Choose three distinct local ports above 1023')
 for port in ports[:2]:
     with socket.socket() as s:
         try:s.bind(('127.0.0.1',port))
@@ -26,7 +28,14 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 if [[ ${LB_ISOLATED:-0} == 1 ]]; then
  db_name="lb-dev-test-$$"
- docker run -d --rm --name "$db_name" -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb -p "127.0.0.1:$db_port:5432" postgres:17-alpine >/dev/null
+ publish_port=$db_port
+ if [[ $db_port == 0 ]]; then publish_port=""; fi
+ docker run -d --rm --name "$db_name" -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb -p "127.0.0.1:$publish_port:5432" postgres:17-alpine >/dev/null
+ if [[ $db_port == 0 ]]; then
+  db_address=$(docker port "$db_name" 5432/tcp)
+  db_port=${db_address##*:}
+  [[ $db_port =~ ^[0-9]+$ ]] || { echo "Could not resolve the isolated PostgreSQL port" >&2; exit 1; }
+ fi
 else
  docker start lbpg >/dev/null 2>&1 || docker run -d --name lbpg -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb -p "127.0.0.1:$db_port:5432" postgres:17-alpine >/dev/null
 fi

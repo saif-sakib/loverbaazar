@@ -91,7 +91,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Prepare least-privilege GitHub/Cloudflare/Render access, 2FA/recovery ownership, restricted production secrets, minimal workflow permissions, pinned third-party action revisions and dependency update/security checks that remain free.
 - Define branch protection or the available free equivalent and a token-expiry recovery procedure. Verify untrusted pull requests cannot access deploy/backup secrets. Account changes requiring owner access remain explicit pending steps.
 
-**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md). GitHub 2FA/read-only workflow defaults verified; main protection and other service-account/recovery checks remain owner actions.
+**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md). GitHub 2FA and read-only workflow defaults were verified. Main protection enforces Store CI on current pull requests, including for administrators. Other provider account and recovery checks remain owner actions.
 
 ### Task 5 — Harden API, admin and customer privacy boundaries
 
@@ -264,9 +264,11 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 ### Task 21 — Reconcile and approve the sellable product database
 
-**Status:** In progress — protected review/apply workflow ready; actual catalog approval pending · **Depends on:** 16, 18, 20
+**Status:** In progress — protected review/apply workflow ready; actual stock approval pending · **Depends on:** 16, 18, 20
 
 **Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
+
+**Live audit, 18 November 2026.** The isolated restore of the production archive contained 291 active catalog entries. Of those, 267 had exactly 100 units, the historical seed quantity. Confirm these against actual stock before relying on them for sales.
 
 - Produce a product-by-product review of real names/models, category, SKU/options, stock quantity, current/regular price, description, specifications, images, warranty and active status. Resolve duplicates, placeholder content, missing photos and unsupported options.
 - Give the owner a practical review/import/admin-edit process. Capture corrections as safe deltas or a controlled prelaunch reconciliation, never a blind stock overwrite during sales.
@@ -302,7 +304,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Map changed URLs and legacy images/downloads to their closest relevant destinations; retain useful old query-link behavior. Review broad existing redirects for soft-404s. Genuine missing resources return an actual 404/410, without universal homepage redirects or redirect chains.
 - Define HTTPS, apex/www, canonical query/filter and staging URL policies. Verify the complete ledger, unusual encodings, redirects and status codes; protect commercially important URLs with regression checks.
 
-**Evidence, 18 November 2026.** Public sitemap ledger and exact path/query aliases implemented. Local comparison covered 348 URLs, with 336 direct, eight equivalent alias redirects, and four private decisions pending. Complete real-export, asset and Search Console/backlink coverage before cutover. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** Public sitemap ledger and exact path/query aliases implemented. Local comparison covered 348 URLs, with 336 direct, eight equivalent alias redirects, and four private decisions pending. The implemented aliases use public WordPress sitemap evidence. Complete private Search Console/backlink and catalog archive coverage. [Results and remaining actions](seo-performance-results.md)
 
 
 ### Task 25 — Finish on-page SEO and indexing rules
@@ -313,7 +315,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Align sitemap inclusion with canonical/indexable active content, excluding admin/account/cart/checkout/search/tracking, drafts and intentional noindex pages. Make preview indexing protection environment-aware and preserve Search Console verification.
 - Verify unique meaningful titles/descriptions, one primary H1, canonical correctness, noindex/robots behavior and valid share images. Do not claim robots disallow makes private data secure or reliably removes an already indexed URL.
 
-**Evidence, 18 November 2026.** Editable product/category/page/post search properties, preview protection, canonical build checks and production sitemap generated from page heads. Local production-shaped build passed. Actual approved policy/catalog metadata, live images and Search Console verification are pending. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** Editable product/category/page/post search properties, preview protection, canonical build checks and production sitemap generated from page heads. Local production-shaped build passed. The custom domain initially served a preview artifact with a sitemap 404. The production release must be verified on the domain and the owner must submit the production sitemap in Search Console. Business metadata approval remains pending. [Results and remaining actions](seo-performance-results.md)
 
 
 ### Task 26 — Make product structured data and feeds trustworthy
@@ -335,7 +337,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Reduce unused font weights/subsets while retaining Bangla/English glyph coverage and stable fallback layout. Verify broken-image handling, zoom quality and gallery sizing.
 - Measure mobile network/image transfers and layout shift on home, category and product pages. Done with recorded before/after evidence and acceptable Cloudinary credit use; do not trade an oversized original for uncontrolled per-device transformation costs.
 
-**Evidence, 18 November 2026.** Bounded responsive Cloudinary image URLs, priority/lazy loading, gallery zoom and self-hosted Latin/Bangla fonts implemented. Fixture measurements completed. Confirm real Cloudinary photo quality, migration coverage and free-tier usage. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** Bounded responsive Cloudinary image URLs, priority/lazy loading, gallery zoom and self-hosted Latin/Bangla fonts implemented. Fixture measurements completed. The live catalog exposed 291 products with Cloudinary galleries. The Cloudinary Free account reported 6.64% of its credits in use during the audit. Confirm visual quality and complete archival coverage. [Results and remaining actions](seo-performance-results.md)
 
 
 ### Task 28 — Set and meet frontend performance budgets
@@ -346,7 +348,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Initial targets: ordinary storefront first-load transfer ≤1 MB, compressed first-party JS ≤75 KB and CSS ≤40 KB, with separately recorded image/font budgets. Adjust targets only with documented measurements and a reason; do not hide regressions by changing thresholds silently.
 - Target LCP ≤2.5 s, INP ≤200 ms and CLS ≤0.1; lab measurements are prelaunch evidence, field 75th-percentile results come later. Verify cold/warm cache and meaningful input interactions. [Metric definitions](https://web.dev/articles/vitals)
 
-**Evidence, 18 November 2026.** Repeatable cold/warm phone-profile lab and documented byte thresholds. All representative fixture pages passed. Repeat against the approved catalog and hosted release, then collect field results when eligible. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** Repeatable cold/warm phone-profile lab and documented byte thresholds. All representative fixture pages passed. The hosted homepage, shop, anodized category and induction product measured 166–386 kB cold transfer and 0.93–1.51 s lab LCP. Collect real-device and field results when eligible. [Results and remaining actions](seo-performance-results.md)
 
 
 ### Task 29 — Add useful, private and free measurement
@@ -368,7 +370,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Check Bangla numerals/phone entry, mixed-language long names, address wrapping, font coverage and clear local currency/date presentation. Do not add a partially translated language switcher that promises unsupported content.
 - Verify with automated accessibility checks plus manual keyboard/screen-reader and 200% zoom checks. Done when critical journeys have no unresolved serious accessibility barriers and any remaining limitations are recorded.
 
-**Evidence, 18 November 2026.** Resolved automated contrast, accessible naming and link issues. Axe, keyboard/reflow and disposable Bangla guest checkout passed. Finish real 200% zoom, TalkBack/VoiceOver and final content checks. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** Resolved automated contrast, accessible naming and link issues. Axe, keyboard/reflow and disposable Bangla guest checkout passed. The hosted public-page and admin sign-in scan also reported zero tested violations. Finish real 200% zoom, TalkBack/VoiceOver and final content checks. [Results and remaining actions](seo-performance-results.md)
 
 
 ## Tasks 31–37: CI/CD, hosting and DevOps
@@ -392,7 +394,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Build and validate a specific catalog/content revision; record commit, artifact hash, release ID and deployment status. Separate content-only publication from code release while reusing required artifact/data checks. Serialize final promotions so an old build cannot replace a newer one.
 - Verify failed API readiness, failed content fetch/build, cancelled publish and failed promotion keep the previous working release. Rehearse code/asset rollback without restoring or discarding current customer orders.
 
-**Evidence, 18 November 2026.** Added exact-commit Render/API readiness gates and serialized Cloudflare version upload, artifact fingerprint, promotion and guarded rollback. Local tests covered stale and failed candidates. Hosted validation awaits existing-service configuration and one coordinated run.
+**Evidence, 18 November 2026.** Added exact-commit Render/API readiness gates and serialized Cloudflare version upload, artifact fingerprint, promotion and guarded rollback. Local tests covered stale and failed candidates. The [coordinated photo release](https://github.com/saif-sakib/loverbaazar/actions/runs/44286387664) passed on the same Worker and Render revision. Record the production release and retain non-disruptive rollback evidence.
 
 
 ### Task 33 — Configure and verify the free hosting accounts
@@ -403,7 +405,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Verify actual account tiers, no payment method/add-ons, limits, TLS, origin secret, custom/preview hostname behavior, static headers/redirects, bot hostnames and catalog build access. Record intended free failure behavior, asset/file limits and the keep-alive cron's quota/terms implications.
 - Smoke-test the preview deployment and production-safe configuration. Update `docs/go-live.md` with current instructions and remove stale fixed counts/email assumptions. Do not change Namecheap DNS or attach the live domain in this task.
 
-**Evidence, 18 November 2026.** Added a reviewable existing-service configuration, Free asset checks and current preview probe. The previous preview was reachable, with differing API and Worker SHAs. Verify plan, zero billing, TLS and secrets in the existing provider dashboards and run the coordinated preview.
+**Evidence, 18 November 2026.** Added a reviewable existing-service configuration, Free asset checks and current preview probe. The live custom domain served HTTPS and returned the matching API/Worker revision. Provider APIs verified Cloudflare zone Free, Render Free in Singapore with auto-deploy off, Cloudinary Free and Brevo Free. Neon and payment-method checks still require the owner’s dashboard.
 
 
 ### Task 34 — Make order notifications observable and recoverable
@@ -425,7 +427,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Keep backup keys recoverable outside the hosting accounts/repository and raw dumps out of public artifacts/logs. Check actual artifact quotas/access and the public-repository scheduled-workflow inactivity rule; provide an owner-operated offline backup fallback.
 - Verify dump/encryption failures, a corrupt/empty artifact and expiry cleanup. Proposed baseline recovery point objective is ≤24 hours of data loss, subject to owner acceptance; do not imply nightly backups provide zero-loss recovery.
 
-**Evidence, 18 November 2026.** Added verified encrypted new-store snapshots, seven-day artifact retention, and a separate freshness check and offline command. Local corruption, weak key, empty and dump-failure checks passed. Existing hosted backup history had failing dump/encrypt runs. Confirm a new hosted archive and owner-held recovery key.
+**Evidence, 18 November 2026.** Added verified encrypted new-store snapshots, seven-day artifact retention, and a separate freshness check and offline command. Local corruption, weak key, empty and dump-failure checks passed. The [current nightly workflow](https://github.com/saif-sakib/loverbaazar/actions/runs/44290663888) created a verified encrypted PostgreSQL 18 archive and the [freshness check](https://github.com/saif-sakib/loverbaazar/actions/runs/44290882632) passed. Keep a separate offline copy and recovery key and retain required originals.
 
 
 ### Task 36 — Rehearse restore, rollback and incident recovery
@@ -436,7 +438,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Write procedures for lost credentials, Render restart, Neon suspension, failed migration, bad release, corrupt content and missing images. Separate code rollback, domain rollback and disaster restore; freeze/reconcile writes before any data replacement.
 - Simulate orders created after a backup and prove the recovery plan explicitly preserves/reconciles them. Done with a successful restore report and exact commands/owner steps, not only a green backup job.
 
-**Evidence, 18 November 2026.** Restored a verified encrypted backup into an isolated empty PostgreSQL database in one to two seconds in the fixture. Verified totals, stock, settings/content/media and the later source order. Exercised guarded Worker rollback with simulated provider state. Owner-key archive and hosted-scale timing are pending.
+**Evidence, 18 November 2026.** Restored a verified encrypted backup into an isolated empty PostgreSQL database in one to two seconds in the fixture. Verified totals, stock, settings/content/media and the later source order. Exercised guarded Worker rollback with simulated provider state and independently decrypted and restored the actual hosted archive into a disposable loopback PostgreSQL 18 database. Confirm the owner can retrieve the offline archive and key.
 
 
 ### Task 37 — Add operational visibility, quotas and failure handling
@@ -447,7 +449,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Define quota reviews and warnings at roughly 70/85/95% with service-specific remedies, including storage, CU-hours, egress, Worker requests/CPU, image credits, email sends and Actions artifacts/runs. Alerts do not authorize payment or upgrades.
 - Exercise origin sleep/down, missing snapshots, exhausted API access, stale price/stock and closed ordering. Record warm/cold latency and the free-stack availability limitation. Done when customers get a recovery path and the owner knows what failed, who acts and how to stay within $0.
 
-**Evidence, 18 November 2026.** Added request references, sanitized API failure logs, API/admin counters, asset-aware stock cache and upstream retry responses. Removed automatic keep-awake traffic from code and documented quota responses. Warm preview health/readiness measured about 0.31/0.43 seconds. Real cold-start and account quota checks remain pending.
+**Evidence, 18 November 2026.** Added request references, sanitized API failure logs, API/admin counters, asset-aware stock cache and upstream retry responses. Removed automatic keep-awake traffic from code and documented quota responses. The apex returned a retryable 503 during one warm-up and later returned ready with the matching API revision. Provider checks confirmed several free tiers and the hosted backup freshness alert. Dashboard quota and owner notification checks remain pending.
 
 
 ## Tasks 38–42: release verification
