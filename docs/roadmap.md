@@ -699,6 +699,23 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 - Design recovery around verified identities and the actually available free channel, with rate limits, expiry, single-use tokens and privacy-preserving responses. Phone knowledge alone must not reveal orders or authorize access.
 - Done with isolated abuse/privacy checks and a real recovery-channel acceptance test; retain guest checkout.
 
+## Post-launch fixes
+
+### Task 56 — Fit desktop invoices and simplify order fulfillment
+
+**Status:** In progress, verified locally and awaiting production acceptance · **Depends on:** 16, 34
+
+- Keep the desktop invoice centered within the viewport and preserve the A4 print layout. Check narrow phones, short laptop windows, long text and multipage printing.
+- Show the saved status in the order list. Use Manage to edit status, courier, tracking and a private note in one save. Keep Invoice and copy-address access, payment verification guidance and the stock-return confirmation.
+- Keep the order receipt at checkout. Queue Brevo customer notifications for shipped, cancelled and returned. Include saved courier and tracking when handing off the shipment. Each status email is queued at most once per order. Confirmed, delivered and detail-only edits update tracking without queuing an email. A return or cancellation notice describes the saved status and leaves any refund or replacement to a separate verified update from the shop. Admin → Operations shows queued and provider outcomes.
+
+**Verification, 19 November 2026.** The isolated API race suite checked email eligibility, deduplication, stale status conflicts and recipient privacy. The isolated browser flow saved fulfillment changes through Manage and verified the invoice at 320, 360, 375, 390, 414, 768, 1024 and 1440 px, including a long address. One-page and three-page A4 PDFs kept printed text away from every edge, repeated item headings and retained totals and the thank-you line. A separate browser test verified payment guidance, the queued-email message and double-submit protection. The fixture sent no live mail.
+
+**Actions required**
+
+1. Merge the reviewed change through the regular release workflow.
+2. Once deployed, open an invoice on the desktop that had clipping. Use a controlled order and inbox to confirm the shipment email contains the saved courier and tracking number. Check its delivery outcome in Admin → Operations.
+
 ## Launch gates
 
 Tasks 43–46 cannot bypass these gates because a preview looks good:

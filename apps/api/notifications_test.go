@@ -103,3 +103,60 @@ func TestNotificationQuotaDoesNotSend(t *testing.T) {
 		t.Fatal(state, attempts, err)
 	}
 }
+
+func TestOrderStatusMailFollowsSavedChanges(t *testing.T) {
+	reset(t)
+	old := dev
+	defer func() { dev = old }()
+	dev = false
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("BREVO_KEY", "")
+	t.Setenv("CUSTOMER_ORDER_EMAIL", "true")
+	t.Setenv("SITE_URL", "https://shop.example.invalid")
+
+	if _, err := db.Exec(bg, `INSERT INTO orders(number,name,phone,email,address,area,payment,subtotal,shipping,total)
+		VALUES ('LB-MAIL','Fixture','01710000000','buyer@example.invalid','Fixture address','Jashore','COD',100,0,100),
+		       ('LB-NO-MAIL','Fixture','01710000000','','Fixture address','Jashore','COD',100,0,100)`); err != nil {
+		t.Fatal(err)
+	}
+	update := func(number string, fields M, wantCode int, wantMail bool) {
+		t.Helper()
+		code, out := call(t, nil, "PUT", "/api/admin/orders/"+number, fields, true)
+		if code != wantCode || code == 200 && out["emailQueued"] != wantMail {
+			t.Fatalf("update %v returned %d %v", fields, code, out)
+		}
+	}
+	update("LB-MAIL", M{"status": "confirmed", "expectedStatus": "pending"}, 200, false)
+	update("LB-MAIL", M{"status": "shipped", "expectedStatus": "pending", "tracking": "UNSAVED"}, 409, false)
+	update("LB-MAIL", M{"status": "shipped", "expectedStatus": "confirmed", "tracking": "FIXTURE-42", "courier": "Fixture courier", "adminNote": "Private note"}, 200, true)
+	update("LB-MAIL", M{"status": "shipped", "tracking": "FIXTURE-43"}, 200, false)
+	update("LB-MAIL", M{"status": "delivered"}, 200, false)
+	update("LB-MAIL", M{"status": "shipped"}, 200, false)
+	update("LB-NO-MAIL", M{"status": "cancelled"}, 200, false)
+	update("LB-MAIL", M{"status": "returned"}, 200, true)
+	update("LB-MAIL", M{"status": "cancelled"}, 200, true)
+	t.Setenv("CUSTOMER_ORDER_EMAIL", "false")
+	if _, err := db.Exec(bg, `UPDATE orders SET email='buyer@example.invalid' WHERE number='LB-NO-MAIL'`); err != nil {
+		t.Fatal(err)
+	}
+	update("LB-NO-MAIL", M{"status": "returned"}, 200, false)
+
+	var payload []byte
+	if err := db.QueryRow(bg, `SELECT payload FROM order_notifications WHERE kind='customer_shipped'`).Scan(&payload); err != nil {
+		t.Fatal(err)
+	}
+	var message mailPayload
+	if err := json.Unmarshal(payload, &message); err != nil {
+		t.Fatal(err)
+	}
+	if len(message.To) != 1 || message.To[0] != "buyer@example.invalid" ||
+		!strings.Contains(message.Text, "Tracking number: FIXTURE-42") ||
+		!strings.Contains(message.Text, "https://shop.example.invalid/track/") ||
+		strings.Contains(message.Text, "Private note") || strings.Contains(message.Text, "UNSAVED") {
+		t.Fatalf("incorrect shipment mail: %+v", message)
+	}
+	var jobs int
+	if err := db.QueryRow(bg, `SELECT count(*) FROM order_notifications`).Scan(&jobs); err != nil || jobs != 3 {
+		t.Fatalf("want shipment, cancellation and return notices, got %d: %v", jobs, err)
+	}
+}

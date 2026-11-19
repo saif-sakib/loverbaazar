@@ -18,8 +18,9 @@
   const view = () => $("#view");
 
   const STATUSES = ["pending", "confirmed", "shipped", "delivered", "cancelled", "returned"];
-  const statusOptions = (current) =>
-    STATUSES.map((v) => `<option value="${v}" ${v === current ? "selected" : ""}>${v[0].toUpperCase() + v.slice(1)}</option>`).join("");
+  const statusLabel = (status) => status[0].toUpperCase() + status.slice(1);
+  const statusOptions = (current, options = STATUSES) =>
+    options.map((v) => `<option value="${v}" ${v === current ? "selected" : ""}>${statusLabel(v)}</option>`).join("");
 
   // Direct 1-click grouped navigation; related sections also share top subtabs.
   const NAV_GROUPS = [
@@ -49,7 +50,7 @@
   const HEADS = {
     operations: ["Operations", "Check API readiness and recover order notifications.", ""],
     dashboard: ["Shop overview", "Your shop today, and quick links to the tasks you do most.", ""],
-    orders: ["Orders", "Find orders, update shipping status, save courier tracking, or print invoices. Status updates appear on order tracking immediately.", ""],
+    orders: ["Orders", "Find orders, manage fulfillment, and print invoices.", ""],
     messages: ["Messages", "Read and manage customer questions.", ""],
     reviews: ["Reviews", "Customer product reviews waiting for moderation. Approved reviews appear on product pages after you click Publish.", "pub"],
     products: ["Products", "Edit prices, old prices, stock, and visibility inline — they save automatically and go live in ~2 minutes. Click Edit for names, photos, categories, and descriptions.", "both"],
@@ -651,15 +652,20 @@
     const [ops, mail, photos] = await Promise.all([api("/operations"), api("/notifications"), api("/image/status")]);
     const count = ops.checkoutResponses;
     const states = { pending: "Pending", sending: "Sending", accepted: "Accepted by Brevo", failed: "Failed", uncertain: "Check Brevo before retrying" };
+    const mailKinds = {
+      owner: "Shop · new order", customer: "Customer · receipt",
+      customer_shipped: "Customer · shipped",
+      customer_cancelled: "Customer · cancelled", customer_returned: "Customer · returned",
+    };
     view().innerHTML = `<div class="panel"><h3>API and checkout</h3>
       <p>${ops.ready ? "API ready" : "API starting"} · Build <code>${esc(ops.version)}</code></p>
       <p>Checkout responses since startup: ${count["2xx"]} successful, ${count["4xx"]} request errors, ${count["5xx"]} service errors.</p>
       <a class="link" href="#publish">Publication status</a>
     </div><div class="panel"><h3>Order email</h3><p>${mail.enabled ? "Order email enabled" : "Order email paused or unavailable"} · ${mail.today} recipient attempts today (UTC).</p>
       ${mail.testConfigured ? '<button type="button" id="testmail" class="btn ghost">Send test email</button>' : ""}
-      <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Order</th><th scope="col">Recipient</th><th scope="col">Status</th><th scope="col">Attempts</th><th scope="col">Action</th></tr></thead><tbody>
-      ${mail.notifications.map(m => `<tr><td>${esc(m.order)}</td><td>${esc(m.kind)}</td><td>${esc(states[m.state])}${m.outcome ? `<br><small>${esc(m.outcome.replaceAll("_", " "))}</small>` : ""}</td><td>${m.attempts}/3</td><td>
-        ${mail.enabled && m.attempts < 3 && ["pending", "failed", "uncertain"].includes(m.state) ? `<button type="button" class="btn ghost" data-retry-mail="${m.id}" data-state="${esc(m.state)}" aria-label="Retry ${esc(m.kind)} email for ${esc(m.order)}">Retry</button>` : ""}
+      <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Order</th><th scope="col">Email</th><th scope="col">Status</th><th scope="col">Attempts</th><th scope="col">Action</th></tr></thead><tbody>
+      ${mail.notifications.map(m => `<tr><td>${esc(m.order)}</td><td>${esc(mailKinds[m.kind] || m.kind)}</td><td>${esc(states[m.state])}${m.outcome ? `<br><small>${esc(m.outcome.replaceAll("_", " "))}</small>` : ""}</td><td>${m.attempts}/3</td><td>
+        ${mail.enabled && m.attempts < 3 && ["pending", "failed", "uncertain"].includes(m.state) ? `<button type="button" class="btn ghost" data-retry-mail="${m.id}" data-state="${esc(m.state)}" aria-label="Retry ${esc(mailKinds[m.kind] || m.kind)} email for ${esc(m.order)}">Retry</button>` : ""}
         ${m.state === "uncertain" ? `<small>Brevo tag: lb-order-mail-${m.id}</small>` : ""}
       </td></tr>`).join("") || '<tr><td colspan="5">There are no order notifications yet.</td></tr>'}
       </tbody></table></div></div>`;
@@ -711,28 +717,15 @@
       orderFilter.q = "";
       orderFilter.page = 0;
     }
-    const pills = [["", "All"], ...STATUSES.map((s) => [s, s[0].toUpperCase() + s.slice(1)])];
-    view().innerHTML = `<div class="qfilters">${pills.map(([v, lbl]) => `<button type="button" class="qpill ${orderFilter.status === v ? "on" : ""}" data-fst="${v}">${lbl}</button>`).join("")}</div>
-      <div class="toolbar">
+    view().innerHTML = `<div class="toolbar">
       <input id="oq" type="search" placeholder="Search order #, phone, name or address" value="${esc(orderFilter.q)}" aria-label="Search orders">
-      <select id="ost" aria-label="Status"><option value="">All statuses</option>${statusOptions(orderFilter.status)}</select>
+      <select id="ost" aria-label="Filter by status"><option value="">All statuses</option>${statusOptions(orderFilter.status)}</select>
       <label class="check toolbar-date">From <input id="ofrom" type="date" value="${esc(orderFilter.from)}"></label><label class="check toolbar-date">To <input id="oto" type="date" value="${esc(orderFilter.to)}"></label>
       <button class="btn ghost" id="csv">Download Excel CSV</button></div><div id="olist"><div class="panel empty-state">Loading…</div></div>`;
     const reload = () => {
       orderFilter.page = 0;
       drawOrders();
     };
-    const syncPills = () => {
-      $$("[data-fst]").forEach((b) => b.classList.toggle("on", b.dataset.fst === orderFilter.status));
-    };
-    $$("[data-fst]").forEach((b) => {
-      b.onclick = () => {
-        orderFilter.status = b.dataset.fst;
-        $("#ost").value = orderFilter.status;
-        syncPills();
-        reload();
-      };
-    });
     let t;
     $("#oq").oninput = (e) => {
       clearTimeout(t);
@@ -743,7 +736,6 @@
     };
     $("#ost").onchange = (e) => {
       orderFilter.status = e.target.value;
-      syncPills();
       reload();
     };
     $("#ofrom").onchange = (e) => {
@@ -765,39 +757,40 @@
     await drawOrders();
   });
 
-  const drawOrders = run(async () => {
+  const drawOrders = run(async (focusOrder) => {
     if (unsaved && $("form[data-n]", view()) && !confirm(LEAVE)) return;
     unsaved = false;
     const res = await api("/orders?" + query());
     const l = res.orders;
     const pages = Math.ceil(res.total / res.size);
-    const quickBtn = (o) => {
-      if (o.status === "pending") return `<button type="button" class="link primary-act" data-step="confirmed" data-num="${esc(o.number)}">✓ Confirm</button> `;
-      if (o.status === "shipped") return `<button type="button" class="link primary-act" data-step="delivered" data-num="${esc(o.number)}">✓ Delivered</button> `;
-      return "";
-    };
-    $("#olist").innerHTML = `<div class="summary-bar"><span><b>${res.total}</b> orders · <b>${money(res.sales)}</b> sales, excluding cancelled and returned</span><span>Use Confirm / Ship / Delivered for 1-click updates, or Details for courier &amp; notes.</span></div>
-    <div class="scroll"><table class="tbl"><thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-    ${
-      l
-        .map(
-          (o) => `<tr data-order-row>
-      <td class="nowrap" data-l="Order"><b>${esc(o.number)}</b><br><small>${esc(when(o.created_at))}</small></td>
-      <td data-l="Customer">${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}${o.bad_phone > 0 ? ` <span class="tag warn">${o.bad_phone} cancelled or returned</span>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a>${o.email ? `<br><a class="link" href="mailto:${esc(o.email)}">${esc(o.email)}</a>` : ""}<br>${esc(o.address)} (${esc(o.area)})${o.note ? `<br><i>${esc(o.note)}</i>` : ""}</td>
-      <td data-l="Items">${(o.items || []).map((i) => `${esc(i.name)} × ${i.qty}`).join("<br>")}</td>
-      <td data-l="Total">${money(o.total)}${o.discount ? `<br><small>${money(o.discount)} off, ${esc(o.coupon)}</small>` : ""}</td>
-      <td data-l="Payment">${esc(o.payment)}<br><small>${esc(o.txn_id)}</small>${o.txn_id && o.status === "pending" ? '<small class="order-payment-note">Verify this transaction in your payment account before confirming.</small>' : ""}</td>
-      <td data-l="Status"><select class="status" data-st="${esc(o.status)}" data-o="${esc(o.number)}" aria-label="Status of ${esc(o.number)}">${statusOptions(o.status)}</select></td>
-      <td class="actions">${quickBtn(o)}${o.status === "confirmed" ? `<button type="button" class="link primary-act" data-more="${esc(o.number)}" data-ship-focus>📦 Ship / Track</button>` : `<button type="button" class="link" data-more="${esc(o.number)}">Details</button>`} <button type="button" class="link" data-print="${esc(o.number)}">Invoice</button></td>
+    const closed = (status) => status === "cancelled" || status === "returned";
+    const emailUpdates = new Map([["shipped", "shipping"], ["cancelled", "cancellation"], ["returned", "return"]]);
+    $("#olist").innerHTML = `<div class="summary-bar"><span><b>${res.total}</b> orders · <b>${money(res.sales)}</b> sales, excluding cancelled and returned</span></div>
+    <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Order</th><th scope="col">Customer</th><th scope="col">Total</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead><tbody>
+    ${l.map((o) => `<tr data-order-row>
+      <td data-l="Order"><b>${esc(o.number)}</b><br><small>${esc(when(o.created_at))}</small></td>
+      <td data-l="Customer">${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}${o.bad_phone > 0 ? ` <span class="tag warn">${o.bad_phone} cancelled or returned</span>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a></td>
+      <td data-l="Total">${money(o.total)}<br><small>${esc(o.payment)}</small></td>
+      <td data-l="Status"><span class="tag ${esc(o.status)}">${esc(statusLabel(o.status))}</span></td>
+      <td class="actions"><button type="button" class="link" data-more="${esc(o.number)}" aria-expanded="false" aria-controls="d-${esc(o.number)}">Manage</button> <button type="button" class="link" data-print="${esc(o.number)}">Invoice</button></td>
     </tr>
-    <tr id="d-${esc(o.number)}" class="detail-row" hidden><td colspan="7"><form class="inlineform" data-n="${esc(o.number)}">
-      ${field("Courier", "courier", o.courier, "", "text", "Shown on /track/.")}
-      ${field("Tracking number", "tracking", o.tracking, "", "text", "Shown on /track/.")}
-      ${field("Private note", "adminNote", o.admin_note, "", "text", "Staff only.")}
-      <div class="inlineform-actions"><button class="btn">Save details</button>${o.status === "cancelled" || o.status === "returned" ? "" : ` <button type="button" class="btn pub-now" data-ship="${esc(o.number)}">Save & Mark Shipped</button>`} <button type="button" class="btn ghost small" data-copy="${esc(o.number)}">Copy address</button></div></form></td></tr>`,
-        )
-        .join("") || `<tr><td colspan="7" class="empty-cell">No orders match these filters.</td></tr>`
-    }</tbody></table></div>
+    <tr id="d-${esc(o.number)}" class="detail-row" hidden><td colspan="5">
+      <div class="order-details">
+        <section><h3>Delivery address</h3><p>${esc(o.address)} (${esc(o.area)})${o.note ? `<br><b>Customer note:</b> ${esc(o.note)}` : ""}</p><button type="button" class="btn ghost small" data-copy="${esc(o.number)}">Copy address</button></section>
+        <section><h3>Items &amp; payment</h3><p>${(o.items || []).map((i) => `${esc(i.name)} × ${i.qty}`).join("<br>")}
+          ${o.discount ? `<br>${money(o.discount)} off (${esc(o.coupon)})` : ""}
+          ${o.txn_id ? `<br>Transaction reference: ${esc(o.txn_id)}` : ""}
+          ${o.txn_id && o.status === "pending" ? '<strong class="order-payment-note">Verify this transaction in your payment account before confirming.</strong>' : ""}</p></section>
+      </div>
+      <form class="order-edit" data-n="${esc(o.number)}">
+        <label class="field"><span class="flabel">Order status</span><select name="status">${statusOptions(o.status, closed(o.status) ? STATUSES.filter(closed) : STATUSES)}</select></label>
+        ${field("Courier", "courier", o.courier, "", "text", "Shown on order tracking.")}
+        ${field("Tracking number", "tracking", o.tracking, "", "text", "Add it before marking shipped if available.")}
+        ${field("Private note", "adminNote", o.admin_note, "", "text", "Staff only.")}
+        <div class="order-save"><p class="order-mail-note" aria-live="polite">${o.email ? `Order email: ${esc(o.email)}` : "No customer email on this order."}</p>
+          <button type="submit" class="btn" disabled>Save order</button></div>
+      </form>
+    </td></tr>`).join("") || `<tr><td colspan="5" class="empty-cell">No orders match these filters.</td></tr>`}</tbody></table></div>
     ${pages > 1 ? `<div class="pager"><button class="btn ghost" id="prev" ${orderFilter.page ? "" : "disabled"}>Previous</button> Page ${orderFilter.page + 1} of ${pages} <button class="btn ghost" id="next" ${orderFilter.page + 1 < pages ? "" : "disabled"}>Next</button></div>` : ""}`;
     if ($("#prev")) {
       $("#prev").onclick = () => {
@@ -817,65 +810,57 @@
         orders();
       };
     });
-    $$("[data-step]").forEach((b) => {
-      b.onclick = run(async () => {
-        if (unsaved && !confirm(LEAVE)) return;
-        unsaved = false;
-        await api("/orders/" + encodeURIComponent(b.dataset.num), { method: "PUT", body: { status: b.dataset.step } });
-        say(`${b.dataset.num} is now ${b.dataset.step}.`);
-        counts();
-        await drawOrders();
-      });
-    });
-    $$("[data-o]").forEach((s) => {
-      s.onchange = run(async () => {
-        const previous = l.find((o) => o.number === s.dataset.o).status;
-        if (unsaved && !confirm(LEAVE)) { s.value = previous; return; }
-        unsaved = false;
-        if (
-          (s.value === "cancelled" || s.value === "returned") &&
-          !confirm(`Mark ${s.dataset.o} as ${s.value}? The stock goes back on sale.`)
-        ) {
-          s.value = previous;
-          return;
-        }
-        try {
-          await api("/orders/" + encodeURIComponent(s.dataset.o), { method: "PUT", body: { status: s.value } });
-          say(`${s.dataset.o} is now ${s.value}.`);
-          counts();
-        } finally {
-          await drawOrders();
-        }
-      });
-    });
     $$("[data-more]").forEach((b) => {
       b.onclick = () => {
-        const r = $(`[id="d-${b.dataset.more}"]`);
-        r.hidden = !r.hidden;
-        b.setAttribute("aria-expanded", String(!r.hidden));
-        if (!r.hidden && b.hasAttribute("data-ship-focus")) $('[name="courier"]', r)?.focus();
+        const open = $('[data-more][aria-expanded="true"]', view());
+        if (open) {
+          const previous = document.getElementById(open.getAttribute("aria-controls"));
+          const form = $("form", previous);
+          if (pendingActions.has(form)) return;
+          if (unsaved) {
+            if (!confirm(LEAVE)) return;
+            form.reset();
+            form.oninput();
+            unsaved = false;
+          }
+          previous.hidden = true;
+          open.setAttribute("aria-expanded", "false");
+          if (open === b) return;
+        }
+        document.getElementById(b.getAttribute("aria-controls")).hidden = false;
+        b.setAttribute("aria-expanded", "true");
       };
+      if (b.dataset.more === focusOrder) b.focus();
     });
-    $$("form[data-n]").forEach((f) => {
-      f.onsubmit = run(async (e) => {
-        e.preventDefault();
-        await api("/orders/" + encodeURIComponent(f.dataset.n), { method: "PUT", body: Object.fromEntries(new FormData(f)) });
-        unsaved = false;
-        say("Order updated.");
-        await drawOrders();
-      });
-    });
-    $$("[data-ship]").forEach((b) => {
-      b.onclick = run(async () => {
-        const f = b.closest("form");
-        await api("/orders/" + encodeURIComponent(f.dataset.n), {
-          method: "PUT",
-          body: { ...Object.fromEntries(new FormData(f)), status: "shipped" },
+    $$("form[data-n]").forEach((form) => {
+      const order = l.find((o) => o.number === form.dataset.n);
+      const original = Object.fromEntries(new FormData(form));
+      const changedFields = () => Object.fromEntries(
+        [...new FormData(form)].filter(([key, value]) => value !== original[key])
+      );
+      const save = $("button[type=submit]", form);
+      const mailNote = $(".order-mail-note", form);
+      const recipientNote = mailNote.textContent;
+      form.oninput = () => {
+        const changed = changedFields();
+        save.disabled = !Object.keys(changed).length || pendingActions.has(form);
+        const emailUpdate = emailUpdates.get(changed.status);
+        mailNote.textContent = emailUpdate && order.email
+          ? `Saving can queue a ${emailUpdate} email to ${order.email}.`
+          : recipientNote;
+      };
+      form.onsubmit = run(async () => {
+        const changed = changedFields();
+        if (!Object.keys(changed).length) return;
+        if (!closed(order.status) && closed(changed.status) &&
+          !confirm(`Mark ${order.number} as ${changed.status}? This returns the items to stock.`)) return;
+        const result = await api("/orders/" + encodeURIComponent(order.number), {
+          method: "PUT", body: { ...changed, expectedStatus: order.status },
         });
         unsaved = false;
-        say(`${f.dataset.n} marked shipped.`);
-        counts();
-        await drawOrders();
+        say(result.emailQueued ? "Order saved. Customer email queued." : "Order saved.");
+        if (changed.status) counts();
+        await drawOrders(order.number);
       });
     });
     $$("[data-copy]").forEach((b) => {
@@ -884,7 +869,7 @@
         if (!o) return;
         const text = `${o.name}\n${o.phone}\n${o.address} (${o.area})`;
         try {
-          if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+          await navigator.clipboard.writeText(text);
           say(`Address copied for ${o.number}.`);
         } catch {
           prompt("Copy customer address:", text);
