@@ -334,6 +334,8 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Verification, 19 November 2026.** The Pureit alias redirects to its corresponding product with the original query. Four old editorial URLs return actual 404s. Review their final disposition and any important old inbound links in Search Console before adding redirects.
 
+**Search Console follow-up, 19 November 2026.** Retested all 15 reported October server-error URLs. Two returned 200, the pressure cooker redirected to a live canonical page, and 12 returned 404. Added exact permanent redirects for that pressure cooker URL and the old chair page-one URL. The three numeric links and ambiguous cookware listing still need matching WordPress records. Retired feeds and malformed URLs return 404. All 50 supplied 404 examples still returned 404, and a crawl of all 571 current sitemap pages found no malformed internal privacy links.
+
 ### Task 25 — Finish on-page SEO and indexing rules
 
 **Status:** Done — current production sitemap verified and accepted in Search Console · **Depends on:** 22, 24

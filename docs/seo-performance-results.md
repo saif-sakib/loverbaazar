@@ -8,6 +8,12 @@ The public comparison processed 348 unique paths. The candidate preserved 336 di
 
 Local Wrangler returned 301 for equivalent slash/no-slash aliases, 301 for legacy `?s=` search and 404 for an unknown numeric link or arbitrary pagination. The asset and numeric mapping tests verify exact targets and negative cases. The production-shaped build test checked valid XML, canonical product with a percent-encoded Bangla URL, one product heading, GTIN checksum output, noindex exclusions, canonical duplicate removal and a draft with no artifact. It verified a new price and sold-out state in visible initial HTML, JSON-LD and product RSS. The preview version carried noindex/nofollow and had no sitemap. The API race suite also verified the publish snapshot preserves earlier editorial data during a price/stock refresh.
 
+### Search Console field data, 19 November 2026
+
+The exported Web Vitals charts show 13 November, before the storefront replacement. Mobile reported 218 poor and 23 needing improvement. Desktop reported 207 poor and 34 needing improvement. LCP was the main poor issue. Both device reports also showed layout shifts. The Google field data uses a rolling 28-day window. [Core Web Vitals report](https://support.google.com/webmasters/answer/9205520)
+
+A controlled Chromium check against the live replacement store on 19 November sampled home, shop, category and product pages. Cold emulated mobile LCP ranged from 0.96 to 2.05 seconds, with CLS below 0.001. The sampled mobile pages met the transfer budgets. Cold desktop LCP ranged from 0.61 to 1.46 seconds, with CLS below 0.015. Recheck the live field report as new visits accumulate.
+
 ## Measured mobile profile
 
 Chromium 390×844, DPR 2, 125 ms added latency, approximately 1.6 Mbit/s download and 4× CPU slowdown. Bytes are decimal KB of completed transfer from Chromium network events during the test window. Cold uses a fresh page context and warm revisits the same path in that context. Values are from one paired run and depend on image completion, caching and network conditions. The old WordPress photos are still in these fixture pages. After numbers cannot establish savings from migrated Cloudinary images.
