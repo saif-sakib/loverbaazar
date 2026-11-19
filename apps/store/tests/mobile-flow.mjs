@@ -63,6 +63,19 @@ try {
   assert.equal(missingAPI.headers()['cache-control'], 'no-store');
   assert.deepEqual(await missingAPI.json(), { error: 'not found' });
 
+  for (const [source, destination] of [
+    ['/product-category/chair/page/1/', '/product-category/chair/'],
+    ['/product/kiam-pressure-cooker-kiam-5-5-queen', '/product/kiam-pressure-cooker-kiam-5-5-queen/'],
+  ]) {
+    const redirect = await context.request.get(source, { maxRedirects: 0 });
+    assert.equal(redirect.status(), 301, source);
+    assert.equal(redirect.headers().location, destination, source);
+    const target = await context.request.get(destination, { maxRedirects: 0 });
+    assert.equal(target.status(), 200, destination);
+  }
+  const missingLegacyPage = await context.request.get('/product-category/chair/page/2/', { maxRedirects: 0 });
+  assert.equal(missingLegacyPage.status(), 404);
+
   const admin = await context.newPage();
   await request('PUT', '/api/admin/content/cat/fixture-kitchen', { name: 'Fixture Kitchen' });
   await request('PUT', '/api/admin/content/page/fixture-warranty', { title: 'Fixture warranty', html: '<p>Local warranty fixture.</p>' });
