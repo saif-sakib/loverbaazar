@@ -763,6 +763,8 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 
 **Verification, 19 November 2026.** The isolated API race and browser flows passed. Chromium checked eight widths from 320 to 1440 px. The one-page PDF and six-page mixed-language print stress case used A4, kept text more than 44 pt from the page edges and printed the saved total and the transaction reference. Item headings repeated and the last item and totals stayed together. The customer email and private staff note stayed out of both PDFs. The owner can review the fixture PDF and verify one copy from their print dialog before approving rollout.
 
+**Follow-up:** [Task 62](#task-62--download-a4-invoices-directly) replaces the browser print path while keeping the document structure.
+
 ### Task 59 — Set and verify customer and order retention
 
 **Status:** Planned, automatic removal is unscheduled · **Depends on:** 19, 35, 36
@@ -783,3 +785,12 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 
 - Investigate blocked mail in Brevo and verify representative customer receipt and shipment with a controlled inbox. Check sender authentication and review retry outcomes in Operations before considering more capacity.
 - Verify scheduled backups and freshness alerts on the current revision, and restore an independently held encrypted copy in an isolated database. Record who responds when a scheduled backup or mail fails.
+
+### Task 62 — Download A4 invoices directly
+
+**Status:** In progress, pending rollout · **Depends on:** 56, 58
+
+- Brave's print settings can override page margins and the admin page title becomes the suggested filename. Download an A4 PDF with its own margins and the saved order number as its filename. Build the document in the browser from the already authorized order data.
+- Keep the approved invoice sections, Bangla and English text, saved charges and totals, repeated headings and the last item with its totals. Load the PDF engine and fonts only when an administrator requests a download. Keep the preview and browser print controls out of the workflow.
+
+**Verification, 19 November 2026.** Brave downloaded a one-page checkout invoice and a five-page fixture with 60 English and Bangla line items. Both downloads used the order number as the filename. Poppler verified the A4 geometry, repeated amounts header and saved totals. Long unbroken codes wrapped within the item column. The last item, totals and shop contact appeared on the final page. The fixtures omit the customer's email and private staff note. After the coordinated release, download one saved order from live Admin to verify the result.

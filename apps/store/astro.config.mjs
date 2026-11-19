@@ -1,8 +1,18 @@
 import { defineConfig } from "astro/config";
-import { writeFile, readFile } from "node:fs/promises";
+import { copyFile, mkdir, writeFile, readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { buildIndex } from "./build-index.mjs";
 
 const site = new URL(process.env.SITE_ORIGIN || "https://loverbaazar.com");
+const require = createRequire(import.meta.url);
+const invoiceAssets = {
+  "pdfmake-0.3.14.js": "pdfmake/build/pdfmake.min.js",
+  "pdfmake-license.txt": "pdfmake/LICENSE",
+  "latin.woff": "@fontsource/noto-sans-bengali/files/noto-sans-bengali-latin-400-normal.woff",
+  "bold.woff": "@fontsource/noto-sans-bengali/files/noto-sans-bengali-latin-700-normal.woff",
+  "bengali.woff": "@fontsource/noto-sans-bengali/files/noto-sans-bengali-bengali-400-normal.woff",
+  "noto-sans-bengali-license.txt": "@fontsource/noto-sans-bengali/LICENSE",
+};
 if (site.protocol !== "https:" || site.href !== site.origin + "/") throw new Error("SITE_ORIGIN must be an HTTPS origin");
 
 export default defineConfig({
@@ -16,6 +26,10 @@ export default defineConfig({
       "astro:build:done": async ({ dir, pages }) => {
         const environment = process.env.BUILD_ENV || "preview";
         if (!["local", "preview", "production"].includes(environment)) throw new Error("Invalid BUILD_ENV");
+        const output = new URL("invoice-assets/", dir);
+        await mkdir(output, { recursive: true });
+        await Promise.all(Object.entries(invoiceAssets).map(([file, source]) =>
+          copyFile(require.resolve(source), new URL(file, output))));
         await buildIndex(dir, pages, site, environment);
         await writeFile(new URL("release.json", dir), JSON.stringify({
           id: process.env.BUILD_ID || "local", commit: process.env.GITHUB_SHA || "local", environment,

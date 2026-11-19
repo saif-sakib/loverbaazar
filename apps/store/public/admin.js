@@ -50,7 +50,7 @@
   const HEADS = {
     operations: ["Operations", "Check API readiness and recover order notifications.", ""],
     dashboard: ["Shop overview", "Your shop today, and quick links to the tasks you do most.", ""],
-    orders: ["Orders", "Find orders, manage fulfillment, and print invoices.", ""],
+    orders: ["Orders", "Find orders, manage fulfillment, and download invoices.", ""],
     messages: ["Messages", "Read and manage customer questions.", ""],
     reviews: ["Reviews", "Customer product reviews waiting for moderation. Approved reviews appear on product pages after you click Publish.", "pub"],
     products: ["Products", "Edit prices, old prices, stock, and visibility inline — they save automatically and go live in ~2 minutes. Click Edit for names, photos, categories, and descriptions.", "both"],
@@ -772,7 +772,7 @@
       <td data-l="Customer">${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}${o.bad_phone > 0 ? ` <span class="tag warn">${o.bad_phone} cancelled or returned</span>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a></td>
       <td data-l="Total">${money(o.total)}<br><small>${esc(o.payment)}</small></td>
       <td data-l="Status"><span class="tag ${esc(o.status)}">${esc(statusLabel(o.status))}</span></td>
-      <td class="actions"><button type="button" class="link" data-more="${esc(o.number)}" aria-expanded="false" aria-controls="d-${esc(o.number)}">Manage</button> <button type="button" class="link" data-print="${esc(o.number)}">Invoice</button></td>
+      <td class="actions"><button type="button" class="link" data-more="${esc(o.number)}" aria-expanded="false" aria-controls="d-${esc(o.number)}">Manage</button> <button type="button" class="link" data-invoice="${esc(o.number)}">Download invoice</button></td>
     </tr>
     <tr id="d-${esc(o.number)}" class="detail-row" hidden><td colspan="5">
       <div class="order-details">
@@ -876,82 +876,22 @@
         }
       };
     });
-    $$("[data-print]").forEach((b) => {
-      b.onclick = () => invoice(l.find((x) => x.number === b.dataset.print));
+    $$("[data-invoice]").forEach((button) => {
+      button.onclick = run(async () => {
+        const order = l.find((entry) => entry.number === button.dataset.invoice);
+        if (!order) return;
+        button.textContent = "Preparing PDF…";
+        try {
+          const { downloadInvoice } = await import("/invoice.js");
+          await downloadInvoice(order, site);
+        } catch {
+          throw new Error("Could not download the invoice. Please try again.");
+        } finally {
+          button.textContent = "Download invoice";
+        }
+      });
     });
   });
-
-  function invoice(o) {
-    const dialog = $("#order-invoice");
-    if (!dialog) return say("Reload Admin to preview the invoice.");
-    if (!o || dialog.open) return;
-    const preview = $("#invoice-preview", dialog);
-    const paper = $("#invoice-print");
-    const shop = site || {};
-    const shopName = esc(shop.name || "LoverBaazar");
-    const contact = [shop.phone, shop.email].filter(Boolean).map(esc).join(" · ");
-    const date = new Date(o.created_at).toLocaleDateString("en-GB", {
-      timeZone: "Asia/Dhaka", day: "numeric", month: "short", year: "numeric",
-    });
-    const rows = (o.items || []).map((item) => `<tr><td>${esc(item.name)}</td><td>${esc(item.qty)}</td><td>${money(item.price)}</td><td>${money(item.price * item.qty)}</td></tr>`);
-    const lastRow = rows.pop() || "";
-
-    const documentHTML = `<header class="invoice-header">
-        <div class="invoice-shop">
-          <img src="${esc(shop.logo || "/logo/primary-logo-80.webp")}" alt="" width="44" height="44">
-          <div><strong>${shopName}</strong>${shop.address ? `<p>${esc(shop.address)}</p>` : ""}</div>
-        </div>
-        <div class="invoice-heading">
-          <h2>Invoice</h2>
-          <p class="invoice-number">${esc(o.number)}</p>
-          <time datetime="${esc(o.created_at)}">${esc(date)}</time>
-        </div>
-      </header>
-      <div class="invoice-details">
-        <section class="invoice-customer">
-          <h3>Deliver to</h3>
-          <p><strong>${esc(o.name)}</strong><br>${esc(o.address)} (${esc(o.area)})<br>${esc(o.phone)}</p>
-        </section>
-        <section class="invoice-payment">
-          <h3>Order details</h3>
-          <dl class="invoice-facts">
-            <div><dt>Order status</dt><dd>${esc(statusLabel(o.status))}</dd></div>
-            <div><dt>Payment method</dt><dd>${esc(o.payment)}</dd></div>
-            ${o.txn_id ? `<div><dt>Transaction reference</dt><dd>${esc(o.txn_id)}</dd></div>` : ""}
-          </dl>
-        </section>
-      </div>
-      <table class="invoice-items">
-        <thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Amount</th></tr></thead>
-        <tbody>${rows.join("")}</tbody>
-        <tbody class="invoice-tail">${lastRow}
-          <tr class="invoice-settlement"><td colspan="4">
-            <dl class="invoice-totals">
-              <div><dt>Subtotal</dt><dd>${money(o.subtotal)}</dd></div>
-              ${o.discount ? `<div><dt>Discount (${esc(o.coupon)})</dt><dd>−${money(o.discount)}</dd></div>` : ""}
-              <div><dt>Delivery charge</dt><dd>${o.shipping ? money(o.shipping) : "Free"}</dd></div>
-              <div class="invoice-total"><dt>Order total</dt><dd>${money(o.total)}</dd></div>
-            </dl>
-            <div class="invoice-footer">
-              <p class="invoice-thanks">Thank you for shopping with ${shopName}.</p>
-              ${contact ? `<p>Questions about your order? ${contact}</p>` : ""}
-            </div>
-          </td></tr>
-        </tbody>
-      </table>
-      `;
-
-    preview.innerHTML = documentHTML;
-    paper.innerHTML = documentHTML;
-    dialog.setAttribute("aria-label", `Invoice ${o.number}`);
-    $("[data-print-invoice]", dialog).onclick = () => window.print();
-    dialog.onclose = () => {
-      if (dialog.open) return;
-      preview.replaceChildren();
-      paper.replaceChildren();
-    };
-    dialog.showModal();
-  }
 
   // ---- Products ----
 
