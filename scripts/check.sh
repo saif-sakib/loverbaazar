@@ -14,6 +14,6 @@ if (encode(process.versions.node) < encode(minimum)) {
 if [[ ${1:-} == --browsers ]]; then (cd apps/store && npx playwright install chromium); fi
 (cd apps/api && test -z "$(gofmt -l .)" && go vet .)
 for file in apps/store/public/*.js edge/*.js scripts/*.mjs; do node --check "$file"; done
-node --test edge/worker.test.mjs scripts/release*.test.mjs
+node --test edge/worker.test.mjs scripts/release*.test.mjs scripts/indexnow.test.mjs
 python3 -m unittest discover -s scripts -p 'test_maintenance.py'
 ./scripts/test-api.sh

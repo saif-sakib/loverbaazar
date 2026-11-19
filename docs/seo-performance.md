@@ -64,6 +64,14 @@ At cutover, use HTTPS on the apex and a single path-and-query-preserving permane
 3. If URL Inspection reports an access error, compare its timestamp and path against Cloudflare Security Events. A generic HTTP client received Cloudflare 1010 on several live URLs, and browser requests to the same pages returned HTTP 200. Use the actual crawler event to identify the rule. If Browser Integrity Check is confirmed, use a scoped configuration rule for the affected public paths. Keep admin and API routes outside it. [Cloudflare error 1010](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1010/), [Cloudflare Browser Integrity Check](https://developers.cloudflare.com/waf/tools/browser-integrity-check/)
 4. For ChatGPT search discovery, confirm that `OAI-SearchBot` can fetch public pages. The production robots file permits public crawling and disallows `/api/`. Check Cloudflare AI Crawl Control and security events for the actual crawler if results are absent. Verify the crawler identity against OpenAI's published ranges before changing an access rule. [OpenAI crawler guide](https://developers.openai.com/api/docs/bots)
 
+### Bing Webmaster Tools, IndexNow and favicons
+
+- The storefront serves a root multi-resolution `/favicon.ico` (`16×16`, `32×32`, `48×48`), standard PNG icons (`/favicon-32x32.png`, `/favicon-48x48.png`, `/favicon-96x96.png`, `/icon-192.png`, `/icon-512.png`, `/apple-touch-icon.png` at `180×180`), and `/site.webmanifest` so Bing, Google, browsers and Android/iOS touch icons do not fall back to an embedded-JPEG SVG or 404 on `/favicon.ico`.
+- Open **Bing Webmaster Tools** and add `https://loverbaazar.com/` using **Import from Google Search Console** for instant verified access and sitemap/URL sync. Optionally add a Cloudflare DNS TXT/CNAME record or set GitHub Actions variable `BING_SITE_VERIFICATION` (`msvalidate.01`, emitted only on the production homepage) as a durable backup.
+- Submit `https://loverbaazar.com/sitemap-index.xml` directly under **Sitemaps** in Bing Webmaster Tools.
+- Generate an IndexNow key (`openssl rand -hex 16`) and store it in GitHub Actions variable `INDEXNOW_KEY` (with `STORE_ENV=production`). Production releases write `/<key>.txt` and run `scripts/indexnow.mjs` after deployment verification. Optionally enable free **Crawler Hints** in Cloudflare (**Caching → Configuration**) to complement direct release pings.
+- After release, check in Bing **URL Inspection** on `https://loverbaazar.com/` and click **Request indexing**, verify `https://loverbaazar.com/favicon.ico` returns HTTP `200`, and review Cloudflare Security Events for any `1010` / Browser Integrity Check blocks affecting `bingbot`, `BingPreview` or `/favicon.ico`.
+
 ## 30. Accessibility and bilingual acceptance
 
 Run the Playwright scans against one isolated fixture through `dev.sh`. The login step uses only the disposable admin. Complete keyboard and 200% browser zoom checks with real user controls, then run TalkBack on Android and VoiceOver on iPhone.
@@ -86,7 +94,7 @@ SHOP_URL=http://127.0.0.1:18788 node apps/store/tests/performance.mjs
 LB_ISOLATED=1 SHOP_URL=http://127.0.0.1:18788 node apps/store/tests/accessibility.mjs
 (cd apps/store && SHOP_URL=http://127.0.0.1:18788 npm run test:ui)
 ./scripts/test-api.sh
-node --test edge/worker.test.mjs scripts/release-verification.test.mjs
+node --test edge/worker.test.mjs scripts/release-verification.test.mjs scripts/indexnow.test.mjs
 ```
 
 Stop the fixture before running `./scripts/test-mobile.sh`, which owns the same default ports and completes checkout and publication with real disposable database writes.

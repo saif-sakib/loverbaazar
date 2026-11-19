@@ -9,6 +9,14 @@ const full = seoTitle || (title ? `${title} | ${spacedSiteName}` : `${spacedSite
 const canon = canonical || siteUrl(Astro.url.pathname);
 const isHome = Astro.url.pathname === "/";
 const preview = import.meta.env.BUILD_ENV !== "production";
+const bingVerification = String(import.meta.env.BING_SITE_VERIFICATION || "").trim();
+const googleVerification = String(import.meta.env.GOOGLE_SITE_VERIFICATION || "").trim();
+if (bingVerification && !/^[A-Fa-f0-9]{16,64}$/.test(bingVerification)) {
+  throw new Error("Invalid BING_SITE_VERIFICATION");
+}
+if (googleVerification && !/^[A-Za-z0-9_-]{16,128}$/.test(googleVerification)) {
+  throw new Error("Invalid GOOGLE_SITE_VERIFICATION");
+}
 const parts = SITE.name.split(/(?=[A-Z])/);
 const logoEnd = parts.length > 1 ? parts.pop() : "";
 const logoStart = parts.join("");
@@ -83,8 +91,16 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
     <meta name="theme-color" content="#b3122e" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    {isHome && !preview && bingVerification && <meta name="msvalidate.01" content={bingVerification} />}
+    {isHome && !preview && googleVerification && <meta name="google-site-verification" content={googleVerification} />}
     <link rel="alternate" type="application/rss+xml" title={`${SITE.name} Product Feed`} href={siteUrl("/feed.xml")} />
     <link rel="alternate" type="application/rss+xml" title={`${SITE.name} Blog`} href={siteUrl("/blog/feed.xml")} />
     {isHome && (

@@ -30,7 +30,7 @@ export default defineConfig({
         await mkdir(output, { recursive: true });
         await Promise.all(Object.entries(invoiceAssets).map(([file, source]) =>
           copyFile(require.resolve(source), new URL(file, output))));
-        await buildIndex(dir, pages, site, environment);
+        await buildIndex(dir, pages, site, environment, { indexNowKey: process.env.INDEXNOW_KEY });
         await writeFile(new URL("release.json", dir), JSON.stringify({
           id: process.env.BUILD_ID || "local", commit: process.env.GITHUB_SHA || "local", environment,
           builtAt: new Date().toISOString(),

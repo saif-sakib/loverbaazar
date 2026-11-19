@@ -60,7 +60,10 @@ const run = promisify(execFile);
 const build = async (environment, dir) => {
   const env = { ...process.env, BUILD_ENV: environment, BUILD_ID: "fixture", BUILD_KEY: buildKey,
     SITE_ORIGIN: "https://loverbaazar.com", NO_COLOR: "1", PUBLIC_TURNSTILE_SITE: "test-site-key",
-    CATALOG_URL: `http://127.0.0.1:${server.address().port}/api/catalog` };
+    CATALOG_URL: `http://127.0.0.1:${server.address().port}/api/catalog`,
+    INDEXNOW_KEY: "0123456789abcdef0123456789abcdef",
+    BING_SITE_VERIFICATION: "0123456789ABCDEF0123456789ABCDEF",
+    GOOGLE_SITE_VERIFICATION: "fixture_google_verify_token_12345" };
   try {
     await run(process.execPath, ["node_modules/.bin/astro", "build", "--outDir", join(work, dir)], { cwd: assets, env, maxBuffer: 3_000_000 });
   } catch (error) {
@@ -83,6 +86,23 @@ try {
   assert.match(home, /<strong lang="en-BD">Everything for your home, at wholesale prices\.<\/strong>/);
   assert.match(home, /<link rel="canonical" href="https:\/\/loverbaazar.com\/">/);
   assert.match(home, /<meta name="robots" content="index, follow/);
+  assert.match(home, /<link rel="icon" href="\/favicon\.ico" sizes="16x16 32x32 48x48">/);
+  assert.match(home, /<link rel="shortcut icon" href="\/favicon\.ico">/);
+  assert.match(home, /<link rel="icon" type="image\/png" sizes="48x48" href="\/favicon-48x48\.png">/);
+  assert.match(home, /<link rel="icon" type="image\/png" sizes="96x96" href="\/favicon-96x96\.png">/);
+  assert.match(home, /<link rel="icon" type="image\/png" sizes="32x32" href="\/favicon-32x32\.png">/);
+  assert.match(home, /<link rel="icon" type="image\/png" sizes="192x192" href="\/icon-192\.png">/);
+  assert.match(home, /<link rel="apple-touch-icon" sizes="180x180" href="\/apple-touch-icon\.png">/);
+  assert.match(home, /<link rel="manifest" href="\/site\.webmanifest">/);
+  assert.doesNotMatch(home, /<link rel="icon"[^>]*favicon\.svg/);
+  assert.match(home, /<meta name="msvalidate\.01" content="0123456789ABCDEF0123456789ABCDEF">/);
+  assert.match(home, /<meta name="google-site-verification" content="fixture_google_verify_token_12345">/);
+  for (const icon of ["favicon.ico", "favicon-32x32.png", "favicon-48x48.png", "favicon-96x96.png", "icon-192.png", "icon-512.png", "apple-touch-icon.png"]) {
+    assert.ok((await readFile(join(work, "production", icon))).length > 0, `${icon} is non-empty`);
+  }
+  const manifest = JSON.parse(await read("production", "site.webmanifest"));
+  assert.ok(manifest.icons.some(icon => icon.sizes === "192x192") && manifest.icons.some(icon => icon.sizes === "512x512"));
+  assert.equal(await read("production", "0123456789abcdef0123456789abcdef.txt"), "0123456789abcdef0123456789abcdef");
   const homeEntities = entities(home);
   const websites = homeEntities.filter(item => item["@type"] === "WebSite");
   const shops = homeEntities.filter(item => item["@type"] === "Store");
@@ -99,6 +119,7 @@ try {
     "@type": "MerchantReturnPolicy", merchantReturnLink: "https://loverbaazar.com/terms-conditions/",
   });
   const page = await read("production", `product/${product.slug}/index.html`);
+  assert.doesNotMatch(page, /name="(?:msvalidate\.01|google-site-verification)"/);
   const htmlLD = entities(page);
   assert.ok(!htmlLD.some(item => ["WebSite", "Store"].includes(item["@type"])));
   const productLD = htmlLD.find(item => item["@type"] === "Product");
@@ -181,6 +202,8 @@ try {
   assert.match(await read("preview", "_headers"), /X-Robots-Tag: noindex, nofollow/);
   const previewHome = await read("preview", "index.html");
   assert.match(previewHome, /noindex, nofollow/);
+  assert.doesNotMatch(previewHome, /name="(?:msvalidate\.01|google-site-verification)"/);
+  await assert.rejects(read("preview", "0123456789abcdef0123456789abcdef.txt"), { code: "ENOENT" });
   assert.ok(!entities(previewHome).find(item => item["@type"] === "Store").hasMerchantReturnPolicy);
   assert.doesNotMatch(await read("preview", "_redirects"), /page-sitemap\.xml/);
   assert.match(next, /noindex, nofollow/);

@@ -12,8 +12,12 @@ function cleanPath(value, site) {
   return new URL(decoded, site).pathname;
 }
 
-export async function buildIndex(dir, pages, site, environment) {
+export async function buildIndex(dir, pages, site, environment, { indexNowKey = "" } = {}) {
   const production = environment === "production";
+  const key = String(indexNowKey ?? "").trim();
+  if (key && (!/^[A-Za-z0-9-]{8,128}$/.test(key) || key.toLowerCase() === "robots")) {
+    throw new Error("INDEXNOW_KEY must be 8–128 ASCII letters, digits or hyphens");
+  }
   const write = (filename, body) => writeFile(new URL(filename, dir), body);
   const generated = new Map();
   for (const { pathname } of pages) {
@@ -83,4 +87,11 @@ export async function buildIndex(dir, pages, site, environment) {
     else if (production) throw new Error(`Legacy ID has no built destination: ${id} → ${to}`);
   }
   await write("legacy-ids.json", JSON.stringify(ids));
+  if (production && key) {
+    const keyPath = `/${key}.txt`;
+    if (generated.has(keyPath) || aliases.has(keyPath)) {
+      throw new Error(`IndexNow key file collides with an existing route: ${keyPath}`);
+    }
+    await write(`${key}.txt`, key);
+  }
 }
