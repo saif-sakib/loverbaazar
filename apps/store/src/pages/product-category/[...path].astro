@@ -1,35 +1,147 @@
 ---
-import { jsonLd, recordSEO, plainText } from "../../lib/seo";
+import {
+  categoryChain,
+  categoryHeading,
+  isMerchandisingCategory,
+  jsonLd,
+  plainText,
+  priceBounds,
+  recordSEO,
+} from "../../lib/seo";
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { cats, inCat, fileSlug, SITE, siteUrl } from "../../lib/shop";
+import { attributeValues, catUrl, cats, fileSlug, inCat, languageOf, MENU, siteUrl, spacedSiteName, taka } from "../../lib/shop";
 export const getStaticPaths = () => cats.map((c) => ({ params: { path: fileSlug(c.path) }, props: { c } }));
 const { c } = Astro.props;
 const items = inCat(c.slug);
-const seo = recordSEO(c, plainText(c.html) || `Browse ${c.name} at ${SITE.name}. See product details, prices and availability.`);
+const heading = categoryHeading(c.name, c.slug, items.length);
+const bounds = priceBounds(items);
+const brands = [...new Set(items.flatMap((p: any) => attributeValues(p, "brand")))].sort((a: string, b: string) => a.localeCompare(b));
+const trail = categoryChain(c, cats);
+const subcategories = cats.filter((x: any) => x.slug !== c.slug && x.path.startsWith(`${c.path}/`) && inCat(x.slug).length > 0);
+const subSlugs = new Set(subcategories.map((x: any) => x.slug));
+const menuGroup = MENU.find((g: any) => g.items.some((x: any) => x.slug === c.slug));
+const parentPrefix = c.path.includes("/") ? c.path.slice(0, c.path.lastIndexOf("/") + 1) : "";
+const candidateCats = menuGroup ? menuGroup.items : parentPrefix ? cats.filter((x: any) => x.path.startsWith(parentPrefix)) : [];
+const relatedCats = candidateCats
+  .filter((x: any, i: number, all: any[]) =>
+    x.slug !== c.slug && !subSlugs.has(x.slug) && inCat(x.slug).length > 0 && all.findIndex((y: any) => y.slug === x.slug) === i)
+  .slice(0, 8);
+const priceList = isMerchandisingCategory(c.slug)
+  ? []
+  : [...items]
+      .filter((p: any) => Number.isSafeInteger(p.price) && p.price > 0)
+      .sort((a: any, b: any) => Number(b.inStock) - Number(a.inStock) || a.price - b.price)
+      .slice(0, 15);
+const priceRange = bounds.max > bounds.min ? `from ${taka(bounds.min)} to ${taka(bounds.max)}` : `at ${taka(bounds.min)}`;
+const fallbackDesc = items.length > 0 && bounds.min > 0
+  ? `Compare ${items.length} ${c.name} prices in Bangladesh ${priceRange} at ${spacedSiteName}.${brands.length ? ` Brands: ${brands.slice(0, 4).join(", ")}.` : ""} Cash on delivery across Bangladesh.`
+  : plainText(c.html) || `Browse ${c.name} at ${spacedSiteName}. See product details, prices and availability.`;
+const seo = recordSEO(c, fallbackDesc);
 const crumbs = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   itemListElement: [
     { "@type": "ListItem", position: 1, name: "Home", item: siteUrl("/") },
     { "@type": "ListItem", position: 2, name: "Shop", item: siteUrl("/shop/") },
-    { "@type": "ListItem", position: 3, name: c.name },
+    ...trail.map((entry: any, i: number) => ({
+      "@type": "ListItem",
+      position: 3 + i,
+      name: entry.name,
+      ...(i < trail.length - 1 ? { item: siteUrl(catUrl(entry)) } : {}),
+    })),
   ],
 };
+const collection = items.length > 0
+  ? {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: heading,
+      description: seo.description,
+      url: seo.canonical || siteUrl(catUrl(c)),
+      mainEntity: {
+        "@type": "ItemList",
+        numberOfItems: items.length,
+        itemListElement: items.slice(0, 24).map((p: any, i: number) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          url: siteUrl(`/product/${p.slug}/`),
+          name: p.name,
+        })),
+      },
+    }
+  : null;
 ---
 
-<Base title={c.name} {...seo} noindex={seo.noindex || !items.length}>
+<Base title={heading} {...seo} noindex={seo.noindex || !items.length}>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />
+    {collection && <script type="application/ld+json" set:html={jsonLd(collection)} />}
   </Fragment>
   <div class="wrap">
     <p class="crumbs">
-      <a href="/">Home</a> / <a href="/shop/">Shop</a> / {c.name}
+      <a href="/">Home</a> / <a href="/shop/">Shop</a>
+      {trail.map((entry: any, i: number) => (
+        <>
+          {" / "}
+          {i < trail.length - 1 ? <a href={catUrl(entry)}>{entry.name}</a> : entry.name}
+        </>
+      ))}
     </p>
     <div class="pagehead">
-      <h1>{c.name}</h1>
-      {c.html && <div class="prose"><Fragment set:html={c.html} /></div>}
+      <h1 lang={languageOf(heading)}>{heading}</h1>
+      {items.length > 0 && bounds.min > 0 && (
+        <p class="cat-summary">
+          <strong>{items.length}</strong> {items.length === 1 ? "product" : "products"}
+          {bounds.inStockCount > 0 && ` (${bounds.inStockCount} in stock)`} · Price{" "}
+          {bounds.max > bounds.min ? `${taka(bounds.min)} – ${taka(bounds.max)}` : taka(bounds.min)}
+          {brands.length > 0 && ` · Brands: ${brands.slice(0, 5).join(", ")}`} · Cash on delivery across Bangladesh
+        </p>
+      )}
+      {subcategories.length > 0 && (
+        <nav class="cat-pills" aria-label={`Subcategories of ${c.name}`}>
+          {subcategories.map((sub: any) => (
+            <a href={catUrl(sub)} lang={languageOf(sub.name)}>{sub.name} ({inCat(sub.slug).length})</a>
+          ))}
+        </nav>
+      )}
     </div>
     {items.length ? <Grid items={items} /> : <div class="empty"><p>No products here yet. See everything else we sell in the shop.</p><a class="btn" href="/shop/">Shop all</a></div>}
+    {items.length > 0 && priceList.length > 0 && (
+      <section class="prose price-guide" aria-labelledby="price-list-title">
+        <h2 id="price-list-title">{c.name} Price List in Bangladesh</h2>
+        <div class="table-wrap" tabindex="0" role="region" aria-label={`${c.name} price list`}>
+          <table class="price-table">
+            <thead>
+              <tr>
+                <th scope="col">Model</th>
+                <th scope="col">Availability</th>
+                <th scope="col">Price (BDT)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {priceList.map((p: any) => (
+                <tr>
+                  <td><a href={`/product/${p.slug}/`} lang={languageOf(p.name)}>{p.name}</a></td>
+                  <td>{p.inStock ? "In stock" : "Sold out"}</td>
+                  <td>{taka(p.price)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    )}
+    {items.length > 0 && c.html && <section class="prose"><Fragment set:html={c.html} /></section>}
+    {items.length > 0 && relatedCats.length > 0 && (
+      <section class="prose" aria-labelledby="related-cats-title">
+        <h2 id="related-cats-title">Related categories</h2>
+        <div class="cat-pills">
+          {relatedCats.map((rel: any) => (
+            <a href={catUrl(rel)} lang={languageOf(rel.name)}>{rel.name}</a>
+          ))}
+        </div>
+      </section>
+    )}
   </div>
 </Base>

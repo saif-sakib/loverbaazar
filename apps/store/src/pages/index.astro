@@ -16,7 +16,7 @@ const heroShots = heroPics.map((p: any, i: number) => ({
 }));
 const tiles = MENU.flatMap((g: any) => g.items)
   .filter((c: any, i: number, all: any[]) => inCat(c.slug).length && all.findIndex((x) => x.slug === c.slug) === i)
-  .slice(0, 12);
+  .slice(0, 20);
 const hero = SITE.hero;
 const brandWords = spacedSiteName.trim().split(/\s+/);
 const brandEnd = brandWords.pop();
@@ -105,7 +105,7 @@ const homeDescription = [spacedSiteName, SITE.address].filter(Boolean).join(" in
           <>
             <div class="sec">
               <h2>{h.title}</h2>
-              <a href={h.cat === "on-sale" ? "/offers/" : catUrl(cats.find((c: any) => c.slug === h.cat) || { path: h.cat })}>See all</a>
+              <a href={h.cat === "on-sale" ? "/offers/" : catUrl(cats.find((c: any) => c.slug === h.cat) || { path: h.cat })}>All {h.title.toLowerCase()}</a>
             </div>
             <section class="grid">
               {homeItems(h.cat)

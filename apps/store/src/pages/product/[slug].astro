@@ -1,17 +1,30 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { gtinOf, jsonLd, merchantReturnURL, plainText, publicImage, recordSEO, skuOf } from "../../lib/seo";
+import { categoryChain, gtinOf, jsonLd, merchantReturnURL, plainText, primaryCategoryOf, productSeoTitle, publicImage, recordSEO, skuOf } from "../../lib/seo";
 import { gallerySizes, responsiveImage, sizedImage } from "../../lib/image-delivery.mjs";
 import Card from "../../components/Card.astro";
-import { products, cats, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, siteUrl, attributeValues, languageOf } from "../../lib/shop";
+import { products, cats, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, siteUrl, attributeValues, languageOf, spacedSiteName } from "../../lib/shop";
 export const getStaticPaths = () => products.map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
 const d = off(p);
 const url = siteUrl(`/product/${p.slug}/`);
 const myCats = p.cats.map((s: string) => cats.find((c: any) => c.slug === s)).filter(Boolean);
-const related = products.filter((x) => x.id !== p.id && x.cats.some((c: string) => p.cats.includes(c))).slice(0, 4);
+const primaryCat = primaryCategoryOf(p.cats, cats);
+const catTrail = primaryCat ? categoryChain(primaryCat, cats) : [];
+const nonMerchSlugs = new Set(myCats.filter((c: any) => c.slug !== "latest-product" && c.slug !== "popular-item").map((c: any) => c.slug));
+const primaryPool = primaryCat ? products.filter((x) => x.id !== p.id && x.cats.includes(primaryCat.slug)) : [];
+const secondaryPool = products.filter(
+  (x) => x.id !== p.id && !primaryPool.some((y) => y.id === x.id) &&
+    (nonMerchSlugs.size ? x.cats.some((c: string) => nonMerchSlugs.has(c)) : x.cats.some((c: string) => p.cats.includes(c))),
+);
+const fallbackPool = products.filter(
+  (x) => x.id !== p.id && !primaryPool.some((y) => y.id === x.id) && !secondaryPool.some((y) => y.id === x.id) &&
+    x.cats.some((c: string) => p.cats.includes(c)),
+);
+const related = [...primaryPool, ...secondaryPool, ...fallbackPool].slice(0, 4);
 const stars = rating(p);
-const description = plainText(p.short || p.desc) || `${p.name} at ${SITE.name}. See specifications, availability and delivery options.`;
+const snippetText = plainText(p.short || p.desc);
+const description = `${p.name} price in Bangladesh is ${taka(p.price)} at ${spacedSiteName}. ${p.inStock ? "In stock" : "Currently sold out"}. ${snippetText || "Cash on delivery available across Bangladesh."}`;
 const seo = recordSEO(p, description);
 const brandName = attributeValues(p, "brand")[0];
 const gtin = gtinOf(p);
@@ -23,12 +36,14 @@ const ld = {
   "@context": "https://schema.org",
   "@type": "Product",
   name: p.name,
+  url: seo.canonical || url,
+  category: primaryCat?.name || undefined,
   sku: skuOf(p),
   brand: brandName ? { "@type": "Brand", name: brandName } : undefined,
   gtin,
   mpn: p.mpn || undefined,
   image: p.images.map((i: any) => publicImage(i.src)).filter(Boolean),
-  description: plainText(p.short || p.desc) || p.name,
+  description: snippetText || p.name,
   offers: {
     "@type": "Offer",
     url: seo.canonical || url,
@@ -37,6 +52,12 @@ const ld = {
     itemCondition: p.condition === "new" ? "https://schema.org/NewCondition" : undefined,
     availability: p.inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
     seller: { "@type": "Store", "@id": siteUrl("/#store"), name: SITE.name },
+    priceSpecification: p.regular > p.price
+      ? { "@type": "UnitPriceSpecification", priceType: "https://schema.org/StrikethroughPrice", price: p.regular, priceCurrency: "BDT" }
+      : undefined,
+    hasMerchantReturnPolicy: merchantReturnURL
+      ? { "@type": "MerchantReturnPolicy", applicableCountry: "BD", merchantReturnLink: merchantReturnURL }
+      : undefined,
   },
   aggregateRating: p.reviews.length
     ? { "@type": "AggregateRating", ratingValue: stars.toFixed(1), reviewCount: p.reviews.length }
@@ -55,15 +76,20 @@ const crumbs = {
   "@type": "BreadcrumbList",
   itemListElement: [
     { "@type": "ListItem", position: 1, name: "Home", item: siteUrl("/") },
-    ...(myCats[0] ? [{ "@type": "ListItem", position: 2, name: myCats[0].name, item: siteUrl(catUrl(myCats[0])) }] : []),
-    { "@type": "ListItem", position: myCats[0] ? 3 : 2, name: p.name },
+    ...catTrail.map((entry: any, i: number) => ({
+      "@type": "ListItem",
+      position: 2 + i,
+      name: entry.name,
+      item: siteUrl(catUrl(entry)),
+    })),
+    { "@type": "ListItem", position: 2 + catTrail.length, name: p.name },
   ],
 };
 const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
 ---
 
 <Base
-  title={p.name}
+  title={productSeoTitle(p.name)}
   {...seo}
   image={seo.image || publicImage(mainImage?.src)}
   type="product"
@@ -78,11 +104,11 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
   <div class="wrap">
     <p class="crumbs">
       <a href="/">Home</a> /{" "}
-      {myCats[0] && (
+      {catTrail.map((entry: any) => (
         <>
-          <a href={catUrl(myCats[0])}>{myCats[0].name}</a> /{" "}
+          <a href={catUrl(entry)}>{entry.name}</a> /{" "}
         </>
-      )}
+      ))}
       {p.name}
     </p>
     <section class="pd" data-product={p.id} data-price={p.price}>
@@ -225,6 +251,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
       <>
         <div class="sec">
           <h2>You may also like</h2>
+          {primaryCat && <a href={catUrl(primaryCat)}>All {primaryCat.name} prices</a>}
         </div>
         <section class="grid">
           {related.map((x) => (

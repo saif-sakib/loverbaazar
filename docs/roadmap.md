@@ -833,3 +833,11 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 **Baseline, 19 November 2026.** Of 291 product pages in the live sitemap, 283 emitted whitespace-bearing SKUs and three emitted reviews. None exposed a brand, GTIN or manufacturer part number in Product markup. The Terms page serves the store's actual return terms and exceptions. Search Console discovered the old `/page-sitemap.xml`, which currently returns 404. The owner's email listed five of six Merchant listings issues and two optional Product snippets issues.
 
 **Build verification.** The isolated release test passed for invalid and valid SKUs, approved reviews, the linked public return policy, the draft-policy exclusion and the exact sitemap redirect. The API race suite passed. Google validation remains pending the production release and reprocessing of affected product pages.
+
+### Task 66 — Optimize category and product pages for Bangladesh price searches
+
+**Status:** In progress — implemented and locally verified; live Publish, Admin catalog enrichment and Search Console verification pending · **Depends on:** 24, 25, 26, 29, 63, 65
+
+- Target Bangladesh commercial-intent price queries across category, product, shop, offers, blog and feed output without changing any existing URLs or inventing unverified claims. Keep custom **Search and social settings** overrides authoritative when filled.
+- Render dynamic BDT price ranges, category `CollectionPage` + `ItemList` JSON-LD, top-15 model price comparison tables, and factual buying guides below the product grid on non-merchandising categories while avoiding thin-tag sitemap bloat.
+- Enrich `Product` markup (`url`, `category`, `Offer.hasMerchantReturnPolicy`, `StrikethroughPrice` when discounted), full non-merchandising `BreadcrumbList` paths, and `<g:product_type>` in `/feed.xml`. Seed category buying guides and an evergreen Rice Cooker Buying & Price Guide via `content-updates.json` while preserving existing owner edits.

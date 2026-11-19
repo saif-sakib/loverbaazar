@@ -1,12 +1,18 @@
 ---
-import { jsonLd, recordSEO } from "../../lib/seo";
+import { jsonLd, priceBounds, recordSEO, tagSeoTitle } from "../../lib/seo";
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { tags, products, fileSlug, SITE, siteUrl } from "../../lib/shop";
+import { tags, products, fileSlug, siteUrl, spacedSiteName, taka } from "../../lib/shop";
 export const getStaticPaths = () => tags.map((t) => ({ params: { slug: fileSlug(t.slug) }, props: { t } }));
 const { t } = Astro.props;
 const items = products.filter((p) => p.tags.includes(t.slug));
-const seo = recordSEO(t, `Browse products tagged ${t.name} at ${SITE.name}. Compare prices and availability.`);
+const bounds = priceBounds(items);
+const title = tagSeoTitle(t.name, items.length);
+const fallbackDesc = items.length > 0 && bounds.min > 0
+  ? `Compare ${items.length} ${t.name} products in Bangladesh starting from ${taka(bounds.min)} at ${spacedSiteName}. Cash on delivery available.`
+  : `Browse products tagged ${t.name} at ${spacedSiteName}. Compare prices and availability.`;
+const seo = recordSEO(t, fallbackDesc);
+const thin = items.length < 3 && !seo.seoTitle;
 const crumbs = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
@@ -19,9 +25,9 @@ const crumbs = {
 ---
 
 <Base
-  title={t.name}
+  title={title}
   {...seo}
-  noindex={seo.noindex || !items.length}
+  noindex={seo.noindex || !items.length || thin}
 >
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />

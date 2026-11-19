@@ -799,6 +799,47 @@ func TestProductTextNeverTouchesNameOrPrice(t *testing.T) {
 	}
 }
 
+func TestSEOCategoryGuidesKeepOwnerEdits(t *testing.T) {
+	reset(t)
+	if _, err := db.Exec(bg, `INSERT INTO content(kind,slug,data) VALUES('cat','rice-cooker','{"slug":"rice-cooker","name":"Rice Cooker","path":"rice-cooker"}'),('cat','chair','{"slug":"chair","name":"Chair","path":"chair","html":"<p>Owner chair guide</p>"}')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyContentUpdates(bg); err != nil {
+		t.Fatal(err)
+	}
+	var riceHTML, chairHTML, postTitle, postHTML string
+	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='cat' AND slug='rice-cooker'`).Scan(&riceHTML); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(riceHTML, "How to choose a rice cooker in Bangladesh") {
+		t.Errorf("rice-cooker guide missing: %q", riceHTML)
+	}
+	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='cat' AND slug='chair'`).Scan(&chairHTML); err != nil {
+		t.Fatal(err)
+	}
+	if chairHTML != "<p>Owner chair guide</p>" {
+		t.Errorf("chair owner guide overwritten: %q", chairHTML)
+	}
+	if err := db.QueryRow(bg, `SELECT data->>'title', data->>'html' FROM content WHERE kind='post' AND slug='rice-cooker-buying-guide-bangladesh'`).Scan(&postTitle, &postHTML); err != nil {
+		t.Fatal(err)
+	}
+	if postTitle != "Rice Cooker Buying & Price Guide in Bangladesh" || !strings.Contains(postHTML, `/product-category/rice-cooker/`) {
+		t.Errorf("buying guide post unexpected: %q %q", postTitle, postHTML)
+	}
+	if _, err := db.Exec(bg, `UPDATE content SET data=jsonb_set(data,'{html}','"Owner updated later"') WHERE kind='cat' AND slug='rice-cooker'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyContentUpdates(bg); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='cat' AND slug='rice-cooker'`).Scan(&riceHTML); err != nil {
+		t.Fatal(err)
+	}
+	if riceHTML != "Owner updated later" {
+		t.Errorf("update re-applied over later owner edit: %q", riceHTML)
+	}
+}
+
 func TestImageCleanupAndSafeUploadPlace(t *testing.T) {
 	reset(t)
 	dir := t.TempDir()
