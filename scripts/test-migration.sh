@@ -10,7 +10,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 docker run -d --rm --name "$migration_container" -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb_test -p 127.0.0.1::5432 postgres:17-alpine >/dev/null
 for attempt in {1..60}; do
- if docker exec "$migration_container" pg_isready -U postgres -d lb_test -q; then break; fi
+ if docker exec -e PGPASSWORD=dev "$migration_container" psql -h 127.0.0.1 -U postgres -d lb_test -c 'SELECT 1' >/dev/null 2>&1; then break; fi
  [[ $attempt != 60 ]] || exit 1
  sleep .5
 done

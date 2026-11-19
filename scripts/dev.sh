@@ -40,7 +40,7 @@ else
  docker start lbpg >/dev/null 2>&1 || docker run -d --name lbpg -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb -p "127.0.0.1:$db_port:5432" postgres:17-alpine >/dev/null
 fi
 for attempt in {1..60}; do
- if docker exec "$db_name" pg_isready -U postgres -d lb -q; then break; fi
+ if docker exec -e PGPASSWORD=dev "$db_name" psql -h 127.0.0.1 -U postgres -d lb -c 'SELECT 1' >/dev/null 2>&1; then break; fi
  [[ $attempt != 60 ]] || { echo 'Local database startup timed out' >&2; exit 1; }; sleep 0.5
 done
 export APP_ENV=local DEV=1 PORT="$api_port"
