@@ -44,11 +44,32 @@ const build = async (environment, dir) => {
   }
 };
 const read = (dir, path) => readFile(join(work, dir, path), "utf8");
+const entities = html => [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)]
+  .map(match => JSON.parse(match[1]));
 
 try {
   await build("production", "production");
+  const home = await read("production", "index.html");
+  assert.match(home, /<title>LoverBaazar \| [^<]+<\/title>/);
+  assert.match(home, /<meta name="description" content="Lover Baazar — /);
+  assert.match(home, /<meta property="og:site_name" content="LoverBaazar">/);
+  assert.match(home, /<p class="eyebrow">Lover Baazar · /);
+  assert.match(home, /<link rel="canonical" href="https:\/\/loverbaazar.com\/">/);
+  assert.match(home, /<meta name="robots" content="index, follow/);
+  const homeEntities = entities(home);
+  const websites = homeEntities.filter(item => item["@type"] === "WebSite");
+  const shops = homeEntities.filter(item => item["@type"] === "Store");
+  assert.equal(websites.length, 1);
+  assert.equal(shops.length, 1);
+  for (const entity of [websites[0], shops[0]]) {
+    assert.equal(entity.name, "LoverBaazar");
+    assert.equal(entity.alternateName, "Lover Baazar");
+    assert.equal(entity.url, "https://loverbaazar.com/");
+  }
+  assert.equal(websites[0].publisher["@id"], shops[0]["@id"]);
   const page = await read("production", `product/${product.slug}/index.html`);
-  const htmlLD = [...page.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)].map(match => JSON.parse(match[1]));
+  const htmlLD = entities(page);
+  assert.ok(!htmlLD.some(item => ["WebSite", "Store"].includes(item["@type"])));
   const offer = htmlLD.find(item => item["@type"] === "Product");
   assert.equal(offer.offers.price, 1250);
   assert.equal(offer.offers.availability, "https://schema.org/InStock");
@@ -60,6 +81,7 @@ try {
   assert.ok(/content="বাংলা বিবরণ (?:&amp;|&#38;) তথ্য"/.test(page), "SEO description is escaped plain text");
   assert.match(page, /<h1[^>]*>বাংলা পরীক্ষার পণ্য<\/h1>/);
   const sitemap = await read("production", "sitemap-0.xml");
+  assert.equal(sitemap.match(/<loc>https:\/\/loverbaazar.com\/<\/loc>/g)?.length, 1);
   assert.ok(sitemap.includes(productURL));
   assert.doesNotMatch(sitemap, /\/(admin|cart|checkout|search|track|wishlist|my-account|404|seo-hidden-fixture|seo-duplicate-fixture|seo-draft-fixture)\//);
   assert.match(await read("production", "seo-hidden-fixture/index.html"), /noindex, follow/);
@@ -80,13 +102,14 @@ try {
   assert.match(next, /<b>৳999<\/b>/);
   assert.match(await read("preview", "feed.xml"), /<g:sale_price>999 BDT<\/g:sale_price>\s*<g:availability>out_of_stock<\/g:availability>/);
   assert.match(await read("preview", "_headers"), /X-Robots-Tag: noindex, nofollow/);
+  assert.match(await read("preview", "index.html"), /noindex, nofollow/);
   assert.match(next, /noindex, nofollow/);
   await assert.rejects(read("preview", "sitemap-index.xml"), { code: "ENOENT" });
   const source = "https://res.cloudinary.com/test/image/upload/f_auto,q_auto,w_300/v100/loverbaazar/products/example.webp";
   assert.equal(sizedImage(source, 640), "https://res.cloudinary.com/test/image/upload/c_limit,w_640/q_auto/f_auto/v100/loverbaazar/products/example.webp");
   assert.match(responsiveImage(source, "", [160, 320, 640]).srcset, /640w$/);
   assert.equal(sizedImage("https://loverbaazar.com/photo.jpg", 640), "https://loverbaazar.com/photo.jpg");
-  console.log("Production sitemap, canonical, Bangla SEO, structured offers, preview noindex, changed offer/feed and image widths passed.");
+  console.log("Homepage identity, production sitemap, canonical, Bangla SEO, structured offers, preview noindex, changed offer/feed and image widths passed.");
 } finally {
   server.close();
   await rm(work, { recursive: true, force: true });

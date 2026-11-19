@@ -36,6 +36,8 @@ export const cats = pick("cats"),
   pages = pick("pages");
 export const posts = [...pick("posts")].sort((a, b) => String(b.date).localeCompare(String(a.date)));
 export const SITE: any = { ...defaults.site, ...store.site };
+// Use the readable spacing of the configured wordmark as an alternate name.
+export const spacedSiteName = SITE.name.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
 // {phone}, {email} and {name} let the admin write text on Pages that stays right when those details change.
 const escapeHTML=(s: string)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
 export const fill = (text = "") =>

@@ -3,10 +3,11 @@ import "../styles/fonts.css";
 import "../styles/site.css";
 import { jsonLd, publicImage } from "../lib/seo";
 import "../styles/mobile.css";
-import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf } from "../lib/shop";
+import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf, spacedSiteName } from "../lib/shop";
 const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", language = languageOf(`${title || ""} ${description}`) } = Astro.props;
 const full = seoTitle || (title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`);
 const canon = canonical || siteUrl(Astro.url.pathname);
+const isHome = Astro.url.pathname === "/";
 const preview = import.meta.env.BUILD_ENV !== "production";
 const parts = SITE.name.split(/(?=[A-Z])/);
 const logoEnd = parts.length > 1 ? parts.pop() : "";
@@ -15,13 +16,18 @@ const logoMark = !SITE.logo || SITE.logo === "/logo/primary-logo.jpg" ? "/logo/p
 const absUrl = (u: string) => (u.startsWith("http") ? u : siteUrl(u));
 const ogImage = publicImage(image) || siteUrl("/og-image.jpg");
 const payments = LIVE.payments.filter((p: any) => p.enabled);
+const alternateName = spacedSiteName !== SITE.name ? spacedSiteName : undefined;
+const storeID = siteUrl("/#store");
 const org = {
   "@context": "https://schema.org",
   "@type": "Store",
+  "@id": storeID,
   name: SITE.name,
-  url: Astro.site?.href,
+  alternateName,
+  url: siteUrl("/"),
+  description: SITE.description,
   logo: absUrl(SITE.logo || "/logo/primary-logo.jpg"),
-  image: ogImage,
+  image: siteUrl("/og-image.jpg"),
   telephone: telOf(SITE.phone),
   email: SITE.email,
   currenciesAccepted: "BDT",
@@ -38,9 +44,11 @@ const org = {
 const webSiteLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
+  "@id": siteUrl("/#website"),
   name: SITE.name,
+  alternateName,
   url: siteUrl("/"),
-
+  publisher: { "@id": storeID },
 };
 const standardSlugs = new Set(["about-us", "how-to-buy", "contact-us", "privacy-policy", "terms-conditions"]);
 const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slug));
@@ -76,8 +84,12 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="alternate" type="application/rss+xml" title={`${SITE.name} Product Feed`} href={siteUrl("/feed.xml")} />
     <link rel="alternate" type="application/rss+xml" title={`${SITE.name} Blog`} href={siteUrl("/blog/feed.xml")} />
-    <script type="application/ld+json" set:html={jsonLd(org)} />
-    <script type="application/ld+json" set:html={jsonLd(webSiteLd)} />
+    {isHome && (
+      <>
+        <script type="application/ld+json" set:html={jsonLd(org)} />
+        <script type="application/ld+json" set:html={jsonLd(webSiteLd)} />
+      </>
+    )}
     <slot name="head" />
     <script is:inline src="/app.js" defer></script>
   </head>

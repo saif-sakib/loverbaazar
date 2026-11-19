@@ -794,3 +794,14 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 - Keep the approved invoice sections, Bangla and English text, saved charges and totals, repeated headings and the last item with its totals. Load the PDF engine and fonts only when an administrator requests a download. Keep the preview and browser print controls out of the workflow.
 
 **Verification, 19 November 2026.** Brave downloaded a one-page checkout invoice and a five-page fixture with 60 English and Bangla line items. Both downloads used the order number as the filename. Poppler verified the A4 geometry, repeated amounts header and saved totals. Long unbroken codes wrapped within the item column. The last item, totals and shop contact appeared on the final page. The fixtures omit the customer's email and private staff note. After the coordinated release, download one saved order from live Admin to verify the result.
+
+### Task 63 — Improve branded homepage visibility
+
+**Status:** In progress · **Depends on:** 24, 25, 29
+
+- Present LoverBaazar and the spaced name Lover Baazar in the homepage metadata, visible copy and structured data. Verify one canonical indexable homepage, one sitemap entry and the legacy redirects.
+- After release, inspect the indexed homepage and request a recrawl in the verified Search Console property. Record Google's canonical and track homepage impressions and clicks for both spellings. See the [branded search checks](seo-performance.md#branded-homepage-visibility).
+
+**Baseline, 19 November 2026.** The live apex homepage returned HTTP 200, declared itself canonical, allowed indexing and appeared once in the 571-URL production sitemap. HTTP and www redirected to the HTTPS apex. The legacy WordPress sitemap and alternate contact URL redirected to their replacements. Public search results still showed older WordPress listings alongside current pages. The indexed homepage status and branded query report require the verified Search Console property.
+
+**Build verification.** The isolated release test checks both site names, the visible hero, the preferred social name, the linked structured data entities, the apex canonical and the single homepage sitemap entry. It also checks that the preview homepage carries noindex and that the product page keeps its own markup.

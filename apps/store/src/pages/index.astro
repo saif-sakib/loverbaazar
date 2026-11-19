@@ -2,7 +2,7 @@
 import Base from "../layouts/Base.astro";
 import { responsiveImage } from "../lib/image-delivery.mjs";
 import Card from "../components/Card.astro";
-import { products, inCat, homeItems, MENU, catUrl, img, languageOf, SITE, cats, LIVE } from "../lib/shop";
+import { products, inCat, homeItems, MENU, catUrl, img, languageOf, SITE, cats, LIVE, spacedSiteName } from "../lib/shop";
 const withPhoto = (l: any[]) => l.filter((p) => p.images[0]);
 const heroPics = withPhoto(SITE.home.flatMap((h: any) => homeItems(h.cat)))
   .filter((p: any, i: number, all: any[]) => all.findIndex((x) => x.id === p.id) === i)
@@ -22,11 +22,11 @@ const heroWords = hero.title.trim().split(" ");
 const heroEnd = heroWords.pop();
 ---
 
-<Base type="website">
+<Base type="website" description={`${spacedSiteName} — ${SITE.description}`}>
   <div class="wrap">
     <section class="hero home-hero">
       <div>
-        <p class="eyebrow">{SITE.tagline}</p>
+        <p class="eyebrow">{spacedSiteName} · {SITE.tagline}</p>
         <h1 lang={languageOf(hero.title)}>{heroWords.join(" ")} <em>{heroEnd}</em></h1>
         <p lang={languageOf(hero.text)}>{hero.text}</p>
         <div class="hero-actions">
