@@ -5,7 +5,7 @@ import { jsonLd, merchantReturnURL, publicImage } from "../lib/seo";
 import "../styles/mobile.css";
 import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf, spacedSiteName } from "../lib/shop";
 const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", language = languageOf(`${title || ""} ${description}`) } = Astro.props;
-const full = seoTitle || (title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`);
+const full = seoTitle || (title ? `${title} | ${spacedSiteName}` : `${spacedSiteName} | ${SITE.tagline}`);
 const canon = canonical || siteUrl(Astro.url.pathname);
 const isHome = Astro.url.pathname === "/";
 const preview = import.meta.env.BUILD_ENV !== "production";

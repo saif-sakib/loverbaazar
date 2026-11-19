@@ -25,7 +25,28 @@ const productURL = `https://loverbaazar.com/product/${encodeURIComponent(product
 const noindex = { slug: "seo-hidden-fixture", title: "Indexing fixture", html: "<p>One paragraph.</p>", seo: { robots: ["noindex"] } };
 const duplicate = { slug: "seo-duplicate-fixture", title: "Duplicate fixture", html: "<p>One paragraph.</p>", seo: { canonical_url: "/" } };
 store.pages.push(noindex, duplicate, { slug: "seo-draft-fixture", title: "Draft fixture", html: "<p>Private</p>", draft: true });
+if (!store.cats.some(c => c.slug === "rice-cooker")) store.cats.push({ slug: "rice-cooker", name: "Rice Cooker", path: "rice-cooker" });
+if (!store.cats.some(c => c.slug === "latest-product")) store.cats.push({ slug: "latest-product", name: "Latest Products", path: "latest-product" });
+if (!store.tags.some(t => t.slug === "thin-fixture-tag")) store.tags.push({ slug: "thin-fixture-tag", name: "Thin Fixture Tag" });
+const riceCookerFixture = {
+  ...products[0],
+  id: 9000002,
+  slug: "fixture-rice-cooker-18l",
+  name: "Fixture Kiam Rice Cooker 1.8L",
+  short: "Double pot rice cooker for 4 to 6 people.",
+  desc: "<p>Stainless body rice cooker.</p>",
+  price: 1450,
+  regular: 1900,
+  inStock: true,
+  cats: ["latest-product", "rice-cooker"],
+  tags: ["thin-fixture-tag"],
+  images: [{ src: "/logo/primary-logo.jpg" }],
+  attrs: [{ name: "Brand", values: ["Kiam"] }],
+  reviews: [],
+  seo: {},
+};
 products.unshift(product);
+products.push(riceCookerFixture);
 const buildKey = "temporary-test-key";
 const server = createServer((request, response) => {
   if (request.url !== "/api/build/fixture" || request.headers["x-build-key"] !== buildKey) return response.writeHead(404).end();
@@ -100,6 +121,30 @@ try {
   assert.doesNotMatch(sitemap, /\/(admin|cart|checkout|search|track|wishlist|my-account|404|seo-hidden-fixture|seo-duplicate-fixture|seo-draft-fixture)\//);
   assert.match(await read("production", "seo-hidden-fixture/index.html"), /noindex, follow/);
   await assert.rejects(read("production", "seo-draft-fixture/index.html"), { code: "ENOENT" });
+  const riceCat = await read("production", "product-category/rice-cooker/index.html");
+  assert.match(riceCat, /<title>Rice Cooker Price in Bangladesh \| Lover Baazar<\/title>/);
+  assert.match(riceCat, /<h1[^>]*>Rice Cooker Price in Bangladesh<\/h1>/);
+  assert.match(riceCat, /<meta name="description" content="Compare \d+ Rice Cooker prices in Bangladesh [^"]*৳[^"]*Lover Baazar/);
+  const riceCatLD = entities(riceCat).find(item => item["@type"] === "CollectionPage");
+  assert.ok(riceCatLD && riceCatLD.mainEntity["@type"] === "ItemList" && riceCatLD.mainEntity.numberOfItems >= 1);
+  assert.match(riceCat, /Rice Cooker Price List in Bangladesh/);
+  assert.match(riceCat, /<table class="price-table">[\s\S]*Fixture Kiam Rice Cooker 1\.8L/);
+  const rcPage = await read("production", "product/fixture-rice-cooker-18l/index.html");
+  assert.match(rcPage, /<title>Fixture Kiam Rice Cooker 1\.8L Price in Bangladesh \| Lover Baazar<\/title>/);
+  assert.match(rcPage, /<meta name="description" content="Fixture Kiam Rice Cooker 1\.8L price in Bangladesh is ৳1,450 at Lover Baazar\./);
+  const rcLD = entities(rcPage);
+  const rcProductLD = rcLD.find(item => item["@type"] === "Product");
+  assert.equal(rcProductLD.category, "Rice Cooker");
+  assert.equal(rcProductLD.offers.hasMerchantReturnPolicy.merchantReturnLink, "https://loverbaazar.com/terms-conditions/");
+  assert.equal(rcProductLD.offers.priceSpecification.price, 1900);
+  assert.equal(rcProductLD.offers.priceSpecification.priceType, "https://schema.org/StrikethroughPrice");
+  const rcCrumbs = rcLD.find(item => item["@type"] === "BreadcrumbList").itemListElement.map(item => item.name);
+  assert.ok(rcCrumbs.includes("Rice Cooker") && !rcCrumbs.includes("Latest Products"));
+  const thinTag = await read("production", "product-tag/thin-fixture-tag/index.html");
+  assert.match(thinTag, /noindex, follow/);
+  assert.doesNotMatch(sitemap, /\/product-tag\/thin-fixture-tag\//);
+  assert.ok(sitemap.includes("https://loverbaazar.com/product-category/rice-cooker/"));
+  assert.ok(sitemap.includes("https://loverbaazar.com/product/fixture-rice-cooker-18l/"));
   assert.match(await read("production", "robots.txt"), /Sitemap: https:\/\/loverbaazar.com\/sitemap-index.xml/);
   assert.match(await read("production", "_redirects"), /^\/page-sitemap\.xml \/sitemap-index\.xml 301$/m);
   const productionHeaders = await read("production", "_headers");
@@ -107,6 +152,7 @@ try {
   assert.doesNotMatch(productionHeaders, /^\/\*\n  X-Robots-Tag:/m);
   const feed = await read("production", "feed.xml");
   assert.match(feed, /<g:sale_price>1250 BDT<\/g:sale_price>/);
+  assert.match(feed, /<g:product_type>Rice Cooker<\/g:product_type>/);
   await run("python3", ["-c", "import sys,xml.etree.ElementTree as ET\nfor x in sys.argv[1:]: ET.parse(x)", ...["feed.xml", "blog/feed.xml", "sitemap-index.xml", "sitemap-0.xml"].map(f => join(work, "production", f))]);
 
   product.price = 999;

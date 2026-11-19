@@ -84,3 +84,63 @@ export const jsonLd = (object: object) => JSON.stringify(object).replace(/</g, "
 export const xmlText = (value: unknown) => String(value ?? "")
   .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/g, "")
   .replace(/[<>&'"]/g, character => `&#${character.charCodeAt(0)};`);
+
+export const isMerchandisingCategory = (slug: string) => slug === "latest-product" || slug === "popular-item";
+
+export const hasPriceIntent = (text: string) => /\b(?:price|bd|bangladesh)\b|দাম|বাংলাদেশ/i.test(text);
+
+export function categoryHeading(name: string, slug: string, count: number) {
+  if (count === 0 || isMerchandisingCategory(slug) || hasPriceIntent(name)) return name;
+  return languageOf(name) === "bn-BD" ? `${name} এর দাম বাংলাদেশে` : `${name} Price in Bangladesh`;
+}
+
+export function productSeoTitle(name: string) {
+  if (hasPriceIntent(name)) return name;
+  if (languageOf(name) === "bn-BD") return `${name} এর দাম`;
+  return name.length > 44 ? `${name} Price in BD` : `${name} Price in Bangladesh`;
+}
+
+export function tagSeoTitle(name: string, count: number) {
+  if (count < 3 || hasPriceIntent(name)) return name;
+  return languageOf(name) === "bn-BD" ? `${name} এর দাম বাংলাদেশে` : `${name} Price in Bangladesh`;
+}
+
+export function categoryChain(cat: any, allCats: any[]) {
+  if (!cat) return [];
+  const parts = String(cat.path || cat.slug || "").split("/").filter(Boolean);
+  const byPath = new Map(allCats.map((entry: any) => [entry.path, entry]));
+  const chain: any[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const found = byPath.get(parts.slice(0, i + 1).join("/"));
+    if (found) chain.push(found);
+  }
+  if (!chain.some((entry: any) => entry.slug === cat.slug)) chain.push(cat);
+  return chain;
+}
+
+export function primaryCategoryOf(productCats: string[], allCats: any[]) {
+  const bySlug = new Map(allCats.map((entry: any) => [entry.slug, entry]));
+  const resolved = (productCats || []).map((slug: string) => bySlug.get(slug)).filter(Boolean);
+  if (!resolved.length) return undefined;
+  const nonMerch = resolved.filter((entry: any) => !isMerchandisingCategory(entry.slug));
+  const pool = nonMerch.length ? nonMerch : resolved;
+  return pool.reduce((best: any, current: any) => {
+    const bestDepth = String(best.path || best.slug).split("/").length;
+    const currentDepth = String(current.path || current.slug).split("/").length;
+    return currentDepth > bestDepth ? current : best;
+  });
+}
+
+export function priceBounds(items: any[]) {
+  let min = Infinity;
+  let max = 0;
+  let inStockCount = 0;
+  for (const item of items) {
+    if (item.inStock) inStockCount++;
+    if (Number.isSafeInteger(item.price) && item.price > 0) {
+      if (item.price < min) min = item.price;
+      if (item.price > max) max = item.price;
+    }
+  }
+  return { min: min === Infinity ? 0 : min, max, inStockCount };
+}
