@@ -266,11 +266,14 @@
         return;
       }
       const finished = latest?.id && latest.id === watchedPublicationId;
+      const wasWatching = !!watchedPublicationId;
       watchedPublicationId = "";
       if (latest?.state === "failed" && dirty) {
         say("Publication failed. Your saved changes still need Publish. Retry after checking the build.");
-      } else if (latest?.state === "published" && finished) {
+      } else if (latest?.state === "published" && (finished || wasWatching)) {
         say(dirty ? "Published. Newer edits still need Publish." : "Publication confirmed.", 8000);
+      } else if (wasWatching) {
+        say(dirty ? "Publication ended. Click Publish to retry." : "Previous publication ended. No pending edits remain.", 8000);
       }
     } catch { /* Retain the existing pending marker on network failure. */ }
   }

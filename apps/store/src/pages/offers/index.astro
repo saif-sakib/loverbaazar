@@ -1,14 +1,57 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { onSale } from "../../lib/shop";
+import { jsonLd, priceBounds } from "../../lib/seo";
+import { onSale, siteUrl, taka } from "../../lib/shop";
 const items = onSale();
+const bounds = priceBounds(items);
+const offersTitle = "Home Appliance & Furniture Offers in Bangladesh";
+const offersDesc = items.length > 0 && bounds.min > 0
+  ? `Save on ${items.length} discounted home appliances, cookware and furniture from ${taka(bounds.min)} to ${taka(bounds.max)} in Bangladesh at Lover Baazar.`
+  : "Browse discounted home appliances, cookware and furniture in Bangladesh at Lover Baazar with live BDT prices and cash on delivery.";
+const crumbs = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: siteUrl("/") },
+    { "@type": "ListItem", position: 2, name: "Shop", item: siteUrl("/shop/") },
+    { "@type": "ListItem", position: 3, name: "Offers" },
+  ],
+};
+const collection = items.length > 0
+  ? {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: offersTitle,
+      description: offersDesc,
+      url: siteUrl("/offers/"),
+      mainEntity: {
+        "@type": "ItemList",
+        numberOfItems: items.length,
+        itemListElement: items.slice(0, 24).map((p: any, i: number) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          url: siteUrl(`/product/${p.slug}/`),
+          name: p.name,
+        })),
+      },
+    }
+  : null;
 ---
 
-<Base title="Home Appliance & Furniture Offers in Bangladesh" description="Browse discounted home appliances, cookware and furniture in Bangladesh at Lover Baazar with live BDT prices and cash on delivery.">
+<Base title={offersTitle} description={offersDesc}>
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={jsonLd(crumbs)} />
+    {collection && <script type="application/ld+json" set:html={jsonLd(collection)} />}
+  </Fragment>
   <div class="wrap">
     <div class="pagehead">
       <h1 class="title">Offers</h1>
+      {items.length > 0 && bounds.min > 0 && (
+        <p class="cat-summary">
+          <strong>{items.length}</strong> discounted {items.length === 1 ? "product" : "products"} · Offer prices {bounds.max > bounds.min ? `${taka(bounds.min)} – ${taka(bounds.max)}` : taka(bounds.min)} · Cash on delivery across Bangladesh
+        </p>
+      )}
     </div>
     {items.length ? <Grid items={items} /> : <p>No offers right now. <a class="link" href="/shop/">See everything we sell</a>.</p>}
   </div>

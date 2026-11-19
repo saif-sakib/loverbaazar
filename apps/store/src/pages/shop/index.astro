@@ -1,16 +1,67 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { products, spacedSiteName } from "../../lib/shop";
+import { isMerchandisingCategory, jsonLd, priceBounds } from "../../lib/seo";
+import { cats, catUrl, inCat, languageOf, products, siteUrl, spacedSiteName, taka } from "../../lib/shop";
+
+const bounds = priceBounds(products);
+const activeCats = cats
+  .filter((c: any) => !isMerchandisingCategory(c.slug))
+  .map((c: any) => ({ ...c, count: inCat(c.slug).length }))
+  .filter((c: any) => c.count > 0)
+  .sort((a: any, b: any) => b.count - a.count || a.name.localeCompare(b.name));
+const shopTitle = "Home Appliances & Furniture Price in Bangladesh";
+const shopDesc = `Browse all ${products.length} kitchen and home appliances, cookware, chairs, tables, and wardrobes${bounds.min > 0 ? ` from ${taka(bounds.min)} to ${taka(bounds.max)}` : ""} in Bangladesh at ${spacedSiteName}.`;
+const crumbs = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: siteUrl("/") },
+    { "@type": "ListItem", position: 2, name: "Shop" },
+  ],
+};
+const collection = products.length > 0
+  ? {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: shopTitle,
+      description: shopDesc,
+      url: siteUrl("/shop/"),
+      mainEntity: {
+        "@type": "ItemList",
+        numberOfItems: products.length,
+        itemListElement: products.slice(0, 24).map((p: any, i: number) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          url: siteUrl(`/product/${p.slug}/`),
+          name: p.name,
+        })),
+      },
+    }
+  : null;
 ---
 
-<Base
-  title="Home Appliances & Furniture Price in Bangladesh"
-  description={`Browse all ${products.length} kitchen and home appliances, cookware, chairs, tables, and wardrobes at wholesale prices in Bangladesh from ${spacedSiteName}.`}
->
+<Base title={shopTitle} description={shopDesc}>
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={jsonLd(crumbs)} />
+    {collection && <script type="application/ld+json" set:html={jsonLd(collection)} />}
+  </Fragment>
   <div class="wrap">
     <div class="pagehead">
       <h1 class="title">All products</h1>
+      {products.length > 0 && bounds.min > 0 && (
+        <p class="cat-summary">
+          <strong>{products.length}</strong> products across <strong>{activeCats.length}</strong> categories
+          {bounds.inStockCount > 0 && ` (${bounds.inStockCount} in stock)`} · Price {taka(bounds.min)} – {taka(bounds.max)} · Cash on delivery across Bangladesh
+        </p>
+      )}
+      {activeCats.length > 0 && (
+        <nav class="cat-pills" aria-label="Browse categories">
+          {activeCats.map((c: any) => (
+            <a href={catUrl(c)} lang={languageOf(c.name)}>{c.name} ({c.count})</a>
+          ))}
+        </nav>
+      )}
     </div>
     <Grid items={products} />
   </div>

@@ -10,7 +10,7 @@ import {
 } from "../../lib/seo";
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { attributeValues, catUrl, cats, fileSlug, inCat, languageOf, MENU, siteUrl, spacedSiteName, taka } from "../../lib/shop";
+import { attributeValues, catUrl, cats, fileSlug, inCat, languageOf, LIVE, MENU, siteUrl, spacedSiteName, taka } from "../../lib/shop";
 export const getStaticPaths = () => cats.map((c) => ({ params: { path: fileSlug(c.path) }, props: { c } }));
 const { c } = Astro.props;
 const items = inCat(c.slug);
@@ -22,11 +22,19 @@ const subcategories = cats.filter((x: any) => x.slug !== c.slug && x.path.starts
 const subSlugs = new Set(subcategories.map((x: any) => x.slug));
 const menuGroup = MENU.find((g: any) => g.items.some((x: any) => x.slug === c.slug));
 const parentPrefix = c.path.includes("/") ? c.path.slice(0, c.path.lastIndexOf("/") + 1) : "";
-const candidateCats = menuGroup ? menuGroup.items : parentPrefix ? cats.filter((x: any) => x.path.startsWith(parentPrefix)) : [];
-const relatedCats = candidateCats
+const preferredCats = [
+  ...(menuGroup ? menuGroup.items : []),
+  ...(parentPrefix ? cats.filter((x: any) => x.path.startsWith(parentPrefix)) : []),
+];
+const popularFallbackCats = [...cats]
+  .filter((x: any) => !isMerchandisingCategory(x.slug))
+  .sort((a: any, b: any) => inCat(b.slug).length - inCat(a.slug).length);
+const relatedCats = [...preferredCats, ...popularFallbackCats]
   .filter((x: any, i: number, all: any[]) =>
     x.slug !== c.slug && !subSlugs.has(x.slug) && inCat(x.slug).length > 0 && all.findIndex((y: any) => y.slug === x.slug) === i)
   .slice(0, 8);
+const enabledPayments = LIVE.payments.filter((p: any) => p.enabled).map((p: any) => p.label).join(", ");
+const deliveryLabels = LIVE.delivery.map((z: any) => z.label).join(", ");
 const priceList = isMerchandisingCategory(c.slug)
   ? []
   : [...items]
@@ -132,7 +140,25 @@ const collection = items.length > 0
         </div>
       </section>
     )}
-    {items.length > 0 && c.html && <section class="prose"><Fragment set:html={c.html} /></section>}
+    {items.length > 0 && (c.html ? (
+      <section class="prose"><Fragment set:html={c.html} /></section>
+    ) : !isMerchandisingCategory(c.slug) && bounds.min > 0 && (
+      <section class="prose" aria-labelledby="cat-guide-fallback">
+        <h2 id="cat-guide-fallback">Buying {c.name} in Bangladesh</h2>
+        <p>
+          Compare <strong>{items.length}</strong> {c.name} {items.length === 1 ? "option" : "options"}
+          {bounds.inStockCount > 0 && ` (${bounds.inStockCount} currently in stock)`} priced{" "}
+          {bounds.max > bounds.min ? `from ${taka(bounds.min)} to ${taka(bounds.max)}` : `at ${taka(bounds.min)}`}
+          {brands.length > 0 && ` across ${brands.slice(0, 6).join(", ")}`} at {spacedSiteName}.
+        </p>
+        <p>
+          No account is required to order.
+          {deliveryLabels && ` Delivery options: ${deliveryLabels}.`}
+          {enabledPayments && ` Accepted payment methods: ${enabledPayments}.`} Read{" "}
+          <a href="/how-to-buy/">How to buy</a> or <a href="/shop/">browse all categories</a>.
+        </p>
+      </section>
+    ))}
     {items.length > 0 && relatedCats.length > 0 && (
       <section class="prose" aria-labelledby="related-cats-title">
         <h2 id="related-cats-title">Related categories</h2>

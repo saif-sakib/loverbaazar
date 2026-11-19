@@ -148,7 +148,7 @@ func orderFingerprint(v any) string {
 	return hex.EncodeToString(sum[:])
 }
 func publishStatus(w http.ResponseWriter, r *http.Request) {
-	_, _ = db.Exec(r.Context(), `UPDATE releases SET state='failed' WHERE state IN ('queued','running') AND created_at<now()-interval '1 day'`)
+	_, _ = db.Exec(r.Context(), `UPDATE releases SET state='failed' WHERE state IN ('queued','running') AND created_at<now()-interval '45 minutes'`)
 	var revision, published int64
 	if e := db.QueryRow(r.Context(), `SELECT revision,published FROM publication_state WHERE id=1`).Scan(&revision, &published); e != nil {
 		oops(w, e)
@@ -238,8 +238,13 @@ func startPublish(w http.ResponseWriter, r *http.Request) {
 			defer localPublishMu.Unlock()
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			defer cancel()
+			var rev int64
+			if e := db.QueryRow(ctx, `SELECT revision FROM releases WHERE id=$1`, id).Scan(&rev); e != nil {
+				_ = finishRelease(ctx, id, key, "failed", "local")
+				return
+			}
 			var newer bool
-			if e := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM releases WHERE state='published' AND created_at>(SELECT created_at FROM releases WHERE id=$1))`, id).Scan(&newer); e != nil {
+			if e := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM releases WHERE state='published' AND (revision>$2 OR (revision=$2 AND created_at>(SELECT created_at FROM releases WHERE id=$1))))`, id, rev).Scan(&newer); e != nil {
 				_ = finishRelease(ctx, id, key, "failed", "local")
 				return
 			}
@@ -361,7 +366,7 @@ func finishArtifact(ctx context.Context, id, key, state, commit, artifact string
 		}
 		if state == "published" || state == "running" {
 			var newer bool
-			if e := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM releases WHERE state='published' AND created_at>(SELECT created_at FROM releases WHERE id=$1))`, id).Scan(&newer); e != nil {
+			if e := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM releases WHERE state='published' AND (revision>$2 OR (revision=$2 AND created_at>(SELECT created_at FROM releases WHERE id=$1))))`, id, revision).Scan(&newer); e != nil {
 				return e
 			}
 			if newer {
@@ -371,6 +376,9 @@ func finishArtifact(ctx context.Context, id, key, state, commit, artifact string
 				state = "superseded"
 			} else if state == "published" {
 				if _, e := tx.Exec(ctx, `UPDATE publication_state SET published=$1 WHERE id=1`, revision); e != nil {
+					return e
+				}
+				if _, e := tx.Exec(ctx, `UPDATE releases SET state='superseded' WHERE id<>$1 AND state='queued' AND (revision<$2 OR (revision=$2 AND created_at<(SELECT created_at FROM releases WHERE id=$1)))`, id, revision); e != nil {
 					return e
 				}
 			}

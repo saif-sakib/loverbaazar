@@ -1,8 +1,9 @@
 ---
 import Base from "../layouts/Base.astro";
 import { responsiveImage } from "../lib/image-delivery.mjs";
+import { isMerchandisingCategory, priceBounds } from "../lib/seo";
 import Card from "../components/Card.astro";
-import { products, inCat, homeItems, MENU, catUrl, img, languageOf, SITE, cats, LIVE, spacedSiteName } from "../lib/shop";
+import { products, inCat, homeItems, MENU, catUrl, img, languageOf, SITE, cats, LIVE, spacedSiteName, taka } from "../lib/shop";
 const withPhoto = (l: any[]) => l.filter((p) => p.images[0]);
 const heroPics = withPhoto(SITE.home.flatMap((h: any) => homeItems(h.cat)))
   .filter((p: any, i: number, all: any[]) => all.findIndex((x) => x.id === p.id) === i)
@@ -14,9 +15,14 @@ const heroShots = heroPics.map((p: any, i: number) => ({
   alt: p.name,
   name: p.name,
 }));
-const tiles = MENU.flatMap((g: any) => g.items)
+const menuTiles = MENU.flatMap((g: any) => g.items);
+const extraTiles = cats.filter((c: any) => !isMerchandisingCategory(c.slug));
+const tiles = [...menuTiles, ...extraTiles]
   .filter((c: any, i: number, all: any[]) => inCat(c.slug).length && all.findIndex((x) => x.slug === c.slug) === i)
-  .slice(0, 20);
+  .map((c: any) => {
+    const items = inCat(c.slug);
+    return { ...c, count: items.length, minPrice: priceBounds(items).min };
+  });
 const hero = SITE.hero;
 const brandWords = spacedSiteName.trim().split(/\s+/);
 const brandEnd = brandWords.pop();
@@ -75,7 +81,7 @@ const homeDescription = [spacedSiteName, SITE.address].filter(Boolean).join(" in
             <a href={catUrl(c)}>
               <img src={img(inCat(c.slug)[0].images[0]?.thumb)} alt="" loading="lazy" width="150" height="150" />
               {c.name}
-              <small>{inCat(c.slug).length} items</small>
+              <small>{c.count} items{c.minPrice > 0 ? ` · From ${taka(c.minPrice)}` : ""}</small>
             </a>
           ))}
         </section>

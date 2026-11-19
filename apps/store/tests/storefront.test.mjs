@@ -332,6 +332,26 @@ test('a publication that finishes before the first status check still confirms',
   await page.getByText('Publication confirmed.', { exact: true }).waitFor();
 }));
 
+test('a superseded or mismatched publication clears the queued banner cleanly', () => shop(async (page, context) => {
+  await page.addInitScript(() => sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'));
+  let latest = { id: 'older-release', state: 'published' };
+  let dirty = true;
+  await context.route('**/api/admin/publish', route => {
+    if (route.request().method() === 'POST') {
+      latest = { id: 'watched-release', state: 'queued' };
+      return route.fulfill({ json: { id: latest.id, message: 'Publication queued. Saved edits remain pending until deployment is confirmed.' } });
+    }
+    return route.fulfill({ json: { dirty, latest } });
+  });
+  await ready(page, '/admin/');
+  await page.locator('#pub2').click();
+  await page.getByText(/Publication queued\. Saved changes/).waitFor();
+  latest = { id: 'different-newer-release', state: 'published' };
+  dirty = false;
+  await page.getByText('Publication confirmed.', { exact: true }).waitFor();
+  assert.equal(await page.locator('#dirtybar').isVisible(), false);
+}));
+
 test('a stale publication status response cannot clear newly saved edits',()=>shop(async(page,context)=>{
  await page.addInitScript(()=>sessionStorage.setItem('t','local-admin-token-for-this-computer-only'));
  let release;

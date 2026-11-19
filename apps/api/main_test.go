@@ -840,6 +840,59 @@ func TestSEOCategoryGuidesKeepOwnerEdits(t *testing.T) {
 	}
 }
 
+func TestSEOCatalogEnrichmentKeepsOwnerValues(t *testing.T) {
+	reset(t)
+	if _, err := db.Exec(bg, `INSERT INTO content(kind,slug,data) VALUES
+		('cat','anodized','{"slug":"anodized","name":"Anodized","path":"anodized"}'),
+		('cat','dc','{"slug":"dc","name":"Die Casting","path":"dc"}'),
+		('cat','pressure-cooker','{"slug":"pressure-cooker","name":"Pressure Cooker","path":"pressure-cooker"}'),
+		('cat','rfl-chair','{"slug":"rfl-chair","name":"RFL Chair","path":"rfl-chair"}')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(bg, `UPDATE products SET data='{"id":1,"slug":"p1","name":"Kiam Pressure Cooker 5.5L","sku":"pc: ss 5.5","cats":["pressure-cooker"],"tags":[],"images":[],"attrs":[]}'::jsonb WHERE id=1`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(bg, `UPDATE products SET data='{"id":2,"slug":"p2","name":"RFL Deluxe Chair","sku":"CUSTOM-1","condition":"refurbished","cats":["rfl-chair"],"tags":[],"images":[],"attrs":[{"name":"Brand","values":["OwnerBrand"]}]}'::jsonb WHERE id=2`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(bg, `INSERT INTO products(id,slug,price,regular,stock,data) VALUES(3,'p3',650,650,5,'{"id":3,"slug":"p3","name":"5 Layer Shoe Rack","sku":"Rack: 5 layer shoe rack","cats":[],"tags":[],"images":[],"attrs":[]}'::jsonb)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyContentUpdates(bg); err != nil {
+		t.Fatal(err)
+	}
+	var sku1, cond1, attrs1, sku2, cond2, attrs2, sku3, cond3, attrs3 string
+	if err := db.QueryRow(bg, `SELECT data->>'sku',data->>'condition',data->'attrs'::text FROM products WHERE id=1`).Scan(&sku1, &cond1, &attrs1); err != nil {
+		t.Fatal(err)
+	}
+	if sku1 != "pc-ss-5.5" || cond1 != "new" || !strings.Contains(attrs1, `"Kiam"`) {
+		t.Errorf("product 1 enrichment unexpected: sku=%q cond=%q attrs=%s", sku1, cond1, attrs1)
+	}
+	if err := db.QueryRow(bg, `SELECT data->>'sku',data->>'condition',data->'attrs'::text FROM products WHERE id=2`).Scan(&sku2, &cond2, &attrs2); err != nil {
+		t.Fatal(err)
+	}
+	if sku2 != "CUSTOM-1" || cond2 != "refurbished" || !strings.Contains(attrs2, `"OwnerBrand"`) || strings.Contains(attrs2, `"RFL"`) {
+		t.Errorf("product 2 owner values overwritten: sku=%q cond=%q attrs=%s", sku2, cond2, attrs2)
+	}
+	if err := db.QueryRow(bg, `SELECT data->>'sku',data->>'condition',data->'attrs'::text FROM products WHERE id=3`).Scan(&sku3, &cond3, &attrs3); err != nil {
+		t.Fatal(err)
+	}
+	if sku3 != "Rack-5-layer-shoe-rack" || cond3 != "new" || attrs3 != "[]" {
+		t.Errorf("product 3 invented brand or bad sku: sku=%q cond=%q attrs=%s", sku3, cond3, attrs3)
+	}
+	var anodizedHTML, dcHTML string
+	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='cat' AND slug='anodized'`).Scan(&anodizedHTML); err != nil || !strings.Contains(anodizedHTML, "Anodized cookware") {
+		t.Errorf("anodized guide missing: %v %q", err, anodizedHTML)
+	}
+	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='cat' AND slug='dc'`).Scan(&dcHTML); err != nil || !strings.Contains(dcHTML, "Die casting cookware") {
+		t.Errorf("dc guide missing: %v %q", err, dcHTML)
+	}
+	var postsCount int
+	if err := db.QueryRow(bg, `SELECT count(*) FROM content WHERE kind='post' AND slug IN ('kitchen-appliances-price-guide-bangladesh','pressure-cooker-cookware-price-guide-bangladesh','plastic-wardrobe-almirah-chair-price-guide-bangladesh')`).Scan(&postsCount); err != nil || postsCount != 3 {
+		t.Errorf("expected 3 storewide guides, got %d (err=%v)", postsCount, err)
+	}
+}
+
 func TestImageCleanupAndSafeUploadPlace(t *testing.T) {
 	reset(t)
 	dir := t.TempDir()
