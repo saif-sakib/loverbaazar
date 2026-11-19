@@ -25,5 +25,7 @@ jobs:
       - name: Install Chromium and system dependencies
         run: npx --no-install playwright install --with-deps chromium
         working-directory: apps/store
+      - name: Install PDF layout checker
+        run: sudo apt-get install -y poppler-utils
       - name: Store build, browser, accessibility and disposable checkout
         run: ./scripts/test-mobile.sh --ci

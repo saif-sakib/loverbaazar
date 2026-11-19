@@ -1,5 +1,6 @@
 // Real writes: invoke only through scripts/test-mobile.sh, which owns a disposable stack.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 const baseURL = process.env.SHOP_URL;
@@ -15,6 +16,39 @@ const photo = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQ
 context.on('page', p => p.on('pageerror', e => errors.push(e.message)));
 const shotDir = process.env.LB_SCREENSHOTS;
 if (shotDir) await fs.mkdir(shotDir, { recursive: true });
+const canInspectPDF = spawnSync('pdftotext', ['-v']).status === 0;
+if (process.env.CI === 'true') assert.ok(canInspectPDF, 'Install poppler-utils for the invoice layout check.');
+
+function inspectInvoice(pdf, multipage) {
+  if (!canInspectPDF) return;
+  const extract = (format) => {
+    const result = spawnSync('pdftotext', [format, '-', '-'], { input: pdf, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout;
+  };
+  const pages = [...extract('-bbox').matchAll(/<page width="([\d.]+)" height="([\d.]+)">([\s\S]*?)<\/page>/g)];
+  assert.ok(multipage ? pages.length > 1 : pages.length === 1, 'Invoice pagination');
+  for (const [, width, height, page] of pages) {
+    assert.equal(Number(width).toFixed(2), '595.28');
+    assert.equal(Number(height).toFixed(2), '841.89');
+    assert.match(page, />Amount<\/word>/, 'Repeat item column headings');
+    for (const [, left, right] of page.matchAll(/<word xMin="([\d.]+)" yMin="[^"]+" xMax="([\d.]+)"/g)) {
+      assert.ok(Number(left) >= 44 && Number(right) <= Number(width) - 44, 'Invoice text stays inside A4 margins');
+    }
+  }
+  const content = extract('-layout');
+  assert.doesNotMatch(content, /private-fixture@example|Private staff fixture note/i);
+  const lastPage = content.trimEnd().split('\f').at(-1);
+  assert.match(lastPage, multipage ? /Order total +৳ *30,050$/m : /Order total +৳ *550$/m);
+  if (multipage) {
+    assert.match(lastPage, /রাইস কুকার · Item 60/);
+  } else {
+    assert.match(content, /House 12 <Unit B>, Example Road/);
+    assert.match(content, /Discount \(FIXTURE\)\s+−৳\s*50/);
+    assert.match(content, /Transaction reference\s+FIXTURE-TXN-42/);
+  }
+}
+
 const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: `${shotDir}/${name}.png`, fullPage: false }); };
 const request = async (method, path, data, admin = true) => {
   const r = await context.request.fetch(path, { method, data, headers: admin ? headers : {} });
@@ -243,67 +277,42 @@ try {
   assert.equal(saved[0].email, 'private-fixture@example.invalid');
   await request('PUT', `/api/admin/orders/${paidOrder.number}`, {adminNote: 'Private staff fixture note'});
   await admin.goto('/admin/#orders');
-  const invoiceButton = admin.locator('[data-order-row]', { hasText: paidOrder.number }).getByRole('button', { name: 'Invoice' });
-  await invoiceButton.click();
-  const invoice = admin.getByRole('dialog', { name: `Invoice ${paidOrder.number}` });
-  await invoice.waitFor();
-  assert.match(await invoice.textContent(), /House 12 <Unit B>, Example Road/);
-  assert.match(await invoice.getByRole('row', { name: /Mobile fixture kettle/ }).textContent(), /৳500/);
-  const formattedTotal = '৳' + saved[0].total.toLocaleString('en-IN');
-  assert.equal(await invoice.locator('.invoice-total dd').textContent(), formattedTotal);
-  assert.match(await invoice.locator('.invoice-totals').textContent(), /Discount \(FIXTURE\)−৳50/);
-  assert.match(await invoice.locator('.invoice-payment').innerText(), /Transaction reference\s+FIXTURE-TXN-42/);
-  assert.equal(await invoice.locator('.invoice-thanks').textContent(), 'Thank you for shopping with LoverBaazar.');
-  assert.doesNotMatch(await invoice.textContent(), /private-fixture@example|Private staff fixture note/i);
-  assert.equal(await invoice.getByRole('columnheader', { name: 'Unit price' }).isVisible(), true);
-  for (const [width, height] of [[320, 568], [360, 812], [375, 812], [390, 812], [414, 812], [768, 850], [1024, 600], [1440, 900]]) {
-    await admin.setViewportSize({ width, height });
-    const geometry = await invoice.evaluate(box => {
-      const bounds = box.getBoundingClientRect();
-      const preview = box.querySelector('#invoice-preview');
-      return {
-        visible: bounds.left >= 8 && bounds.top >= 8 && bounds.right <= innerWidth - 8 && bounds.bottom <= innerHeight - 8,
-        centered: Math.abs(bounds.left - (innerWidth - bounds.right)) <= 2,
-        wrapped: preview.scrollWidth <= preview.clientWidth,
-      };
-    });
-    assert.deepEqual(geometry, {visible: true, centered: true, wrapped: true}, `Invoice geometry at ${width}×${height}`);
-  }
-  await admin.setViewportSize({ width: 375, height: 812 });
-  await shot(admin, 'invoice-375');
+  const invoiceButton = admin.locator('[data-order-row]', { hasText: paidOrder.number }).getByRole('button', { name: 'Download invoice' });
+  await admin.evaluate(() => { window.print = () => { document.body.dataset.printCalled = 'yes'; }; });
+  assert.equal(await admin.evaluate(() => performance.getEntriesByType('resource')
+    .some(entry => entry.name.includes('/invoice-assets/'))), false, 'Load the PDF engine only when requested.');
+  const download = async (button, number, sampleName) => {
+    const openTabs = context.pages().length;
+    const [file] = await Promise.all([admin.waitForEvent('download'), button.click()]);
+    assert.equal(file.suggestedFilename(), `${number}.pdf`);
+    assert.equal(context.pages().length, openTabs);
+    const output = await fs.readFile(await file.path());
+    assert.equal(output.subarray(0, 5).toString(), '%PDF-');
+    if (shotDir) await file.saveAs(`${shotDir}/${sampleName}`);
+    return output;
+  };
+  inspectInvoice(await download(invoiceButton, paidOrder.number, 'invoice-fixture.pdf'), false);
+  assert.equal(await admin.locator('body').getAttribute('data-print-called'), null);
+  assert.equal(await admin.locator('dialog[open]').count(), 0);
+
+  // Render real pagination through the same download button with a large
+  // synthetic invoice. The PDF fixture is independent of print preferences.
+  const items = Array.from({ length: 60 }, (_, index) => ({
+    name: index % 2 ? `রাইস কুকার · Item ${index + 1} ${'LongCode'.repeat(15)}` : `Fixture item ${index + 1}`,
+    qty: 1, price: 500,
+  }));
+  const largeOrder = { ...saved[0], number: 'LB-PDF-LARGE', items, subtotal: 30000,
+    total: 30000 + saved[0].shipping - saved[0].discount };
+  const route = '**/api/admin/orders?*';
+  const ordersMock = async request => request.fulfill({ json: { orders: [largeOrder], total: 1, sales: largeOrder.total, size: 50 } });
+  await admin.route(route, ordersMock);
+  await admin.reload();
   await admin.setViewportSize({ width: 1440, height: 900 });
-  assert.equal(await invoice.evaluate(box => box.scrollWidth <= box.clientWidth), true);
-  await shot(admin, 'invoice-desktop');
-  const paper = admin.locator('#invoice-print');
-  assert.equal(await paper.isVisible(), false);
-  await admin.evaluate(() => { window.print = () => { document.body.dataset.testPrintCalled = 'yes'; }; });
-  await invoice.getByRole('button', { name: 'Print or save PDF' }).click();
-  assert.equal(await admin.locator('body').getAttribute('data-test-print-called'), 'yes');
-  await admin.emulateMedia({ media: 'print' });
-  assert.equal(await admin.locator('body > .wrap').isVisible(), false);
-  assert.equal(await admin.locator('#order-invoice').isVisible(), false);
-  assert.equal(await paper.locator('.invoice-total').isVisible(), true);
-  assert.equal(await paper.locator('.invoice-thanks').isVisible(), true);
-  assert.equal(await paper.evaluate(page => page.scrollWidth <= page.clientWidth), true);
-  if (shotDir) {
-    await admin.pdf({ path: `${shotDir}/invoice-fixture.pdf`, preferCSSPageSize: true, printBackground: true });
-    await paper.locator('.invoice-tail').evaluate(tail => {
-      const row = tail.firstElementChild;
-      const table = tail.previousElementSibling;
-      for (let number = 2; number <= 60; number++) {
-        const copy = row.cloneNode(true);
-        copy.firstElementChild.textContent = number % 2 ? `Fixture item ${number}` : `রাইস কুকার · Fixture item ${number} ${"LongCode".repeat(15)}`;
-        table.append(copy);
-      }
-    });
-    await admin.pdf({ path: `${shotDir}/invoice-multipage-fixture.pdf`, preferCSSPageSize: true });
-  }
-  await admin.emulateMedia({ media: null });
+  const largeInvoice = admin.locator('[data-order-row]', { hasText: largeOrder.number }).getByRole('button', { name: 'Download invoice' });
+  inspectInvoice(await download(largeInvoice, largeOrder.number, 'invoice-multipage-fixture.pdf'), true);
   await admin.setViewportSize({ width: 375, height: 812 });
-  await invoice.getByRole('button', { name: 'Close' }).click();
-  await admin.waitForFunction(() => document.querySelector('#invoice-preview').childElementCount === 0);
-  assert.equal(await paper.locator('header').count(), 0);
-  assert.equal(await invoiceButton.evaluate(button => button === document.activeElement), true);
+  await admin.unroute(route, ordersMock);
+  await admin.reload();
   const coupon = await request('GET', '/api/admin/coupons');
   assert.equal(coupon.find(c => c.code === 'FIXTURE').used, 1);
   const paidProducts = await request('GET', '/api/admin/products');
@@ -331,5 +340,5 @@ try {
   await admin.getByRole('heading', { name: 'API and checkout' }).waitFor();
   assert.match(await admin.locator('#view').textContent(), /API ready/);
   assert.match(await admin.locator('#view').textContent(), /Order email paused or unavailable/);
-  console.log('PASS: isolated publication, mobile navigation, guest checkout, logged-in coupon/manual payment with a safe retry, printable invoice, fulfillment, cancellation, stock and last-unit race.');
+  console.log('PASS: isolated publication, mobile navigation, guest checkout, logged-in coupon/manual payment with a safe retry, direct invoice downloads, fulfillment, cancellation, stock and last-unit race.');
 } finally { await context.close(); await browser.close(); }
