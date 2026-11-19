@@ -884,55 +884,71 @@
   function invoice(o) {
     const dialog = $("#order-invoice");
     if (!dialog) return say("Reload Admin to preview the invoice.");
+    if (!o || dialog.open) return;
     const preview = $("#invoice-preview", dialog);
+    const paper = $("#invoice-print");
     const shop = site || {};
     const shopName = esc(shop.name || "LoverBaazar");
+    const contact = [shop.phone, shop.email].filter(Boolean).map(esc).join(" · ");
     const date = new Date(o.created_at).toLocaleDateString("en-GB", {
       timeZone: "Asia/Dhaka", day: "numeric", month: "short", year: "numeric",
     });
+    const rows = (o.items || []).map((item) => `<tr><td>${esc(item.name)}</td><td>${esc(item.qty)}</td><td>${money(item.price)}</td><td>${money(item.price * item.qty)}</td></tr>`);
+    const lastRow = rows.pop() || "";
 
-    preview.innerHTML = `<header class="invoice-header">
+    const documentHTML = `<header class="invoice-header">
         <div class="invoice-shop">
-          <img src="${esc(shop.logo || "/favicon.svg")}" alt="" width="48" height="48">
-          <div><strong>${shopName}</strong><br>${esc(shop.phone)}${shop.address ? `<br>${esc(shop.address)}` : ""}</div>
+          <img src="${esc(shop.logo || "/logo/primary-logo-80.webp")}" alt="" width="44" height="44">
+          <div><strong>${shopName}</strong>${shop.address ? `<p>${esc(shop.address)}</p>` : ""}</div>
         </div>
         <div class="invoice-heading">
-          <h2 id="invoice-title">Invoice <span>${esc(o.number)}</span></h2>
-          <p class="invoice-date"><time datetime="${esc(o.created_at)}">${esc(date)}</time> · <span class="invoice-status">${esc(o.status)}</span></p>
+          <h2>Invoice</h2>
+          <p class="invoice-number">${esc(o.number)}</p>
+          <time datetime="${esc(o.created_at)}">${esc(date)}</time>
         </div>
       </header>
-      <section class="invoice-customer">
-        <h3>Bill to</h3>
-        <p><strong>${esc(o.name)}</strong><br>${esc(o.phone)}${o.email ? `<br>${esc(o.email)}` : ""}<br>${esc(o.address)} (${esc(o.area)})</p>
-      </section>
+      <div class="invoice-details">
+        <section class="invoice-customer">
+          <h3>Deliver to</h3>
+          <p><strong>${esc(o.name)}</strong><br>${esc(o.address)} (${esc(o.area)})<br>${esc(o.phone)}</p>
+        </section>
+        <section class="invoice-payment">
+          <h3>Order details</h3>
+          <dl class="invoice-facts">
+            <div><dt>Order status</dt><dd>${esc(statusLabel(o.status))}</dd></div>
+            <div><dt>Payment method</dt><dd>${esc(o.payment)}</dd></div>
+            ${o.txn_id ? `<div><dt>Transaction reference</dt><dd>${esc(o.txn_id)}</dd></div>` : ""}
+          </dl>
+        </section>
+      </div>
       <table class="invoice-items">
         <thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Amount</th></tr></thead>
-        <tbody>${(o.items || []).map((item) => `<tr><td>${esc(item.name)}</td><td>${esc(item.qty)}</td><td>${money(item.price)}</td><td>${money(item.price * item.qty)}</td></tr>`).join("")}</tbody>
+        <tbody>${rows.join("")}</tbody>
+        <tbody class="invoice-tail">${lastRow}
+          <tr class="invoice-settlement"><td colspan="4">
+            <dl class="invoice-totals">
+              <div><dt>Subtotal</dt><dd>${money(o.subtotal)}</dd></div>
+              ${o.discount ? `<div><dt>Discount (${esc(o.coupon)})</dt><dd>−${money(o.discount)}</dd></div>` : ""}
+              <div><dt>Delivery charge</dt><dd>${o.shipping ? money(o.shipping) : "Free"}</dd></div>
+              <div class="invoice-total"><dt>Order total</dt><dd>${money(o.total)}</dd></div>
+            </dl>
+            <div class="invoice-footer">
+              <p class="invoice-thanks">Thank you for shopping with ${shopName}.</p>
+              ${contact ? `<p>Questions about your order? ${contact}</p>` : ""}
+            </div>
+          </td></tr>
+        </tbody>
       </table>
-      <div class="invoice-end">
-        <div class="invoice-summary">
-          <div class="invoice-payment">
-            <h3>Payment method</h3>
-            <p>${esc(o.payment)}${o.txn_id ? `<br>Transaction reference<br>${esc(o.txn_id)}` : ""}</p>
-          </div>
-          <dl class="invoice-totals">
-            <div><dt>Subtotal</dt><dd>${money(o.subtotal)}</dd></div>
-            ${o.discount ? `<div><dt>Discount (${esc(o.coupon)})</dt><dd>−${money(o.discount)}</dd></div>` : ""}
-            <div><dt>Delivery charge</dt><dd>${o.shipping ? money(o.shipping) : "Free"}</dd></div>
-            <div class="invoice-total"><dt>Total</dt><dd>${money(o.total)}</dd></div>
-          </dl>
-        </div>
-        <p class="invoice-thanks">Thanks for shopping from ${shopName}!</p>
-      </div>`;
+      `;
 
-    const paper = preview.cloneNode(true);
-    paper.id = "invoice-print";
-    $("#invoice-title", paper).removeAttribute("id");
-    dialog.after(paper);
+    preview.innerHTML = documentHTML;
+    paper.innerHTML = documentHTML;
+    dialog.setAttribute("aria-label", `Invoice ${o.number}`);
     $("[data-print-invoice]", dialog).onclick = () => window.print();
     dialog.onclose = () => {
+      if (dialog.open) return;
       preview.replaceChildren();
-      paper.remove();
+      paper.replaceChildren();
     };
     dialog.showModal();
   }

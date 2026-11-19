@@ -123,6 +123,8 @@ Normal legacy `seed` is bootstrap-only: missing quantities produce zero stock an
 
 ## Old customers and orders
 
+See [current retention by system](data-retention.md) for the distinction between WordPress originals, private archives, new-store orders and backups.
+
 ```sh
 python3 scripts/import_wp.py archive /private/source --output /private/work/legacy.sqlite
 python3 scripts/import_wp.py lookup /private/work/legacy.sqlite --order-id 123

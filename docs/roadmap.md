@@ -749,3 +749,37 @@ Some evidence needs owner/account participation. If it is absent, finish prepara
 ## Result to record when completing a task
 
 For the chosen task, replace Planned with its actual status and record the date, implementation/artifact links, verification commands and results, any accepted limitations, and numbered **Actions required** for the owner. Link to a longer sanitized report when necessary. A blocked account action does not erase completed implementation work, but the task remains incomplete until its acceptance criteria are satisfied.
+
+## Retention, security and print follow-ups
+
+Prioritize tasks 59 and 60 before implementing data cleanup or changing production access.
+
+### Task 58 — Redesign the A4 customer invoice
+
+**Status:** In progress, awaiting owner approval of the new print design · **Depends on:** 16, 56
+
+- Use a single invoice document layout in the admin preview and print. Separate seller, delivery, order details, items and totals. Fit A4 and keep long Bangla and English text legible. Keep private notes and customer email out of the PDF.
+- Verify a narrow phone preview, desktop, one-page and multipage output, repeated headings, currency, close/focus recovery and printed data matching the saved order. Review a fixture PDF before rollout.
+
+**Verification, 19 November 2026.** The isolated API race and browser flows passed. Chromium checked eight widths from 320 to 1440 px. The one-page PDF and six-page mixed-language print stress case used A4, kept text more than 44 pt from the page edges and printed the saved total and the transaction reference. Item headings repeated and the last item and totals stayed together. The customer email and private staff note stayed out of both PDFs. The owner can review the fixture PDF and verify one copy from their print dialog before approving rollout.
+
+### Task 59 — Set and verify customer and order retention
+
+**Status:** Planned, automatic removal is unscheduled · **Depends on:** 19, 35, 36
+
+- Inventory data in WooCommerce, Neon, private exports, email, PDF and backup copies. Agree what must be retained, what can be anonymized, the retention dates or periods, and how disputes and outstanding obligations pause cleanup.
+- Build report-only eligibility first. Verify action approvals, audit evidence, backups, batch/retry safety and restore reconciliation. Implement a verified privacy-request process and update the published privacy text after owner review. See [current behavior and acceptance](data-retention.md).
+
+### Task 60 — Verify production security and dependency alerts
+
+**Status:** Planned · **Depends on:** 4, 5, 31, 41
+
+- Review GitHub dependency alerts, set a private vulnerability reporting path and verify that untrusted workflows cannot access deploy/backup secrets. Main already requires a PR and Store CI, applies to administrators and rejects force pushes. GitHub reports Dependabot alerts disabled as of 19 November.
+- Verify 2FA and independent recovery for production services. Check least-privilege access and token expiry, preview/live isolation and mail/backup/production alerts. Track dependency patches and document closure evidence without exposing secrets or customer data.
+
+### Task 61 — Check transactional email delivery and backup freshness
+
+**Status:** Planned · **Depends on:** 34, 35, 36, 49
+
+- Investigate blocked mail in Brevo and verify representative customer receipt and shipment with a controlled inbox. Check sender authentication and review retry outcomes in Operations before considering more capacity.
+- Verify scheduled backups and freshness alerts on the current revision, and restore an independently held encrypted copy in an isolated database. Record who responds when a scheduled backup or mail fails.
