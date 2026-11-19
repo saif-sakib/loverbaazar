@@ -2,6 +2,7 @@
   "paths": {
     "/sitemap_index.xml": "/sitemap-index.xml",
     "/wp-sitemap.xml": "/sitemap-index.xml",
+    "/page-sitemap.xml": "/sitemap-index.xml",
     "/contact-us-2/": "/contact-us/",
     "/privacy-policy-2/": "/privacy-policy/",
     "/wishlist-2/": "/wishlist/",

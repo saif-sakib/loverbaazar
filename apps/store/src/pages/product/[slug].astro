@@ -1,6 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { gtinOf, jsonLd, plainText, publicImage, recordSEO } from "../../lib/seo";
+import { gtinOf, jsonLd, merchantReturnURL, plainText, publicImage, recordSEO, skuOf } from "../../lib/seo";
 import { gallerySizes, responsiveImage, sizedImage } from "../../lib/image-delivery.mjs";
 import Card from "../../components/Card.astro";
 import { products, cats, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, siteUrl, attributeValues, languageOf } from "../../lib/shop";
@@ -23,7 +23,7 @@ const ld = {
   "@context": "https://schema.org",
   "@type": "Product",
   name: p.name,
-  sku: p.sku || undefined,
+  sku: skuOf(p),
   brand: brandName ? { "@type": "Brand", name: brandName } : undefined,
   gtin,
   mpn: p.mpn || undefined,
@@ -36,7 +36,7 @@ const ld = {
     price: p.price,
     itemCondition: p.condition === "new" ? "https://schema.org/NewCondition" : undefined,
     availability: p.inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-    seller: { "@type": "Organization", name: SITE.name },
+    seller: { "@type": "Store", "@id": siteUrl("/#store"), name: SITE.name },
   },
   aggregateRating: p.reviews.length
     ? { "@type": "AggregateRating", ratingValue: stars.toFixed(1), reviewCount: p.reviews.length }
@@ -159,6 +159,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
             <b>Returns:</b> {SITE.returns}
           </p>
         )}
+        {merchantReturnURL && <p class="meta"><a class="link" href={merchantReturnURL}>Returns and exchanges</a></p>}
         <p class="note">
           Order by phone:{" "}
           <a href={`tel:${telOf(SITE.phone)}`}>

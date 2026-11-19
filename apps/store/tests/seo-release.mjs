@@ -19,6 +19,8 @@ const readJSON = async path => {
 };
 const [products, store] = await Promise.all([readJSON("/api/catalog"), readJSON("/api/storefront")]);
 const product = { ...products[0], id: 9000001, slug: "বিক্রয়-পরীক্ষা", name: "বাংলা পরীক্ষার পণ্য", short: "বাংলা বিবরণ ও তথ্য", desc: "<p>বাংলা পরীক্ষার পণ্য।</p>", price: 1250, regular: 1500, inStock: true, images: [{ src: "/logo/primary-logo.jpg" }], gtin: "012345678905", reviews: [], seo: { title: "পরীক্ষার দোকান", description: "<b>বাংলা বিবরণ</b> &amp; তথ্য", canonical_url: "http://www.loverbaazar.com/product/" + encodeURIComponent("বিক্রয়-পরীক্ষা").toLowerCase() } };
+product.sku = "Fixture SKU";
+product.attrs = [{ name: "Brand", values: ["Fixture Brand"] }];
 const productURL = `https://loverbaazar.com/product/${encodeURIComponent(product.slug)}/`;
 const noindex = { slug: "seo-hidden-fixture", title: "Indexing fixture", html: "<p>One paragraph.</p>", seo: { robots: ["noindex"] } };
 const duplicate = { slug: "seo-duplicate-fixture", title: "Duplicate fixture", html: "<p>One paragraph.</p>", seo: { canonical_url: "/" } };
@@ -71,15 +73,23 @@ try {
   assert.equal(websites[0].url, "https://loverbaazar.com/");
   assert.equal(shops[0].url, "https://loverbaazar.com/");
   assert.equal(websites[0].publisher["@id"], shops[0]["@id"]);
+  assert.deepEqual(shops[0].hasMerchantReturnPolicy, {
+    "@type": "MerchantReturnPolicy", merchantReturnLink: "https://loverbaazar.com/terms-conditions/",
+  });
   const page = await read("production", `product/${product.slug}/index.html`);
   const htmlLD = entities(page);
   assert.ok(!htmlLD.some(item => ["WebSite", "Store"].includes(item["@type"])));
-  const offer = htmlLD.find(item => item["@type"] === "Product");
-  assert.equal(offer.offers.price, 1250);
-  assert.equal(offer.offers.availability, "https://schema.org/InStock");
-  assert.equal(offer.offers.url, productURL);
-  assert.equal(offer.gtin, product.gtin);
-  assert.equal(offer.image[0], "https://loverbaazar.com/logo/primary-logo.jpg");
+  const productLD = htmlLD.find(item => item["@type"] === "Product");
+  assert.equal(productLD.offers.price, 1250);
+  assert.equal(productLD.offers.availability, "https://schema.org/InStock");
+  assert.equal(productLD.offers.url, productURL);
+  assert.equal(productLD.offers.seller["@id"], shops[0]["@id"]);
+  assert.equal(productLD.gtin, product.gtin);
+  assert.equal(productLD.brand.name, "Fixture Brand");
+  assert.equal(productLD.image[0], "https://loverbaazar.com/logo/primary-logo.jpg");
+  for (const key of ["sku", "aggregateRating", "review"]) assert.ok(!(key in productLD));
+  assert.match(page, /SKU: Fixture SKU/);
+  assert.match(page, /href="https:\/\/loverbaazar.com\/terms-conditions\/">Returns and exchanges<\/a>/);
   assert.match(page, /<title>পরীক্ষার দোকান<\/title>/);
   assert.match(page, /lang="bn-BD"/);
   assert.ok(/content="বাংলা বিবরণ (?:&amp;|&#38;) তথ্য"/.test(page), "SEO description is escaped plain text");
@@ -91,6 +101,7 @@ try {
   assert.match(await read("production", "seo-hidden-fixture/index.html"), /noindex, follow/);
   await assert.rejects(read("production", "seo-draft-fixture/index.html"), { code: "ENOENT" });
   assert.match(await read("production", "robots.txt"), /Sitemap: https:\/\/loverbaazar.com\/sitemap-index.xml/);
+  assert.match(await read("production", "_redirects"), /^\/page-sitemap\.xml \/sitemap-index\.xml 301$/m);
   const productionHeaders = await read("production", "_headers");
   assert.match(productionHeaders, /https:\/\/:worker\.:account\.workers\.dev\/\*\n  X-Robots-Tag: noindex, nofollow/);
   assert.doesNotMatch(productionHeaders, /^\/\*\n  X-Robots-Tag:/m);
@@ -100,13 +111,25 @@ try {
 
   product.price = 999;
   product.inStock = false;
+  product.sku = "  LB-0125  ";
+  product.reviews = [{ name: "Fixture customer", rating: 5, body: "Review fixture" }];
+  store.pages.find(page => page.slug === "terms-conditions").draft = true;
   await build("preview", "preview");
   const next = await read("preview", `product/${product.slug}/index.html`);
+  const nextProduct = entities(next).find(item => item["@type"] === "Product");
+  assert.equal(nextProduct.sku, "LB-0125");
+  assert.equal(nextProduct.aggregateRating.reviewCount, 1);
+  assert.equal(nextProduct.review[0].reviewBody, "Review fixture");
+  assert.match(next, /Review fixture/);
+  assert.doesNotMatch(next, /Returns and exchanges/);
   assert.match(next, /"price":999,"availability":"https:\/\/schema.org\/OutOfStock"/);
   assert.match(next, /<b>৳999<\/b>/);
   assert.match(await read("preview", "feed.xml"), /<g:sale_price>999 BDT<\/g:sale_price>\s*<g:availability>out_of_stock<\/g:availability>/);
   assert.match(await read("preview", "_headers"), /X-Robots-Tag: noindex, nofollow/);
-  assert.match(await read("preview", "index.html"), /noindex, nofollow/);
+  const previewHome = await read("preview", "index.html");
+  assert.match(previewHome, /noindex, nofollow/);
+  assert.ok(!entities(previewHome).find(item => item["@type"] === "Store").hasMerchantReturnPolicy);
+  assert.doesNotMatch(await read("preview", "_redirects"), /page-sitemap\.xml/);
   assert.match(next, /noindex, nofollow/);
   await assert.rejects(read("preview", "sitemap-index.xml"), { code: "ENOENT" });
   const source = "https://res.cloudinary.com/test/image/upload/f_auto,q_auto,w_300/v100/loverbaazar/products/example.webp";

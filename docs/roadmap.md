@@ -810,6 +810,8 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 
 **Follow-up, 19 November 2026.** After releasing the first branding update, public searches found the rice cooker category and current contact page. A public result still showed the old WordPress homepage title. The new build places the spaced brand in the title, main heading, social name and preferred site name. It includes the configured address in the description. A generic HTTP client received Cloudflare 1010 on several live paths, and browser requests to those paths returned 200. Record Google's indexed status and real crawl result before attributing the ranking to an access rule. Compare branded homepage impressions after recrawl.
 
+**Search Console evidence, 19 November 2026.** The owner confirmed that Google indexed the homepage, selected the inspected apex URL as canonical and fetched it successfully with Googlebot smartphone. The brand-first homepage release is live. Monitor impressions for both spellings after Google processes the updated page.
+
 ### Task 64 — Restore invoice preview and fix PDF download under production policy
 
 **Status:** In progress · **Depends on:** 58, 62
@@ -818,3 +820,14 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 - Embed the logo in a format that works under the existing security policy. Verify single- and multipage downloads in Brave with that policy applied, along with preview fit, the retry path and the absence of a browser print dialog or new tab. After release, verify a saved order from live Admin.
 
 **Verification, 19 November 2026.** A synthetic download on the deployed page reproduced the blocked blob worker and stalled download. The isolated Brave test applied the production policy and downloaded a one-page and five-page A4 invoice with the order number as the filename. The logo was embedded as JPEG. The preview fit eight phone-to-desktop viewport sizes and a blocked font was recoverable with **Retry PDF**. No browser preview or print dialog opened. The API race suite passed.
+
+### Task 65 — Resolve verified product search markup issues
+
+**Status:** In progress · **Depends on:** 24, 26, 29
+
+- Omit invalid SKU values from Product markup, link the seller to its published return terms, and redirect the retired WordPress page sitemap named in URL Inspection.
+- Check fixed issues after release using representative product URLs. Obtain the complete Merchant listings issue table. Fill brand, identifiers, shipping and sale dates from verified catalog or policy data as available. Publish ratings from genuine approved reviews.
+
+**Baseline, 19 November 2026.** Of 291 product pages in the live sitemap, 283 emitted whitespace-bearing SKUs and three emitted reviews. None exposed a brand, GTIN or manufacturer part number in Product markup. The Terms page serves the store's actual return terms and exceptions. Search Console discovered the old `/page-sitemap.xml`, which currently returns 404. The owner's email listed five of six Merchant listings issues and two optional Product snippets issues.
+
+**Build verification.** The isolated release test passed for invalid and valid SKUs, approved reviews, the linked public return policy, the draft-policy exclusion and the exact sitemap redirect. The API race suite passed. Google validation remains pending the production release and reprocessing of affected product pages.
