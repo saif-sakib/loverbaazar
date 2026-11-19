@@ -45,8 +45,8 @@ const webSiteLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
   "@id": siteUrl("/#website"),
-  name: SITE.name,
-  alternateName,
+  name: spacedSiteName,
+  alternateName: alternateName ? SITE.name : undefined,
   url: siteUrl("/"),
   publisher: { "@id": storeID },
 };
@@ -70,7 +70,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     <meta property="og:locale" content={language.replace("-", "_")} />
     <meta property="og:title" content={socialTitle || full} />
     <meta property="og:description" content={socialDescription || description} />
-    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:site_name" content={spacedSiteName} />
     <meta property="og:type" content={type} />
     <meta property="og:url" content={canon} />
     <meta property="og:image" content={ogImage} />
