@@ -1183,6 +1183,12 @@ footer {
   display: block;
   padding: 3px 0;
 }
+.cols div > a.community-link {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 44px;
+}
 .cols a {
   transition: color var(--ease);
 }

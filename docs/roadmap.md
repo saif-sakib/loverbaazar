@@ -716,6 +716,19 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 1. Merge the reviewed change through the regular release workflow.
 2. Once deployed, open an invoice on the desktop that had clipping. Use a controlled order and inbox to confirm the shipment email contains the saved courier and tracking number. Check its delivery outcome in Admin → Operations.
 
+### Task 57 — Connect visitors to Hasnahena Foundation and review free capacity
+
+**Status:** In progress, pending deployed SEO verification · **Depends on:** 25, 29, 49
+
+- Link the homepage and About footer to the foundation's canonical About page. Keep checkout, tracking and product browsing focused on the shop. The foundation site maintains its own canonical URLs and pairs its English and Bengali sitemap entries.
+- Review capacity at 15,000 public visits/month or around 50–60 orders/day when each typical order generates three recipient attempts. Use observed traffic and measured service limits to decide when to act. A hosting move addresses API latency, uptime and compute capacity. Image and email thresholds have their own remedies.
+- The private owner audit compares both projects using read-only provider metrics, service configurations, public browser samples and backup records. Keep account figures and data outside Git. Confirm actual limits in the dashboards before using an estimated visitor count to justify spending.
+
+**Actions required**
+
+1. Review and merge the SEO changes through each project's release process, then confirm the footer link and public sitemaps.
+2. Record the remaining provider and traffic baselines from the private audit. Check Hasnahena's Vercel eligibility and R2 billing terms before relying on the current hosting model.
+
 ## Launch gates
 
 Tasks 43–46 cannot bypass these gates because a preview looks good:
