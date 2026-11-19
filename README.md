@@ -1,6 +1,6 @@
 # LoverBaazar
 
-Run a disposable local demo (needs Docker, Go, Node): `LB_ISOLATED=1 ./scripts/dev.sh`, then open http://127.0.0.1:8787/. Use `./scripts/dev.sh` for existing verified local inventory. Unknown legacy quantities are quarantined, never invented.
+Run a disposable local demo (needs Docker, Go per `apps/api/go.mod`, Node per `.nvmrc`): `LB_ISOLATED=1 ./scripts/dev.sh`, then open http://127.0.0.1:8787/. Use `./scripts/dev.sh` for existing verified local inventory. Unknown legacy quantities are quarantined, never invented.
 
 For setup/checks use `./scripts/check.sh --browsers`; isolated test commands and environment/release contracts are in [docs/foundation.md](docs/foundation.md).
 
@@ -24,12 +24,12 @@ admin, under Settings. Their first values come from `apps/api/defaults.json`.
 
 ## Project layout
 
-    apps/api/        Go API: main.go core, shop.go customers, admin.go admin, schema.sql database
-    apps/store/      Astro storefront, and the admin panel in public/admin.js
-    edge/worker.js   Cloudflare Worker: forwards /api to the Go API
-    scripts/         Local start, WordPress import
-    docs/go-live.md  Launch guide
-    .github/         Tests, deploys, nightly backups
+    apps/api/        Go API: main.go core, shop.go customers, admin.go admin, notifications.go email, release.go frozen builds, product_photos.go uploads, operations.go ops, safety.go validation, catalog_migration.go importer, schema.sql & migrations*.sql
+    apps/store/      Astro storefront, admin panel (public/admin.js, public/invoice.js), legacy-urls.json, tests/
+    edge/worker.js   Cloudflare Worker: /api proxy, legacy redirects, caching, security headers
+    scripts/         Local dev (dev.sh), checks (check.sh, test-*.sh), release/backup/maintenance/security & WordPress migration
+    docs/            Operating runbooks, roadmap, and point-in-time verification records
+    .github/         CI, coordinated deploys, security scan, nightly backups and freshness watch
 
 Admin covers orders, products, categories, coupons, customers, reviews, messages, pages, blog and shop settings.
 
@@ -43,4 +43,4 @@ Admin covers orders, products, categories, coupons, customers, reviews, messages
 - Routine maintenance and measured upgrade triggers: [docs/maintenance.md](docs/maintenance.md)
 - Architecture audit and verified baseline: [docs/architecture-audit.md](docs/architecture-audit.md)
 - Why this stack: [PLAN.md](PLAN.md)
-- Rules for changing the code: [CLAUDE.md](CLAUDE.md)
+- Rules for changing the code: [AGENTS.md](AGENTS.md) and [CLAUDE.md](CLAUDE.md)
