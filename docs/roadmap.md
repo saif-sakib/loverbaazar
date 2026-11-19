@@ -788,12 +788,14 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 
 ### Task 62 — Download A4 invoices directly
 
-**Status:** In progress, pending rollout · **Depends on:** 56, 58
+**Status:** In progress, production follow-up in Task 64 · **Depends on:** 56, 58
 
 - Brave's print settings can override page margins and the admin page title becomes the suggested filename. Download an A4 PDF with its own margins and the saved order number as its filename. Build the document in the browser from the already authorized order data.
-- Keep the approved invoice sections, Bangla and English text, saved charges and totals, repeated headings and the last item with its totals. Load the PDF engine and fonts only when an administrator requests a download. Keep the preview and browser print controls out of the workflow.
+- Keep the approved invoice sections, Bangla and English text, saved charges and totals, repeated headings and the last item with its totals. Load the PDF engine and fonts on demand. Save the file directly. Task 64 restores the in-app preview.
 
 **Verification, 19 November 2026.** Brave downloaded a one-page checkout invoice and a five-page fixture with 60 English and Bangla line items. Both downloads used the order number as the filename. Poppler verified the A4 geometry, repeated amounts header and saved totals. Long unbroken codes wrapped within the item column. The last item, totals and shop contact appeared on the final page. The fixtures omit the customer's email and private staff note. After the coordinated release, download one saved order from live Admin to verify the result.
+
+**Production finding.** Brave stalled in the deployed build when PDFKit's PNG path attempted to start a blob worker and the storefront security policy blocked it. Task 64 fixes the download and restores the in-app review step.
 
 ### Task 63 — Improve branded homepage visibility
 
@@ -805,3 +807,12 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 **Baseline, 19 November 2026.** The live apex homepage returned HTTP 200, declared itself canonical, allowed indexing and appeared once in the 571-URL production sitemap. HTTP and www redirected to the HTTPS apex. The legacy WordPress sitemap and alternate contact URL redirected to their replacements. Public search results still showed older WordPress listings alongside current pages. The indexed homepage status and branded query report require the verified Search Console property.
 
 **Build verification.** The isolated release test checks both site names, the visible hero, the preferred social name, the linked structured data entities, the apex canonical and the single homepage sitemap entry. It also checks that the preview homepage carries noindex and that the product page keeps its own markup.
+
+### Task 64 — Restore invoice preview and fix PDF download under production policy
+
+**Status:** In progress · **Depends on:** 58, 62
+
+- Restore the Admin invoice preview. Present a direct, order-number PDF download in the preview and offer a retry when preparation fails or times out.
+- Embed the logo in a format that works under the existing security policy. Verify single- and multipage downloads in Brave with that policy applied, along with preview fit, the retry path and the absence of a browser print dialog or new tab. After release, verify a saved order from live Admin.
+
+**Verification, 19 November 2026.** A synthetic download on the deployed page reproduced the blocked blob worker and stalled download. The isolated Brave test applied the production policy and downloaded a one-page and five-page A4 invoice with the order number as the filename. The logo was embedded as JPEG. The preview fit eight phone-to-desktop viewport sizes and a blocked font was recoverable with **Retry PDF**. No browser preview or print dialog opened. The API race suite passed.

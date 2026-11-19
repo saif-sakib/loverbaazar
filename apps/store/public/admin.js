@@ -183,6 +183,7 @@
     if (dismissAfter) noticeTimer = setTimeout(() => say(""), dismissAfter);
   };
   const logout = (msg) => {
+    $("#order-invoice")?.close();
     publicationGeneration++;
     clearTimeout(publicationTimer);
     watchedPublicationId = "";
@@ -772,7 +773,7 @@
       <td data-l="Customer">${esc(o.name)} ${o.same_phone > 1 ? `<a class="tag" href="#orders" data-phone="${esc(o.phone)}">${o.same_phone} orders</a>` : ""}${o.bad_phone > 0 ? ` <span class="tag warn">${o.bad_phone} cancelled or returned</span>` : ""}<br><a class="link" href="tel:${esc(o.phone)}">${esc(o.phone)}</a></td>
       <td data-l="Total">${money(o.total)}<br><small>${esc(o.payment)}</small></td>
       <td data-l="Status"><span class="tag ${esc(o.status)}">${esc(statusLabel(o.status))}</span></td>
-      <td class="actions"><button type="button" class="link" data-more="${esc(o.number)}" aria-expanded="false" aria-controls="d-${esc(o.number)}">Manage</button> <button type="button" class="link" data-invoice="${esc(o.number)}">Download invoice</button></td>
+      <td class="actions"><button type="button" class="link" data-more="${esc(o.number)}" aria-expanded="false" aria-controls="d-${esc(o.number)}">Manage</button> <button type="button" class="link" data-invoice="${esc(o.number)}" aria-haspopup="dialog">Invoice</button></td>
     </tr>
     <tr id="d-${esc(o.number)}" class="detail-row" hidden><td colspan="5">
       <div class="order-details">
@@ -877,21 +878,103 @@
       };
     });
     $$("[data-invoice]").forEach((button) => {
-      button.onclick = run(async () => {
-        const order = l.find((entry) => entry.number === button.dataset.invoice);
-        if (!order) return;
-        button.textContent = "Preparing PDF…";
-        try {
-          const { downloadInvoice } = await import("/invoice.js");
-          await downloadInvoice(order, site);
-        } catch {
-          throw new Error("Could not download the invoice. Please try again.");
-        } finally {
-          button.textContent = "Download invoice";
-        }
-      });
+      button.onclick = () => showInvoice(l.find((entry) => entry.number === button.dataset.invoice));
     });
   });
+
+  function showInvoice(order) {
+    const dialog = $("#order-invoice");
+    if (!dialog) return say("Reload Admin to view the invoice.");
+    if (!order || dialog.open) return;
+    const preview = $("#invoice-preview", dialog);
+    const status = $(".invoice-status", dialog);
+    const download = $("[data-invoice-download]", dialog);
+    const retry = $("[data-invoice-retry]", dialog);
+    const shop = site || {};
+    const name = esc(shop.name || "LoverBaazar");
+    const contact = [shop.phone, shop.email].filter(Boolean).map(esc).join(" · ");
+    const date = new Date(order.created_at).toLocaleDateString("en-GB", {
+      timeZone: "Asia/Dhaka", day: "numeric", month: "short", year: "numeric",
+    });
+    const address = [order.address, order.area && `(${order.area})`].filter(Boolean).join(" ");
+    const rows = (order.items || []).map(item => `<tr><td>${esc(item.name)}</td><td>${esc(item.qty)}</td><td>${money(item.price)}</td><td>${money(item.price * item.qty)}</td></tr>`);
+    preview.innerHTML = `<header class="invoice-header">
+      <div class="invoice-shop">
+        <img src="${esc(shop.logo || "/logo/primary-logo-80.webp")}" alt="" width="44" height="44">
+        <div><strong>${name}</strong>${shop.address ? `<p>${esc(shop.address)}</p>` : ""}</div>
+      </div>
+      <div class="invoice-heading"><h2>Invoice</h2><p class="invoice-number">${esc(order.number)}</p>
+        <time datetime="${esc(order.created_at)}">${esc(date)}</time>
+      </div>
+    </header>
+    <div class="invoice-details">
+      <section class="invoice-customer"><h3>Deliver to</h3>
+        <p><strong>${esc(order.name)}</strong><br>${esc(address)}<br>${esc(order.phone)}</p>
+      </section>
+      <section><h3>Order details</h3><dl class="invoice-facts">
+        <div><dt>Order status</dt><dd>${esc(statusLabel(order.status))}</dd></div>
+        <div><dt>Payment method</dt><dd>${esc(order.payment)}</dd></div>
+        ${order.txn_id ? `<div><dt>Transaction reference</dt><dd>${esc(order.txn_id)}</dd></div>` : ""}
+      </dl></section>
+    </div>
+    <table class="invoice-items">
+      <thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Amount</th></tr></thead>
+      <tbody>${rows.join("")}</tbody>
+    </table>
+    <dl class="invoice-totals">
+      <div><dt>Subtotal</dt><dd>${money(order.subtotal)}</dd></div>
+      ${order.discount ? `<div><dt>Discount${order.coupon ? ` (${esc(order.coupon)})` : ""}</dt><dd>−${money(order.discount)}</dd></div>` : ""}
+      <div><dt>Delivery charge</dt><dd>${order.shipping ? money(order.shipping) : "Free"}</dd></div>
+      <div class="invoice-total"><dt>Order total</dt><dd>${money(order.total)}</dd></div>
+    </dl>
+    <div class="invoice-footer">
+      <p class="invoice-thanks">Thank you for shopping with ${name}.</p>
+      ${contact ? `<p>Questions about your order? ${contact}</p>` : ""}
+    </div>`;
+    let active = true;
+    let pdfURL;
+    let cancel;
+    const prepare = async () => {
+      status.textContent = "Preparing PDF…";
+      retry.hidden = true;
+      const cancelled = new Promise((_, reject) => { cancel = reject; });
+      const timer = setTimeout(cancel, 15000);
+      try {
+        const pdf = await Promise.race([
+          import("/invoice.js").then(({ createInvoicePDF }) => createInvoicePDF(order, shop)),
+          cancelled,
+        ]);
+        if (!active || !dialog.open) return;
+        pdfURL = URL.createObjectURL(pdf);
+        download.href = pdfURL;
+        download.download = String(order.number || "invoice").replace(/[^a-z0-9_-]+/gi, "-") + ".pdf";
+        download.hidden = false;
+        status.textContent = "PDF ready";
+      } catch {
+        if (active && dialog.open) {
+          retry.hidden = false;
+          status.textContent = "Could not prepare the PDF.";
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+    dialog.onclose = () => {
+      active = false;
+      cancel?.();
+      if (pdfURL) URL.revokeObjectURL(pdfURL);
+      download.removeAttribute("href");
+      download.hidden = true;
+      retry.hidden = true;
+      retry.onclick = null;
+      status.textContent = "";
+      preview.replaceChildren();
+    };
+    retry.onclick = prepare;
+    dialog.setAttribute("aria-label", `Invoice ${order.number}`);
+    dialog.showModal();
+    void prepare();
+  }
 
   // ---- Products ----
 
