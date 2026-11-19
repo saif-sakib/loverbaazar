@@ -81,8 +81,6 @@ func queueOrderUpdateMail(ctx context.Context, tx pgx.Tx, id int64, number, stat
 	}
 	var update string
 	switch status {
-	case "confirmed":
-		update = "We have confirmed your order."
 	case "shipped":
 		update = "Your order has shipped."
 		if courier = strings.TrimSpace(courier); courier != "" {
@@ -92,9 +90,9 @@ func queueOrderUpdateMail(ctx context.Context, tx pgx.Tx, id int64, number, stat
 			update += "\nTracking number: " + tracking
 		}
 	case "cancelled":
-		update = "Your order has been cancelled. If you already paid, contact the shop about your payment."
+		update = "Your order has been cancelled. If you already paid, please contact the shop about the next step for your payment."
 	case "returned":
-		update = "Your order has been marked as returned. Contact the shop if you have questions about your return or payment."
+		update = "Your order is recorded as returned. Please contact the shop if you are expecting a refund or replacement."
 	default:
 		return false, nil
 	}

@@ -654,7 +654,7 @@
     const states = { pending: "Pending", sending: "Sending", accepted: "Accepted by Brevo", failed: "Failed", uncertain: "Check Brevo before retrying" };
     const mailKinds = {
       owner: "Shop · new order", customer: "Customer · receipt",
-      customer_confirmed: "Customer · confirmed", customer_shipped: "Customer · shipped",
+      customer_shipped: "Customer · shipped",
       customer_cancelled: "Customer · cancelled", customer_returned: "Customer · returned",
     };
     view().innerHTML = `<div class="panel"><h3>API and checkout</h3>
@@ -764,7 +764,7 @@
     const l = res.orders;
     const pages = Math.ceil(res.total / res.size);
     const closed = (status) => status === "cancelled" || status === "returned";
-    const emailUpdates = ["confirmed", "shipped", "cancelled", "returned"];
+    const emailUpdates = new Map([["shipped", "shipping"], ["cancelled", "cancellation"], ["returned", "return"]]);
     $("#olist").innerHTML = `<div class="summary-bar"><span><b>${res.total}</b> orders · <b>${money(res.sales)}</b> sales, excluding cancelled and returned</span></div>
     <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Order</th><th scope="col">Customer</th><th scope="col">Total</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead><tbody>
     ${l.map((o) => `<tr data-order-row>
@@ -844,9 +844,9 @@
       form.oninput = () => {
         const changed = changedFields();
         save.disabled = !Object.keys(changed).length || pendingActions.has(form);
-        const status = changed.status;
-        mailNote.textContent = status && emailUpdates.includes(status) && order.email
-          ? `Saving can queue a ${status} email to ${order.email}.`
+        const emailUpdate = emailUpdates.get(changed.status);
+        mailNote.textContent = emailUpdate && order.email
+          ? `Saving can queue a ${emailUpdate} email to ${order.email}.`
           : recipientNote;
       };
       form.onsubmit = run(async () => {

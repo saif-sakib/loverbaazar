@@ -564,9 +564,14 @@ test('mobile order controls prevent duplicate updates and show payment verificat
   await context.route('**/api/admin/orders?*', r => r.fulfill({ json: { orders: [order], total: 1, sales: 1060, size: 50 } }));
   await context.route('**/api/admin/orders/LB-FIXTURE', async r => {
     updates++;
-    assert.deepEqual(r.request().postDataJSON(), { status: 'confirmed', expectedStatus: 'pending' });
+    if (order.status === 'pending') {
+      assert.deepEqual(r.request().postDataJSON(), { status: 'confirmed', expectedStatus: 'pending' });
+      order.status = 'confirmed';
+      return r.fulfill({ json: { emailQueued: false } });
+    }
+    assert.deepEqual(r.request().postDataJSON(), { status: 'shipped', expectedStatus: 'confirmed' });
     await gate;
-    order.status = 'confirmed';
+    order.status = 'shipped';
     return r.fulfill({ json: { emailQueued: true } });
   });
   await ready(page, '/admin/#orders');
@@ -578,13 +583,19 @@ test('mobile order controls prevent duplicate updates and show payment verificat
   await page.getByRole('button', { name: 'Manage' }).click();
   assert.equal(await page.locator('.order-payment-note').isVisible(), true);
   await page.locator('[name="status"]').selectOption('confirmed');
-  assert.match(await page.locator('.order-mail-note').textContent(), /confirmed email to fixture@example.invalid/);
+  assert.equal(await page.locator('.order-mail-note').textContent(), 'Order email: fixture@example.invalid');
+  await page.getByRole('button', { name: 'Save order' }).click();
+  await page.waitForSelector('[data-order-row] .tag.confirmed');
+  assert.equal(await page.locator('#ok').textContent(), 'Order saved.');
+  await page.getByRole('button', { name: 'Manage' }).click();
+  await page.locator('[name="status"]').selectOption('shipped');
+  assert.match(await page.locator('.order-mail-note').textContent(), /shipping email to fixture@example.invalid/);
   await page.getByRole('button', { name: 'Save order' }).click();
   await page.locator('form[data-n]').evaluate(form => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
   release();
-  await page.waitForSelector('[data-order-row] .tag.confirmed');
+  await page.waitForSelector('[data-order-row] .tag.shipped');
   assert.match(await page.locator('#ok').textContent(), /Customer email queued/);
-  assert.equal(updates, 1);
+  assert.equal(updates, 2);
 }));
 
 test('late admin reads cannot replace a newly selected section', () => shop(async (page, context) => {

@@ -126,7 +126,7 @@ func TestOrderStatusMailFollowsSavedChanges(t *testing.T) {
 			t.Fatalf("update %v returned %d %v", fields, code, out)
 		}
 	}
-	update("LB-MAIL", M{"status": "confirmed", "expectedStatus": "pending"}, 200, true)
+	update("LB-MAIL", M{"status": "confirmed", "expectedStatus": "pending"}, 200, false)
 	update("LB-MAIL", M{"status": "shipped", "expectedStatus": "pending", "tracking": "UNSAVED"}, 409, false)
 	update("LB-MAIL", M{"status": "shipped", "expectedStatus": "confirmed", "tracking": "FIXTURE-42", "courier": "Fixture courier", "adminNote": "Private note"}, 200, true)
 	update("LB-MAIL", M{"status": "shipped", "tracking": "FIXTURE-43"}, 200, false)
@@ -156,7 +156,7 @@ func TestOrderStatusMailFollowsSavedChanges(t *testing.T) {
 		t.Fatalf("incorrect shipment mail: %+v", message)
 	}
 	var jobs int
-	if err := db.QueryRow(bg, `SELECT count(*) FROM order_notifications`).Scan(&jobs); err != nil || jobs != 4 {
-		t.Fatalf("want four distinct lifecycle notices, got %d: %v", jobs, err)
+	if err := db.QueryRow(bg, `SELECT count(*) FROM order_notifications`).Scan(&jobs); err != nil || jobs != 3 {
+		t.Fatalf("want shipment, cancellation and return notices, got %d: %v", jobs, err)
 	}
 }
