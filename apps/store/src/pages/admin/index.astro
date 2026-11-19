@@ -71,5 +71,16 @@ import "../../styles/mobile.css";
         </main>
       </div>
     </div>
+    <dialog class="order-invoice" id="order-invoice" aria-label="Invoice">
+      <div class="invoice-toolbar">
+        <p class="invoice-status" role="status"></p>
+        <form method="dialog" class="invoice-controls">
+          <a class="btn" data-invoice-download hidden>Download PDF</a>
+          <button type="button" class="btn" data-invoice-retry hidden>Retry PDF</button>
+          <button class="btn ghost" autofocus>Close</button>
+        </form>
+      </div>
+      <article id="invoice-preview" class="invoice-paper" tabindex="0" aria-label="Invoice preview"></article>
+    </dialog>
   </body>
 </html>

@@ -35,8 +35,14 @@ async function invoiceLogo(configured) {
       const scale = 88 / Math.max(image.naturalWidth, image.naturalHeight);
       const w = image.naturalWidth * scale;
       const h = image.naturalHeight * scale;
-      canvas.getContext("2d").drawImage(image, (88 - w) / 2, (88 - h) / 2, w, h);
-      return canvas.toDataURL("image/png");
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, 88, 88);
+      context.drawImage(image, (88 - w) / 2, (88 - h) / 2, w, h);
+      // PDFKit can embed JPEGs directly. Decoding transparent PNGs tries to
+      // start a blob worker, which the production security policy blocks.
+      const jpeg = canvas.toDataURL("image/jpeg", 0.93);
+      if (jpeg.startsWith("data:image/jpeg;")) return jpeg;
     } catch {
       // Try the bundled logo. Seller details can also stand alone.
     } finally {
@@ -207,7 +213,7 @@ function invoiceDocument(order, shop, logo) {
   };
 }
 
-export async function downloadInvoice(order, shop) {
+export async function createInvoicePDF(order, shop) {
   await import("/invoice-assets/pdfmake-0.3.14.js");
   const pdfMake = globalThis.pdfMake;
   const regular = absoluteURL("/invoice-assets/latin.woff");
@@ -218,6 +224,5 @@ export async function downloadInvoice(order, shop) {
     Bengali: { normal: bengali, bold: bengali, italics: bengali, bolditalics: bengali },
   });
   const logo = await invoiceLogo(shop?.logo);
-  const filename = String(order.number || "invoice").replace(/[^a-z0-9_-]+/gi, "-");
-  await pdfMake.createPdf(invoiceDocument(order, shop || {}, logo)).download(filename + ".pdf");
+  return pdfMake.createPdf(invoiceDocument(order, shop || {}, logo)).getBlob();
 }

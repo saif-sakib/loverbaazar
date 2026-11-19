@@ -276,14 +276,41 @@ try {
   assert.equal(saved[0].status, 'pending');
   assert.equal(saved[0].email, 'private-fixture@example.invalid');
   await request('PUT', `/api/admin/orders/${paidOrder.number}`, {adminNote: 'Private staff fixture note'});
+  // The deployed CSP blocks blob workers. Exercise the full branded download
+  // under that policy even when the local asset server omits custom headers.
+  const productionHeaders = await fs.readFile(new URL('../public/_headers', import.meta.url), 'utf8');
+  const csp = productionHeaders.match(/^  Content-Security-Policy: (.+)$/m)?.[1];
+  assert.ok(csp);
+  const withProductionCSP = async route => {
+    const response = await route.fetch();
+    await route.fulfill({response, headers: {...response.headers(), 'content-security-policy': csp}});
+  };
+  await admin.route('**/admin/', withProductionCSP);
+  await admin.addInitScript(() => {
+    window.print = () => { document.body.dataset.printCalled = 'yes'; };
+    window.open = () => { document.body.dataset.openCalled = 'yes'; };
+    document.addEventListener('securitypolicyviolation', event => {
+      if (event.effectiveDirective === 'worker-src') document.body.dataset.workerBlocked = 'yes';
+    });
+  });
+  await admin.route('**/invoice-assets/latin.woff', route => route.abort(), {times: 1});
   await admin.goto('/admin/#orders');
-  const invoiceButton = admin.locator('[data-order-row]', { hasText: paidOrder.number }).getByRole('button', { name: 'Download invoice' });
-  await admin.evaluate(() => { window.print = () => { document.body.dataset.printCalled = 'yes'; }; });
+  const invoiceButton = admin.locator('[data-order-row]', { hasText: paidOrder.number }).getByRole('button', { name: 'Invoice' });
   assert.equal(await admin.evaluate(() => performance.getEntriesByType('resource')
     .some(entry => entry.name.includes('/invoice-assets/'))), false, 'Load the PDF engine only when requested.');
+  await invoiceButton.click();
+  const invoice = admin.getByRole('dialog', {name: `Invoice ${paidOrder.number}`});
+  await invoice.waitFor();
+  assert.match(await invoice.textContent(), /House 12 <Unit B>, Example Road/);
+  assert.match(await invoice.locator('.invoice-total').textContent(), /Order total৳550/);
+  assert.doesNotMatch(await invoice.textContent(), /private-fixture@example|Private staff fixture note/i);
+  const retryPDF = invoice.getByRole('button', {name: 'Retry PDF'});
+  await retryPDF.waitFor({timeout: 10000});
+  assert.equal(await invoice.getByRole('status').textContent(), 'Could not prepare the PDF.');
+  await retryPDF.click();
   const download = async (button, number, sampleName) => {
     const openTabs = context.pages().length;
-    const [file] = await Promise.all([admin.waitForEvent('download'), button.click()]);
+    const [file] = await Promise.all([admin.waitForEvent('download', {timeout: 20000}), button.click()]);
     assert.equal(file.suggestedFilename(), `${number}.pdf`);
     assert.equal(context.pages().length, openTabs);
     const output = await fs.readFile(await file.path());
@@ -291,9 +318,28 @@ try {
     if (shotDir) await file.saveAs(`${shotDir}/${sampleName}`);
     return output;
   };
-  inspectInvoice(await download(invoiceButton, paidOrder.number, 'invoice-fixture.pdf'), false);
+  const savePDF = invoice.getByRole('link', {name: 'Download PDF'});
+  await savePDF.waitFor({timeout: 10000});
+  for (const [width, height] of [[320, 568], [360, 812], [375, 812], [390, 812], [414, 812], [768, 850], [1024, 600], [1440, 900]]) {
+    await admin.setViewportSize({width, height});
+    const fits = await invoice.evaluate(box => {
+      const bounds = box.getBoundingClientRect();
+      const preview = box.querySelector('#invoice-preview');
+      return bounds.left >= 8 && bounds.top >= 8 && bounds.right <= innerWidth - 8 &&
+        bounds.bottom <= innerHeight - 8 && preview.scrollWidth <= preview.clientWidth;
+    });
+    assert.ok(fits, `Invoice preview fits ${width}×${height}`);
+  }
+  await shot(admin, 'invoice-preview-desktop');
+  await admin.setViewportSize({width: 375, height: 812});
+  await shot(admin, 'invoice-preview-375');
+  inspectInvoice(await download(savePDF, paidOrder.number, 'invoice-fixture.pdf'), false);
   assert.equal(await admin.locator('body').getAttribute('data-print-called'), null);
-  assert.equal(await admin.locator('dialog[open]').count(), 0);
+  assert.equal(await admin.locator('body').getAttribute('data-open-called'), null);
+  assert.equal(await admin.locator('body').getAttribute('data-worker-blocked'), null);
+  await invoice.getByRole('button', {name: 'Close'}).click();
+  await admin.waitForFunction(() => document.querySelector('#invoice-preview').childElementCount === 0);
+  assert.equal(await invoiceButton.evaluate(button => button === document.activeElement), true);
 
   // Render real pagination through the same download button with a large
   // synthetic invoice. The PDF fixture is independent of print preferences.
@@ -308,10 +354,15 @@ try {
   await admin.route(route, ordersMock);
   await admin.reload();
   await admin.setViewportSize({ width: 1440, height: 900 });
-  const largeInvoice = admin.locator('[data-order-row]', { hasText: largeOrder.number }).getByRole('button', { name: 'Download invoice' });
-  inspectInvoice(await download(largeInvoice, largeOrder.number, 'invoice-multipage-fixture.pdf'), true);
+  await admin.locator('[data-order-row]', { hasText: largeOrder.number }).getByRole('button', { name: 'Invoice' }).click();
+  const largeInvoice = admin.getByRole('dialog', {name: `Invoice ${largeOrder.number}`});
+  inspectInvoice(await download(largeInvoice.getByRole('link', {name: 'Download PDF'}),
+    largeOrder.number, 'invoice-multipage-fixture.pdf'), true);
+  assert.equal(await admin.locator('body').getAttribute('data-worker-blocked'), null);
+  await largeInvoice.getByRole('button', {name: 'Close'}).click();
   await admin.setViewportSize({ width: 375, height: 812 });
   await admin.unroute(route, ordersMock);
+  await admin.unroute('**/admin/', withProductionCSP);
   await admin.reload();
   const coupon = await request('GET', '/api/admin/coupons');
   assert.equal(coupon.find(c => c.code === 'FIXTURE').used, 1);
