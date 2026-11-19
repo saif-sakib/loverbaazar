@@ -808,6 +808,8 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 
 **Build verification.** The isolated release test checks both site names, the visible hero, the preferred social name, the linked structured data entities, the apex canonical and the single homepage sitemap entry. It also checks that the preview homepage carries noindex and that the product page keeps its own markup.
 
+**Follow-up, 19 November 2026.** After releasing the first branding update, public searches found the rice cooker category and current contact page. A public result still showed the old WordPress homepage title. The new build places the spaced brand in the title, main heading, social name and preferred site name. It includes the configured address in the description. A generic HTTP client received Cloudflare 1010 on several live paths, and browser requests to those paths returned 200. Record Google's indexed status and real crawl result before attributing the ranking to an access rule. Compare branded homepage impressions after recrawl.
+
 ### Task 64 — Restore invoice preview and fix PDF download under production policy
 
 **Status:** In progress · **Depends on:** 58, 62

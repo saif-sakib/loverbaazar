@@ -60,7 +60,6 @@ fieldset.panel { margin: 0; }
 .home-hero .hero-actions { gap: 12px; }
 .home-hero .hero-offers { display: inline-flex; align-items: center; min-height: 44px; }
 .home-hero .hero-actions .btn { padding: 11px 16px; font-size: 14px; }
-.home-hero .hero-caption { display: none; }
 .perks { gap: 0 12px; margin-block: 20px; }
 .perks b { font-size: 13px; }
 .perks span { font-size: 12px; }
@@ -159,7 +158,6 @@ body.has-buybar { padding-bottom: calc(152px + var(--safe-bottom)); }
   .home-hero h1 { font-size: clamp(32px,4vw,52px); }
   .home-hero p:not(.eyebrow) { font-size: 16px; }
   .home-hero .pics { display: grid; }
-  .home-hero .hero-caption { display: block; }
   .pd h1 { font-size: 32px; }
   .filter-panel .filters { grid-template-columns: repeat(4,minmax(0,1fr)); }
   .filter-panel .check, .filter-panel .btn { grid-column: auto; }

@@ -50,10 +50,13 @@ const entities = html => [...html.matchAll(/<script type="application\/ld\+json"
 try {
   await build("production", "production");
   const home = await read("production", "index.html");
-  assert.match(home, /<title>LoverBaazar \| [^<]+<\/title>/);
-  assert.match(home, /<meta name="description" content="Lover Baazar — /);
-  assert.match(home, /<meta property="og:site_name" content="LoverBaazar">/);
-  assert.match(home, /<p class="eyebrow">Lover Baazar · /);
+  assert.match(home, /<title>Lover Baazar \| [^<]+<\/title>/);
+  assert.match(home, /<meta name="description" content="Lover Baazar in Vekutia, Jashore\. /);
+  assert.match(home, /<meta property="og:site_name" content="Lover Baazar">/);
+  const headings = [...home.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)];
+  assert.equal(headings.length, 1);
+  assert.equal(headings[0][1].replace(/<[^>]+>/g, "").trim(), "Lover Baazar");
+  assert.match(home, /<strong lang="en-BD">Everything for your home, at wholesale prices\.<\/strong>/);
   assert.match(home, /<link rel="canonical" href="https:\/\/loverbaazar.com\/">/);
   assert.match(home, /<meta name="robots" content="index, follow/);
   const homeEntities = entities(home);
@@ -61,11 +64,12 @@ try {
   const shops = homeEntities.filter(item => item["@type"] === "Store");
   assert.equal(websites.length, 1);
   assert.equal(shops.length, 1);
-  for (const entity of [websites[0], shops[0]]) {
-    assert.equal(entity.name, "LoverBaazar");
-    assert.equal(entity.alternateName, "Lover Baazar");
-    assert.equal(entity.url, "https://loverbaazar.com/");
-  }
+  assert.equal(websites[0].name, "Lover Baazar");
+  assert.equal(websites[0].alternateName, "LoverBaazar");
+  assert.equal(shops[0].name, "LoverBaazar");
+  assert.equal(shops[0].alternateName, "Lover Baazar");
+  assert.equal(websites[0].url, "https://loverbaazar.com/");
+  assert.equal(shops[0].url, "https://loverbaazar.com/");
   assert.equal(websites[0].publisher["@id"], shops[0]["@id"]);
   const page = await read("production", `product/${product.slug}/index.html`);
   const htmlLD = entities(page);

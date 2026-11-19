@@ -18,17 +18,21 @@ const tiles = MENU.flatMap((g: any) => g.items)
   .filter((c: any, i: number, all: any[]) => inCat(c.slug).length && all.findIndex((x) => x.slug === c.slug) === i)
   .slice(0, 12);
 const hero = SITE.hero;
-const heroWords = hero.title.trim().split(" ");
-const heroEnd = heroWords.pop();
+const brandWords = spacedSiteName.trim().split(/\s+/);
+const brandEnd = brandWords.pop();
+const homeDescription = [spacedSiteName, SITE.address].filter(Boolean).join(" in ") + ". " + SITE.description;
 ---
 
-<Base type="website" description={`${spacedSiteName} — ${SITE.description}`}>
+<Base seoTitle={`${spacedSiteName} | ${SITE.tagline}`} description={homeDescription}>
   <div class="wrap">
     <section class="hero home-hero">
       <div>
-        <p class="eyebrow">{spacedSiteName} · {SITE.tagline}</p>
-        <h1 lang={languageOf(hero.title)}>{heroWords.join(" ")} <em>{heroEnd}</em></h1>
-        <p lang={languageOf(hero.text)}>{hero.text}</p>
+        <p class="eyebrow">{SITE.tagline}</p>
+        <h1 lang={languageOf(spacedSiteName)}>{brandWords.join(" ")} <em>{brandEnd}</em></h1>
+        <p>
+          <strong lang={languageOf(hero.title)}>{hero.title}</strong><br />
+          <span lang={languageOf(hero.text)}>{hero.text}</span>
+        </p>
         <div class="hero-actions">
           {hero.button && (
             <a class="btn" href={hero.link || "/shop/"}>
@@ -37,7 +41,6 @@ const heroEnd = heroWords.pop();
           )}
           <a class="hero-offers" href="/offers/">Explore offers <span aria-hidden="true">→</span></a>
         </div>
-        <p class="hero-caption">Browse. Choose. Order. No account needed.</p>
       </div>
       <div class="pics">
         {heroShots.map((h: any, index: number) => (
