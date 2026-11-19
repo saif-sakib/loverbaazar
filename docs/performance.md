@@ -11,11 +11,11 @@ A local benchmark with 300 sample products and 30 iterations measured:
 | Full | 8 | 10.5 ms |
 | Inventory only | 3 | 6.6 ms |
 
-These measure snapshot work on local PostgreSQL, not total checkout latency or live hosting performance. Run the benchmark only against a throwaway test database: it truncates products and their dependent test data.
+These measure snapshot work on local PostgreSQL, not total checkout latency or live hosting performance. Run the benchmark only against a throwaway loopback database named `lb_test`: it truncates products and their dependent test data, and `safeTestDatabase()` in `apps/api/safety.go` deliberately refuses other database names such as `lb`.
 
 ```sh
 cd apps/api
-TEST_DATABASE_URL='postgres://postgres:dev@127.0.0.1:55433/lb?sslmode=disable' go test -run '^$' -bench BenchmarkSnapshotRefresh -benchtime=30x -count=1 .
+TEST_DATABASE_URL='postgres://postgres:dev@127.0.0.1:55433/lb_test?sslmode=disable' go test -run '^$' -bench BenchmarkSnapshotRefresh -benchtime=30x -count=1 .
 ```
 
 The Worker caches stock for 60 seconds. After that, an available saved copy returns immediately while a background request refreshes it. Concurrent requests in one Worker instance share an origin request. Query strings share the same public cache key. Failed refreshes briefly cache the fallback for 15 seconds to reduce retries; they never extend the original fallback's one-day lifetime. Cache failures still permit a healthy origin response. Saved responses are marked so the browser can check once after the background refresh window; this lets newly published products become available without continuous polling.

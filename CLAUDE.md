@@ -23,7 +23,15 @@ Bangladesh home-appliance shop. Replaces WordPress at loverbaazar.com.
 - Verify sticky navigation, product buy bars, chat buttons, safe areas and the software keyboard never cover form fields, errors, prices or primary actions. Guest checkout stays the shortest purchase path.
 - Prioritize real Android/iPhone usability and slow mobile networks. Desktop screenshots and mocked browser tests alone do not establish mobile readiness.
 
+Mobile implementation and acceptance evidence: [docs/mobile-ui.md](docs/mobile-ui.md). Never claim Chromium emulation as real-phone acceptance.
+
 Foundation contracts, environment setup and release protocol: [docs/foundation.md](docs/foundation.md).
+
+## SEO, performance and accessibility
+
+- [SEO, measurement and release checks](docs/seo-performance.md) cover tasks 24–30. Use the private WordPress URL ledger and exact reviewed redirects. Build the production sitemap from indexable self-canonical pages. Preview builds carry noindex and omit the sitemap.
+- Published-only offer refreshes use the existing frozen release path. Verify visible price, BDT Product/Offer markup and feeds together from the same artifact. Keep optional measurement off by default and exclude customer fields, preview hosts and retries from new-order counts.
+- Use bounded Cloudinary image widths and keep the local phone transfer budgets in the performance test. Combine automated accessibility scans with keyboard, actual zoom and physical-device screen-reader checks.
 
 ## Run and check
 
@@ -34,6 +42,9 @@ Foundation contracts, environment setup and release protocol: [docs/foundation.m
 `astro dev` cannot reach `/api`. Always test through `dev.sh`. Local admin token: `local-admin-token-for-this-computer-only`. Every setting is listed in `.env.example`; real secrets live in the hosting dashboards, never in the repo.
 
 ## Rules
+
+- WordPress migration follows `docs/migration.md`. Keep all raw exports, review sheets, approvals and legacy archives outside Git/web roots. Never infer quantities from availability or attach historical orders by a matching phone.
+- Apply catalog plans only to an offline prelaunch target with exact owner-reviewed hashes. Never clear quarantine, delete orders or reopen the migration gate to force an import. Legacy `seed` is not launch reconciliation.
 
 - Browsing must never touch the database. Prices and stock come from `/api/stock`, an in-memory snapshot. Only writes refresh it.
 - The server computes every total. Never trust browser prices.
@@ -61,4 +72,4 @@ Foundation contracts, environment setup and release protocol: [docs/foundation.m
 - Don't start long-running commands in the foreground.
 - Don't use `pkill -f` with text that appears in your own command. It kills your shell.
 
-Skills: `run-local`, `test-shop`, `go-live`. Stack reasons: `PLAN.md`.
+Skills (read the SKILL.md before that task): `.claude/skills/run-local`, `.claude/skills/test-shop`, `.claude/skills/go-live`. Stack reasons: `PLAN.md`.
