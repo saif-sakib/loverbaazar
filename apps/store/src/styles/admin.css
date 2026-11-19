@@ -461,77 +461,112 @@ figcaption { display: flex; justify-content: space-between; margin-top: 6px; }
   position: fixed;
   inset: 0;
   margin: auto;
-  box-sizing: border-box;
-  width: min(calc(100% - 24px), 42rem);
+  width: min(calc(100% - 24px), 46rem);
   height: fit-content;
   max-width: none;
   max-height: calc(100vh - 24px);
   max-height: calc(100dvh - 24px);
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
-  color: var(--ink);
+  border-radius: 12px;
+  background: #edf0f4;
   overflow: hidden;
 }
 .order-invoice[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
-.order-invoice::backdrop { background: #18181b9c; }
-.invoice-controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.order-invoice::backdrop { background: #141a29a6; }
+.invoice-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  background: white;
+  border-bottom: 1px solid var(--line);
+}
 .invoice-controls .btn { min-height: 44px; }
-#invoice-preview { min-width: 0; min-height: 0; padding: clamp(12px, 3vw, 28px); overflow: auto; overscroll-behavior: contain; }
-#invoice-preview, #invoice-print { overflow-wrap: anywhere; }
+#invoice-preview {
+  min-width: 0;
+  min-height: 0;
+  padding: clamp(14px, 4vw, 34px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
 #invoice-print { display: none; }
-.invoice-header, .invoice-summary { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
-.invoice-header { padding-bottom: 16px; margin-bottom: 16px; border-bottom: 2px solid var(--brand); }
-.invoice-shop { display: flex; align-items: flex-start; gap: 12px; }
-.invoice-shop img { flex: none; border-radius: 8px; object-fit: cover; }
-.invoice-shop strong { font-size: 1.125em; }
-.invoice-heading h2 { margin: 0; font-size: 1.65em; line-height: 1.15; }
-.invoice-heading h2 span { display: block; margin-top: 4px; font-size: .64em; font-weight: 600; }
-.invoice-date { margin: 6px 0 0; color: var(--mute); }
-.invoice-status { text-transform: capitalize; }
-.invoice-customer { margin-bottom: 18px; }
-.invoice-customer h3, .invoice-payment h3 { margin: 0 0 4px; color: var(--mute); font-size: .82em; }
-.invoice-customer p, .invoice-payment p { margin: 0; }
-.invoice-items { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: .875em; }
-.invoice-items th:nth-child(2) { width: 12%; }
+.invoice-paper {
+  --paper-ink: #172438;
+  --paper-mute: #48586b;
+  --paper-line: #cad3df;
+  --paper-accent: #92243d;
+  background: white;
+  color: var(--paper-ink);
+  overflow-wrap: anywhere;
+  font-size: .875rem;
+  line-height: 1.45;
+}
+.invoice-header, .invoice-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+.invoice-header { border-top: 4px solid var(--paper-accent); padding: 16px 0 14px; }
+.invoice-shop { display: flex; align-items: center; gap: 10px; }
+.invoice-shop img { flex: none; object-fit: contain; border-radius: 6px; }
+.invoice-shop strong { font-size: 1.15em; }
+.invoice-shop p, .invoice-heading p, .invoice-customer p, .invoice-footer p { margin: 0; }
+.invoice-shop p, .invoice-heading time { color: var(--paper-mute); }
+.invoice-heading h2 { margin: 0; font-size: 2em; line-height: 1.08; }
+.invoice-number { font-variant-numeric: tabular-nums; font-weight: 700; }
+.invoice-details { padding: 12px 0; border-block: 1px solid var(--paper-line); margin-bottom: 14px; }
+.invoice-details h3 { margin: 0 0 5px; font-size: .88em; color: var(--paper-mute); }
+.invoice-facts { margin: 0; }
+.invoice-facts > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+.invoice-facts dd { margin: 0; font-weight: 600; }
+.invoice-items { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: .92em; }
+.invoice-items th:nth-child(2) { width: 10%; }
 .invoice-items th:nth-child(n+3) { width: 24%; }
-.invoice-items th {
-  background: #f3f5f8;
-  border-block: 1px solid var(--line);
-  color: #253146;
-}
-.invoice-items :is(th, td) { padding: 8px 5px; border-bottom: 1px solid var(--line); text-align: left; }
+.invoice-items th { background: #f2f4f7; border-top: 1px solid var(--paper-line); }
+.invoice-items :is(th, td) { padding: 7px 4px; text-align: left; border-bottom: 1px solid var(--paper-line); }
 .invoice-items :is(th, td):not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
-.invoice-summary { margin-top: 18px; }
-.invoice-totals { margin: 0; }
-.invoice-totals > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding-block: 5px; }
+.invoice-items .invoice-settlement > td { padding: 0; border: 0; }
+.invoice-totals { width: min(100%, 17rem); margin: 12px 0 0 auto; }
+.invoice-totals > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 45%);
+  gap: 8px;
+  padding: 5px 6px;
+}
 .invoice-totals dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
-.invoice-total { border-top: 1px solid var(--line); font-size: 1.2em; font-weight: 700; }
-.invoice-thanks { margin: 22px 0 0; padding-top: 14px; border-top: 1px solid var(--line); text-align: center; font-weight: 600; }
+.invoice-total {
+  border-top: 2px solid var(--paper-accent);
+  background: #f7eff1;
+  color: var(--paper-ink);
+  font-size: 1.15em;
+  font-weight: 700;
+}
+.invoice-footer { margin-top: 16px; padding-top: 9px; border-top: 1px solid var(--paper-line); color: var(--paper-mute); }
+.invoice-footer .invoice-thanks { color: var(--paper-ink); font-weight: 600; }
+
 @media print, (min-width: 560px) {
-  .invoice-header { grid-template-columns: minmax(0, 1fr) minmax(0, 38%); }
+  .invoice-header { grid-template-columns: minmax(0, 1fr) minmax(0, 35%); align-items: start; }
   .invoice-heading { text-align: right; }
-  .invoice-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 15rem); gap: 28px; }
+  .invoice-details { grid-template-columns: minmax(0, 1fr) minmax(0, 45%); gap: 22px; }
   .invoice-items th:nth-child(n+3) { width: 20%; }
-  .invoice-items :is(th, td) { padding: 9px 10px; }
+  .invoice-items :is(th, td) { padding-inline: 8px; }
 }
-@page {
-  size: A4 portrait;
-  margin: 15mm 16mm;
-}
+@page shop-invoice { size: A4 portrait; margin: 14mm 16mm 16mm; }
 @media print {
-  .admin:has(.order-invoice[open]) { margin: 0; padding: 0; background: #fff; }
+  .admin:has(.order-invoice[open]) { margin: 0; padding: 0; background: white; }
   .admin:has(.order-invoice[open]) > :not(#invoice-print),
   .order-invoice::backdrop { display: none; }
   .admin:has(.order-invoice[open]) > #invoice-print {
     display: block;
+    page: shop-invoice;
     width: auto;
     max-width: 100%;
-    color: #111;
-    font-size: 11pt;
+    padding: 0;
+    font-size: 10.5pt;
   }
-  .invoice-items { font-size: 1em; }
-  .invoice-items :is(th, td) { padding-block: 7px; }
-  .invoice-header, .invoice-customer, .invoice-items tr, .invoice-end { break-inside: avoid; }
+  .invoice-items thead { display: table-header-group; }
+  .invoice-header, .invoice-details, .invoice-items tr, .invoice-tail { break-inside: avoid; }
+  .invoice-totals { width: min(100%, 72mm); }
 }

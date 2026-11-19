@@ -208,7 +208,8 @@ try {
   const pay = stock.settings.payments.find(p => p.enabled && p.number);
   const outside = stock.settings.delivery.find(z => z.fee > 0);
   assert.ok(pay && outside, 'Fixture requires manual payment and a paid delivery zone');
-  await buyer.locator('[name="address"]').fill('Isolated retry fixture address <unit>, Bangladesh, ' + 'LongAddress'.repeat(12));
+  await buyer.locator('[name="address"]').fill('House 12 <Unit B>, Example Road, near the community centre, Jashore, Bangladesh');
+  await buyer.locator('[name="email"]').fill('private-fixture@example.invalid');
   await buyer.locator('[name="area"]').selectOption(outside.id);
   await buyer.locator('[name="payment"]').selectOption(pay.id);
   assert.match(await buyer.locator('[data-pay]').textContent(), /must verify this payment/);
@@ -239,18 +240,21 @@ try {
   assert.equal(saved.length, 1);
   assert.equal(saved[0].discount, 50);
   assert.equal(saved[0].status, 'pending');
+  assert.equal(saved[0].email, 'private-fixture@example.invalid');
+  await request('PUT', `/api/admin/orders/${paidOrder.number}`, {adminNote: 'Private staff fixture note'});
   await admin.goto('/admin/#orders');
   const invoiceButton = admin.locator('[data-order-row]', { hasText: paidOrder.number }).getByRole('button', { name: 'Invoice' });
   await invoiceButton.click();
   const invoice = admin.getByRole('dialog', { name: `Invoice ${paidOrder.number}` });
   await invoice.waitFor();
-  assert.match(await invoice.textContent(), /Isolated retry fixture address <unit>, Bangladesh/);
+  assert.match(await invoice.textContent(), /House 12 <Unit B>, Example Road/);
   assert.match(await invoice.getByRole('row', { name: /Mobile fixture kettle/ }).textContent(), /৳500/);
   const formattedTotal = '৳' + saved[0].total.toLocaleString('en-IN');
   assert.equal(await invoice.locator('.invoice-total dd').textContent(), formattedTotal);
   assert.match(await invoice.locator('.invoice-totals').textContent(), /Discount \(FIXTURE\)−৳50/);
   assert.match(await invoice.locator('.invoice-payment').innerText(), /Transaction reference\s+FIXTURE-TXN-42/);
-  assert.equal(await invoice.locator('.invoice-thanks').textContent(), 'Thanks for shopping from LoverBaazar!');
+  assert.equal(await invoice.locator('.invoice-thanks').textContent(), 'Thank you for shopping with LoverBaazar.');
+  assert.doesNotMatch(await invoice.textContent(), /private-fixture@example|Private staff fixture note/i);
   assert.equal(await invoice.getByRole('columnheader', { name: 'Unit price' }).isVisible(), true);
   for (const [width, height] of [[320, 568], [360, 812], [375, 812], [390, 812], [414, 812], [768, 850], [1024, 600], [1440, 900]]) {
     await admin.setViewportSize({ width, height });
@@ -273,7 +277,7 @@ try {
   const paper = admin.locator('#invoice-print');
   assert.equal(await paper.isVisible(), false);
   await admin.evaluate(() => { window.print = () => { document.body.dataset.testPrintCalled = 'yes'; }; });
-  await invoice.getByRole('button', { name: 'Print / Save PDF' }).click();
+  await invoice.getByRole('button', { name: 'Print or save PDF' }).click();
   assert.equal(await admin.locator('body').getAttribute('data-test-print-called'), 'yes');
   await admin.emulateMedia({ media: 'print' });
   assert.equal(await admin.locator('body > .wrap').isVisible(), false);
@@ -282,12 +286,13 @@ try {
   assert.equal(await paper.locator('.invoice-thanks').isVisible(), true);
   assert.equal(await paper.evaluate(page => page.scrollWidth <= page.clientWidth), true);
   if (shotDir) {
-    await admin.pdf({ path: `${shotDir}/invoice-fixture.pdf`, preferCSSPageSize: true });
-    await paper.locator('tbody').evaluate(table => {
-      const row = table.firstElementChild;
+    await admin.pdf({ path: `${shotDir}/invoice-fixture.pdf`, preferCSSPageSize: true, printBackground: true });
+    await paper.locator('.invoice-tail').evaluate(tail => {
+      const row = tail.firstElementChild;
+      const table = tail.previousElementSibling;
       for (let number = 2; number <= 60; number++) {
         const copy = row.cloneNode(true);
-        copy.firstElementChild.textContent = `Fixture item ${number}`;
+        copy.firstElementChild.textContent = number % 2 ? `Fixture item ${number}` : `রাইস কুকার · Fixture item ${number} ${"LongCode".repeat(15)}`;
         table.append(copy);
       }
     });
@@ -297,7 +302,7 @@ try {
   await admin.setViewportSize({ width: 375, height: 812 });
   await invoice.getByRole('button', { name: 'Close' }).click();
   await admin.waitForFunction(() => document.querySelector('#invoice-preview').childElementCount === 0);
-  assert.equal(await paper.count(), 0);
+  assert.equal(await paper.locator('header').count(), 0);
   assert.equal(await invoiceButton.evaluate(button => button === document.activeElement), true);
   const coupon = await request('GET', '/api/admin/coupons');
   assert.equal(coupon.find(c => c.code === 'FIXTURE').used, 1);

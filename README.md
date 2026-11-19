@@ -37,6 +37,8 @@ Admin covers orders, products, categories, coupons, customers, reviews, messages
 - Export WordPress privately: [docs/wordpress-export.md](docs/wordpress-export.md)
 - Go live for $0: [docs/go-live.md](docs/go-live.md)
 - Storefront SEO, mobile performance and accessibility: [docs/seo-performance.md](docs/seo-performance.md)
+- A-to-Z owner operating guide: [docs/operations-index.md](docs/operations-index.md)
+- Old orders, accounts and backup retention: [docs/data-retention.md](docs/data-retention.md)
 - Numbered implementation and launch tasks: [docs/roadmap.md](docs/roadmap.md)
 - Routine maintenance and measured upgrade triggers: [docs/maintenance.md](docs/maintenance.md)
 - Architecture audit and verified baseline: [docs/architecture-audit.md](docs/architecture-audit.md)
