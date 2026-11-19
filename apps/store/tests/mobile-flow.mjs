@@ -151,14 +151,27 @@ try {
   assert.equal(unauth.status(), 401);
   await admin.goto('/admin/#orders');
   const row = admin.locator('[data-order-row]', { hasText: number });
-  await row.locator('[data-step="confirmed"]').click();
-  await admin.waitForSelector(`[data-more="${number}"][data-ship-focus]`);
-  await row.locator('[data-more]').click();
+  const manage = row.getByRole('button', { name: 'Manage' });
   const details = admin.locator(`[id="d-${number}"]`);
+  assert.equal(await details.isVisible(), false);
+  assert.equal(await row.getByRole('combobox').count(), 0);
+  await manage.click();
+  const status = details.locator('[name="status"]');
+  const saveOrder = details.getByRole('button', { name: 'Save order' });
+  assert.equal(await saveOrder.isEnabled(), false);
+  await status.selectOption('confirmed');
+  assert.equal((await request('GET', '/api/admin/orders')).orders.find(o => o.number === number).status, 'pending');
+  await saveOrder.click();
+  await row.locator('.tag.confirmed').waitFor();
+  await manage.click();
   await details.locator('[name="courier"]').fill('Fixture courier');
   await details.locator('[name="tracking"]').fill('FIXTURE-123');
-  await details.locator('[data-ship]').click();
-  await admin.waitForSelector(`[data-num="${number}"][data-step="delivered"]`);
+  await status.selectOption('shipped');
+  await saveOrder.click();
+  await row.locator('.tag.shipped').waitFor();
+  const shipment = (await request('GET', '/api/admin/orders')).orders.find(o => o.number === number);
+  assert.equal(shipment.courier, 'Fixture courier');
+  assert.equal(shipment.tracking, 'FIXTURE-123');
   assert.equal(await admin.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await shot(admin, 'admin-orders-375');
   // Relative stock edit while an existing editor holds an older stock value.
@@ -195,7 +208,7 @@ try {
   const pay = stock.settings.payments.find(p => p.enabled && p.number);
   const outside = stock.settings.delivery.find(z => z.fee > 0);
   assert.ok(pay && outside, 'Fixture requires manual payment and a paid delivery zone');
-  await buyer.locator('[name="address"]').fill('Isolated retry fixture address <unit>, Bangladesh');
+  await buyer.locator('[name="address"]').fill('Isolated retry fixture address <unit>, Bangladesh, ' + 'LongAddress'.repeat(12));
   await buyer.locator('[name="area"]').selectOption(outside.id);
   await buyer.locator('[name="payment"]').selectOption(pay.id);
   assert.match(await buyer.locator('[data-pay]').textContent(), /must verify this payment/);
@@ -239,9 +252,18 @@ try {
   assert.match(await invoice.locator('.invoice-payment').innerText(), /Transaction reference\s+FIXTURE-TXN-42/);
   assert.equal(await invoice.locator('.invoice-thanks').textContent(), 'Thanks for shopping from LoverBaazar!');
   assert.equal(await invoice.getByRole('columnheader', { name: 'Unit price' }).isVisible(), true);
-  for (const width of [320, 360, 375, 390, 414]) {
-    await admin.setViewportSize({ width, height: 812 });
-    assert.equal(await invoice.evaluate(box => box.scrollWidth <= box.clientWidth), true, `Invoice overflows at ${width}px`);
+  for (const [width, height] of [[320, 568], [360, 812], [375, 812], [390, 812], [414, 812], [768, 850], [1024, 600], [1440, 900]]) {
+    await admin.setViewportSize({ width, height });
+    const geometry = await invoice.evaluate(box => {
+      const bounds = box.getBoundingClientRect();
+      const preview = box.querySelector('#invoice-preview');
+      return {
+        visible: bounds.left >= 8 && bounds.top >= 8 && bounds.right <= innerWidth - 8 && bounds.bottom <= innerHeight - 8,
+        centered: Math.abs(bounds.left - (innerWidth - bounds.right)) <= 2,
+        wrapped: preview.scrollWidth <= preview.clientWidth,
+      };
+    });
+    assert.deepEqual(geometry, {visible: true, centered: true, wrapped: true}, `Invoice geometry at ${width}×${height}`);
   }
   await admin.setViewportSize({ width: 375, height: 812 });
   await shot(admin, 'invoice-375');
@@ -258,6 +280,7 @@ try {
   assert.equal(await admin.locator('#order-invoice').isVisible(), false);
   assert.equal(await paper.locator('.invoice-total').isVisible(), true);
   assert.equal(await paper.locator('.invoice-thanks').isVisible(), true);
+  assert.equal(await paper.evaluate(page => page.scrollWidth <= page.clientWidth), true);
   if (shotDir) {
     await admin.pdf({ path: `${shotDir}/invoice-fixture.pdf`, preferCSSPageSize: true });
     await paper.locator('tbody').evaluate(table => {

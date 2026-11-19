@@ -160,10 +160,10 @@ func adminOrdersCSV(w http.ResponseWriter, r *http.Request) {
 	c.WriteAll(lines)
 }
 
-// adminUpdateOrder sends only what changed. Leaving cancelled or returned gives the stock back once only.
+// A transition into cancelled or returned restores stock once.
 func adminUpdateOrder(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Status, Courier, Tracking, AdminNote *string
+		Status, Courier, Tracking, AdminNote, ExpectedStatus *string
 	}
 	if !read(w, r, &in) {
 		return
@@ -174,6 +174,7 @@ func adminUpdateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	num := chi.URLParam(r, "number")
+	var queued bool
 	err := pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
 		var id int64
 		var prev, coupon string
@@ -183,7 +184,11 @@ func adminUpdateOrder(w http.ResponseWriter, r *http.Request) {
 		} else if err != nil {
 			return err
 		}
-		if in.Status != nil && *in.Status != prev {
+		if in.ExpectedStatus != nil && *in.ExpectedStatus != prev {
+			return userErr{409, "order status changed in another session. Reload the orders before saving again"}
+		}
+		changed := in.Status != nil && *in.Status != prev
+		if changed {
 			switch {
 			case isOut(prev) && !isOut(*in.Status):
 				return userErr{409, "a cancelled or returned order cannot be reopened. Please place a new one"}
@@ -201,8 +206,12 @@ func adminUpdateOrder(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 		}
-		_, err = tx.Exec(ctx, `UPDATE orders SET status=coalesce($2,status),courier=coalesce($3,courier),tracking=coalesce($4,tracking),admin_note=coalesce($5,admin_note) WHERE id=$1`,
-			id, in.Status, in.Courier, in.Tracking, in.AdminNote)
+		var email, courier, tracking string
+		err = tx.QueryRow(ctx, `UPDATE orders SET status=coalesce($2,status),courier=coalesce($3,courier),tracking=coalesce($4,tracking),admin_note=coalesce($5,admin_note)
+			WHERE id=$1 RETURNING email,courier,tracking`, id, in.Status, in.Courier, in.Tracking, in.AdminNote).Scan(&email, &courier, &tracking)
+		if err == nil && changed {
+			queued, err = queueOrderUpdateMail(ctx, tx, id, num, *in.Status, email, courier, tracking)
+		}
 		return err
 	})
 	if err != nil {
@@ -210,7 +219,10 @@ func adminUpdateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	refresh()
-	done(w)
+	if queued {
+		kickOrderMail()
+	}
+	ok(w, map[string]bool{"ok": true, "emailQueued": queued})
 }
 
 func adminCustomers(w http.ResponseWriter, r *http.Request) {

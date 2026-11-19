@@ -558,23 +558,32 @@ test('blocked shopping storage explains its limits and keeps the current page us
 
 test('mobile order controls prevent duplicate updates and show payment verification guidance', () => shop(async (page, context) => {
   await page.addInitScript(() => sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'));
-  const order = { number: 'LB-FIXTURE', name: 'Fixture buyer', phone: '01710000000', address: 'Fixture address', area: 'local', total: 1060, payment: 'Mobile payment', txn_id: 'FIXTURE123', status: 'pending', items: [{ name: 'Cooker', qty: 1, price: 1000 }] };
+  const order = { number: 'LB-FIXTURE', name: 'Fixture buyer', phone: '01710000000', email: 'fixture@example.invalid', address: 'Fixture address', area: 'local', total: 1060, payment: 'Mobile payment', txn_id: 'FIXTURE123', status: 'pending', items: [{ name: 'Cooker', qty: 1, price: 1000 }] };
   let updates = 0, release;
   const gate = new Promise(resolve => { release = resolve; });
   await context.route('**/api/admin/orders?*', r => r.fulfill({ json: { orders: [order], total: 1, sales: 1060, size: 50 } }));
-  await context.route('**/api/admin/orders/LB-FIXTURE', async r => { updates++; await gate; order.status = 'confirmed'; return r.fulfill({ json: {} }); });
+  await context.route('**/api/admin/orders/LB-FIXTURE', async r => {
+    updates++;
+    assert.deepEqual(r.request().postDataJSON(), { status: 'confirmed', expectedStatus: 'pending' });
+    await gate;
+    order.status = 'confirmed';
+    return r.fulfill({ json: { emailQueued: true } });
+  });
   await ready(page, '/admin/#orders');
   for (const width of [320, 360, 375, 390, 414]) {
     await page.setViewportSize({ width, height: 812 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     assert.equal(await page.locator('[data-order-row]').isVisible(), true);
   }
-  assert.match(await page.locator('.order-payment-note').textContent(), /Verify this transaction/);
-  const button = page.locator('[data-step="confirmed"]');
-  await button.click();
-  await button.evaluate(el => el.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  await page.getByRole('button', { name: 'Manage' }).click();
+  assert.equal(await page.locator('.order-payment-note').isVisible(), true);
+  await page.locator('[name="status"]').selectOption('confirmed');
+  assert.match(await page.locator('.order-mail-note').textContent(), /confirmed email to fixture@example.invalid/);
+  await page.getByRole('button', { name: 'Save order' }).click();
+  await page.locator('form[data-n]').evaluate(form => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
   release();
-  await page.waitForSelector('[data-ship-focus]');
+  await page.waitForSelector('[data-order-row] .tag.confirmed');
+  assert.match(await page.locator('#ok').textContent(), /Customer email queued/);
   assert.equal(updates, 1);
 }));
 

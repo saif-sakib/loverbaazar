@@ -112,7 +112,7 @@ fieldset.panel { margin: 0; }
 body.has-buybar { padding-bottom: calc(152px + var(--safe-bottom)); }
 .toast { max-width: calc(100vw - 24px); }
 .lightbox .x { min-width: 48px; min-height: 48px; }
-.admin .btn, .admin .btn.small, .admin .adminactions .link, .admin .tbl td.actions .link, .admin #tabs a, .admin .qpill, .admin .richbar button { min-height: 44px; }
+.admin .btn, .admin .btn.small, .admin .adminactions .link, .admin .tbl td.actions .link, .admin #tabs a, .admin .richbar button { min-height: 44px; }
 .admin .repbtn button { width: 44px; height: 44px; }
 .admin .prod-title { text-align: left; min-height: 44px; }
 .admin .scroll { max-width: 100%; overflow: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
@@ -132,7 +132,7 @@ body.has-buybar { padding-bottom: calc(152px + var(--safe-bottom)); }
 .admin #olist thead { display: none; }
 .admin #olist tr[data-order-row] { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding: 16px; border-bottom: 1px solid var(--line); }
 .admin #olist tr[data-order-row] td { display: block; padding: 0; border: 0; white-space: normal; }
-.admin #olist tr[data-order-row] td:nth-child(-n+3), .admin #olist td.actions { grid-column: 1 / -1; }
+.admin #olist tr[data-order-row] td:nth-child(-n+2), .admin #olist td.actions { grid-column: 1 / -1; }
 .admin #olist td[data-l]::before { content: attr(data-l); display: block; font-size: 12px; font-weight: 600; color: var(--mute); margin-bottom: 4px; }
 .admin #olist .detail-row { display: block; }
 .admin #olist .detail-row > td { display: block; padding: 16px; }
@@ -192,7 +192,7 @@ body.has-buybar { padding-bottom: calc(152px + var(--safe-bottom)); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
-.admin .richbar button, .admin .qpill, .admin .tbl td.actions .link { min-width: 44px; }
+.admin .richbar button, .admin .tbl td.actions .link { min-width: 44px; }
 .admin .imgs figure { width: 164px; }
 .admin .imgs figcaption button { width: 44px; height: 44px; }
 .admin .imgs input { font-size: 16px !important; min-height: 44px; }

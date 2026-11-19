@@ -21,6 +21,9 @@ import (
 
 //go:embed migrations-v4.sql
 var notificationSQL string
+
+//go:embed migrations-v6.sql
+var orderUpdateMailSQL string
 var notificationDrain sync.Mutex
 
 type mailPayload struct {
@@ -70,6 +73,43 @@ func queueOrderMail(ctx context.Context, tx pgx.Tx, orderID int64, to, name stri
 		return err
 	}
 	return nil
+}
+
+func queueOrderUpdateMail(ctx context.Context, tx pgx.Tx, id int64, number, status, email, courier, tracking string) (bool, error) {
+	if !orderMailEnabled() || os.Getenv("CUSTOMER_ORDER_EMAIL") == "false" || !emailRe.MatchString(email) {
+		return false, nil
+	}
+	var update string
+	switch status {
+	case "confirmed":
+		update = "We have confirmed your order."
+	case "shipped":
+		update = "Your order has shipped."
+		if courier = strings.TrimSpace(courier); courier != "" {
+			update += "\nCourier: " + courier
+		}
+		if tracking = strings.TrimSpace(tracking); tracking != "" {
+			update += "\nTracking number: " + tracking
+		}
+	case "cancelled":
+		update = "Your order has been cancelled. If you already paid, contact the shop about your payment."
+	case "returned":
+		update = "Your order has been marked as returned. Contact the shop if you have questions about your return or payment."
+	default:
+		return false, nil
+	}
+	message := mailPayload{
+		To:      []string{email},
+		Subject: fmt.Sprintf("Order %s %s", number, status),
+		Text:    fmt.Sprintf("Order %s\n\n%s\n", number, update),
+	}
+	if site := strings.TrimRight(os.Getenv("SITE_URL"), "/"); site != "" {
+		message.Text += "\nCheck your order: " + site + "/track/\n"
+	}
+	payload, _ := json.Marshal(message)
+	result, err := tx.Exec(ctx, `INSERT INTO order_notifications(order_id,kind,payload)
+		VALUES($1,$2,$3::jsonb) ON CONFLICT (order_id,kind) DO NOTHING`, id, "customer_"+status, string(payload))
+	return result.RowsAffected() == 1, err
 }
 
 func configuredMail() bool {
