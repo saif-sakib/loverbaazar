@@ -37,6 +37,7 @@ const riceCookerFixture = {
   desc: "<p>Stainless body rice cooker.</p>",
   price: 1450,
   regular: 1900,
+  condition: "new",
   inStock: true,
   cats: ["latest-product", "rice-cooker"],
   tags: ["thin-fixture-tag"],
@@ -135,11 +136,16 @@ try {
   const rcLD = entities(rcPage);
   const rcProductLD = rcLD.find(item => item["@type"] === "Product");
   assert.equal(rcProductLD.category, "Rice Cooker");
+  assert.equal(rcProductLD.offers.itemCondition, "https://schema.org/NewCondition");
   assert.equal(rcProductLD.offers.hasMerchantReturnPolicy.merchantReturnLink, "https://loverbaazar.com/terms-conditions/");
   assert.equal(rcProductLD.offers.priceSpecification.price, 1900);
   assert.equal(rcProductLD.offers.priceSpecification.priceType, "https://schema.org/StrikethroughPrice");
   const rcCrumbs = rcLD.find(item => item["@type"] === "BreadcrumbList").itemListElement.map(item => item.name);
   assert.ok(rcCrumbs.includes("Rice Cooker") && !rcCrumbs.includes("Latest Products"));
+  const shopHTML = await read("production", "shop/index.html");
+  assert.match(shopHTML, /Browse categories/);
+  const shopLD = entities(shopHTML).find(item => item["@type"] === "CollectionPage");
+  assert.ok(shopLD && shopLD.mainEntity["@type"] === "ItemList" && shopLD.mainEntity.numberOfItems >= 2);
   const thinTag = await read("production", "product-tag/thin-fixture-tag/index.html");
   assert.match(thinTag, /noindex, follow/);
   assert.doesNotMatch(sitemap, /\/product-tag\/thin-fixture-tag\//);
@@ -153,6 +159,7 @@ try {
   const feed = await read("production", "feed.xml");
   assert.match(feed, /<g:sale_price>1250 BDT<\/g:sale_price>/);
   assert.match(feed, /<g:product_type>Rice Cooker<\/g:product_type>/);
+  assert.match(feed, /<g:condition>new<\/g:condition>/);
   await run("python3", ["-c", "import sys,xml.etree.ElementTree as ET\nfor x in sys.argv[1:]: ET.parse(x)", ...["feed.xml", "blog/feed.xml", "sitemap-index.xml", "sitemap-0.xml"].map(f => join(work, "production", f))]);
 
   product.price = 999;

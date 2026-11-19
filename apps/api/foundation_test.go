@@ -203,6 +203,57 @@ func TestFrozenPublicationAndImageProtection(t *testing.T) {
 	}
 }
 
+func TestCodeReleaseDoesNotSupersedeNewerEditorialPublish(t *testing.T) {
+	reset(t)
+	if _, err := db.Exec(bg, `UPDATE publication_state SET revision=1,published=1 WHERE id=1`); err != nil {
+		t.Fatal(err)
+	}
+	baseID, baseKey, err := frozenRelease(bg, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := finishRelease(bg, baseID, baseKey, "published", "base"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(bg, `UPDATE products SET data=data||'{"name":"Editorial update"}' WHERE id=1`); err != nil {
+		t.Fatal(err)
+	}
+	edID, edKey, err := frozenRelease(bg, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	codeID, codeKey, err := frozenRelease(bg, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := finishRelease(bg, codeID, codeKey, "running", "code"); err != nil {
+		t.Fatal(err)
+	}
+	if err := finishRelease(bg, codeID, codeKey, "published", "code"); err != nil {
+		t.Fatal(err)
+	}
+	if err := finishRelease(bg, edID, edKey, "running", "ed"); err != nil {
+		t.Fatalf("editorial publish wrongly blocked by older-revision code release: %v", err)
+	}
+	if err := finishRelease(bg, edID, edKey, "published", "ed"); err != nil {
+		t.Fatal(err)
+	}
+	var dirty bool
+	var state string
+	if err := db.QueryRow(bg, `SELECT revision<>published FROM publication_state WHERE id=1`).Scan(&dirty); err != nil {
+		t.Fatal(err)
+	}
+	if dirty {
+		t.Fatal("editorial publication remained dirty after completing")
+	}
+	if err := db.QueryRow(bg, `SELECT state FROM releases WHERE id=$1`, edID).Scan(&state); err != nil {
+		t.Fatal(err)
+	}
+	if state != "published" {
+		t.Fatalf("editorial release state = %q, want published", state)
+	}
+}
+
 func TestEnvironmentAndChallengeHost(t *testing.T) {
 	old := dev
 	defer func() { dev = old }()

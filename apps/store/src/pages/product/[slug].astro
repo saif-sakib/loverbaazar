@@ -49,8 +49,8 @@ const ld = {
     url: seo.canonical || url,
     priceCurrency: "BDT",
     price: p.price,
-    itemCondition: p.condition === "new" ? "https://schema.org/NewCondition" : undefined,
     availability: p.inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    itemCondition: p.condition === "new" ? "https://schema.org/NewCondition" : undefined,
     seller: { "@type": "Store", "@id": siteUrl("/#store"), name: SITE.name },
     priceSpecification: p.regular > p.price
       ? { "@type": "UnitPriceSpecification", priceType: "https://schema.org/StrikethroughPrice", price: p.regular, priceCurrency: "BDT" }
@@ -203,10 +203,27 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
         </p>
       </div>
     </section>
-    {p.desc && (
+    {p.desc ? (
       <section class="prose">
         <h2>Description</h2>
         <Fragment set:html={p.desc} />
+      </section>
+    ) : !p.short && (
+      <section class="prose">
+        <h2>Product overview</h2>
+        <p>
+          <strong>{p.name}</strong> is priced at <strong>{taka(p.price)}</strong> in Bangladesh at {spacedSiteName}
+          {brandName ? ` (${brandName})` : ""} and is currently {p.inStock ? "in stock" : "out of stock"}.
+          {primaryCat && (
+            <>
+              {" "}Compare more options in <a href={catUrl(primaryCat)}>{primaryCat.name}</a>.
+            </>
+          )}
+        </p>
+        <p>
+          Available payments: {LIVE.payments.filter((m: any) => m.enabled).map((m: any) => m.label).join(", ") || "contact the shop"}. See{" "}
+          <a href="/how-to-buy/">delivery and buying details</a>.
+        </p>
       </section>
     )}
     <section class="prose" id="reviews">
