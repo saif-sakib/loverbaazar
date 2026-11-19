@@ -1,4 +1,4 @@
-import { languageOf, siteUrl } from "./shop";
+import { languageOf, pages, siteUrl } from "./shop";
 
 const entities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 export function plainText(input: unknown) {
@@ -65,6 +65,19 @@ export function gtinOf(record: any) {
   const sum = [...id].reverse().reduce((total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
   return sum % 10 === 0 ? id : undefined;
 }
+
+export function skuOf(record: { sku?: unknown }) {
+  const sku = typeof record.sku === "string" ? record.sku.trim() : "";
+  // Google accepts Unicode SKUs but excludes whitespace and non-interchange characters.
+  return sku && !/[\p{White_Space}\p{C}]/u.test(sku) ? sku : undefined;
+}
+
+const termsPage = pages.find(page => page.slug === "terms-conditions");
+const termsURL = siteUrl("/terms-conditions/");
+const termsSEO = termsPage && recordSEO(termsPage, "");
+export const merchantReturnURL = termsSEO && !termsSEO.noindex &&
+  (!termsSEO.canonical || termsSEO.canonical === termsURL) &&
+  /\b(?:returns|return policy|refunds)\b|ফেরত/iu.test(plainText(termsPage.html)) ? termsURL : undefined;
 
 export const jsonLd = (object: object) => JSON.stringify(object).replace(/</g, "\\u003c");
 
