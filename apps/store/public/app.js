@@ -958,7 +958,7 @@
     const timeout = new AbortController();
     const timer = setTimeout(() => timeout.abort(), 8000); // a sleeping API must not hold up the page
     try {
-      const r = await fetch("/api/stock", { signal: timeout.signal, cache: reload ? "reload" : "default" });
+      const r = await fetch("/api/stock", { signal: timeout.signal, cache: reload ? "reload" : "default", priority: "low" });
       if (!r.ok) throw new Error();
       const snap = await r.json();
       // A saved snapshot renders immediately. Check once after the Worker's five-second

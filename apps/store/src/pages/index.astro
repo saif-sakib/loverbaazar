@@ -1,9 +1,9 @@
 ---
 import Base from "../layouts/Base.astro";
-import { responsiveImage } from "../lib/image-delivery.mjs";
+import { responsiveImage, sizedImage } from "../lib/image-delivery.mjs";
 import { isMerchandisingCategory, priceBounds } from "../lib/seo";
 import Card from "../components/Card.astro";
-import { products, inCat, homeItems, MENU, catUrl, img, languageOf, SITE, cats, LIVE, spacedSiteName, taka } from "../lib/shop";
+import { products, inCat, homeItems, MENU, catUrl, languageOf, SITE, cats, LIVE, spacedSiteName, taka } from "../lib/shop";
 const withPhoto = (l: any[]) => l.filter((p) => p.images[0]);
 const heroPics = withPhoto(SITE.home.flatMap((h: any) => homeItems(h.cat)))
   .filter((p: any, i: number, all: any[]) => all.findIndex((x) => x.id === p.id) === i)
@@ -29,7 +29,7 @@ const brandEnd = brandWords.pop();
 const homeDescription = [spacedSiteName, SITE.address].filter(Boolean).join(" in ") + ". " + SITE.description;
 ---
 
-<Base seoTitle={`${spacedSiteName} | ${SITE.tagline}`} description={homeDescription}>
+<Base seoTitle={`${spacedSiteName} | ${SITE.tagline}`} description={homeDescription} preconnectCloudinary>
   <div class="wrap">
     <section class="hero home-hero">
       <div>
@@ -79,7 +79,7 @@ const homeDescription = [spacedSiteName, SITE.address].filter(Boolean).join(" in
         <section class="cats">
           {tiles.map((c: any) => (
             <a href={catUrl(c)}>
-              <img src={img(inCat(c.slug)[0].images[0]?.thumb)} alt="" loading="lazy" width="150" height="150" />
+              <img src={sizedImage(inCat(c.slug)[0].images[0]?.src || inCat(c.slug)[0].images[0]?.thumb, 160)} alt="" loading="lazy" decoding="async" width="150" height="150" />
               {c.name}
               <small>{c.count} items{c.minPrice > 0 ? ` · From ${taka(c.minPrice)}` : ""}</small>
             </a>

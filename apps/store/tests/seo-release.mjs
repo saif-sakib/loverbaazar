@@ -41,7 +41,7 @@ const riceCookerFixture = {
   inStock: true,
   cats: ["latest-product", "rice-cooker"],
   tags: ["thin-fixture-tag"],
-  images: [{ src: "/logo/primary-logo.jpg" }],
+  images: [{ src: "https://res.cloudinary.com/test/image/upload/f_auto,q_auto/loverbaazar/products/rice-cooker/fixture-rice-cooker-18l-1.jpg" }],
   attrs: [{ name: "Brand", values: ["Kiam"] }],
   reviews: [],
   seo: {},
@@ -149,7 +149,10 @@ try {
   assert.equal(sitemap.match(/<loc>https:\/\/loverbaazar.com\/<\/loc>/g)?.length, 1);
   assert.ok(sitemap.includes(productURL));
   assert.doesNotMatch(sitemap, /\/(admin|cart|checkout|search|track|wishlist|my-account|404|seo-hidden-fixture|seo-duplicate-fixture|seo-draft-fixture)\//);
-  assert.match(await read("production", "seo-hidden-fixture/index.html"), /noindex, follow/);
+  const hiddenFixtureHTML = await read("production", "seo-hidden-fixture/index.html");
+  assert.match(hiddenFixtureHTML, /noindex, follow/);
+  assert.doesNotMatch(hiddenFixtureHTML, /<link rel="stylesheet"/);
+  assert.doesNotMatch(hiddenFixtureHTML, /rel="preconnect" href="https:\/\/res\.cloudinary\.com"/);
   await assert.rejects(read("production", "seo-draft-fixture/index.html"), { code: "ENOENT" });
   const riceCat = await read("production", "product-category/rice-cooker/index.html");
   assert.match(riceCat, /<title>Rice Cooker Price in Bangladesh \| Lover Baazar<\/title>/);
@@ -171,6 +174,14 @@ try {
   assert.equal(rcProductLD.offers.priceSpecification.priceType, "https://schema.org/StrikethroughPrice");
   const rcCrumbs = rcLD.find(item => item["@type"] === "BreadcrumbList").itemListElement.map(item => item.name);
   assert.ok(rcCrumbs.includes("Rice Cooker") && !rcCrumbs.includes("Latest Products"));
+  assert.doesNotMatch(home, /<link rel="stylesheet"/);
+  assert.match(home, /<style>/);
+  assert.match(home, /<script src="\/app\.js" defer fetchpriority="low">/);
+  assert.doesNotMatch(rcPage, /<link rel="stylesheet"/);
+  assert.match(rcPage, /<link rel="preconnect" href="https:\/\/res\.cloudinary\.com" crossorigin>/);
+  assert.match(rcPage, /<link rel="preload" as="image"[^>]*imagesrcset="[^"]*640w"[^>]*fetchpriority="high">/);
+  assert.match(rcPage, /<img class="main" data-main[^>]*srcset="[^"]*640w"[^>]*data-zoom="https:\/\/res\.cloudinary\.com\/test\/image\/upload\/c_limit,w_960\/q_auto\/f_auto\/loverbaazar\/products\/rice-cooker\/fixture-rice-cooker-18l-1\.jpg"[^>]*decoding="sync" fetchpriority="high">/);
+  assert.doesNotMatch(rcPage, /<img class="main"[^>]*960w/);
   const shopHTML = await read("production", "shop/index.html");
   assert.match(shopHTML, /Browse categories/);
   const shopLD = entities(shopHTML).find(item => item["@type"] === "CollectionPage");
@@ -184,6 +195,10 @@ try {
   assert.match(await read("production", "_redirects"), /^\/page-sitemap\.xml \/sitemap-index\.xml 301$/m);
   const productionHeaders = await read("production", "_headers");
   assert.match(productionHeaders, /https:\/\/:worker\.:account\.workers\.dev\/\*\n  X-Robots-Tag: noindex, nofollow/);
+  assert.match(productionHeaders, /\/_astro\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
+  assert.match(productionHeaders, /\/app\.js\n  Cache-Control: public, max-age=300, stale-while-revalidate=86400/);
+  assert.match(productionHeaders, /\/logo\/\*\n  Cache-Control: public, max-age=2592000/);
+  assert.match(productionHeaders, /\/release\.json\n  Cache-Control: no-store/);
   assert.doesNotMatch(productionHeaders, /^\/\*\n  X-Robots-Tag:/m);
   const feed = await read("production", "feed.xml");
   assert.match(feed, /<g:sale_price>1250 BDT<\/g:sale_price>/);

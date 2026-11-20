@@ -39,7 +39,7 @@ const collection = items.length > 0
   : null;
 ---
 
-<Base title={offersTitle} description={offersDesc}>
+<Base title={offersTitle} description={offersDesc} preconnectCloudinary>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />
     {collection && <script type="application/ld+json" set:html={jsonLd(collection)} />}

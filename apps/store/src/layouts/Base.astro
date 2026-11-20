@@ -4,7 +4,7 @@ import "../styles/site.css";
 import { jsonLd, organizationReturnPolicy, publicImage } from "../lib/seo";
 import "../styles/mobile.css";
 import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf, spacedSiteName } from "../lib/shop";
-const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", language = languageOf(`${title || ""} ${description}`) } = Astro.props;
+const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", preconnectCloudinary = false, language = languageOf(`${title || ""} ${description}`) } = Astro.props;
 const full = seoTitle || (title ? `${title} | ${spacedSiteName}` : `${spacedSiteName} | ${SITE.tagline}`);
 const canon = canonical || siteUrl(Astro.url.pathname);
 const isHome = Astro.url.pathname === "/";
@@ -68,6 +68,12 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    {preconnectCloudinary && (
+      <>
+        <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
+        <link rel="dns-prefetch" href="https://res.cloudinary.com" />
+      </>
+    )}
     <title>{full}</title>
     <meta name="description" content={description} />
     <meta
@@ -108,7 +114,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
       </>
     )}
     <slot name="head" />
-    <script is:inline src="/app.js" defer></script>
+    <script is:inline src="/app.js" defer fetchpriority="low"></script>
   </head>
   <body>
     <a class="skip" href="#main" lang="en-BD">

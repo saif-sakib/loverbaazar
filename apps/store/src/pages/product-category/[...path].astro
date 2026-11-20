@@ -81,7 +81,7 @@ const collection = items.length > 0
   : null;
 ---
 
-<Base title={heading} {...seo} noindex={seo.noindex || !items.length}>
+<Base title={heading} {...seo} noindex={seo.noindex || !items.length} preconnectCloudinary>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />
     {collection && <script type="application/ld+json" set:html={jsonLd(collection)} />}

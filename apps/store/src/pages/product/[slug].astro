@@ -29,7 +29,7 @@ const seo = recordSEO(p, description);
 const brandName = attributeValues(p, "brand")[0];
 const gtin = gtinOf(p);
 const mainImage = p.images[0];
-const displayImage = (image: any) => responsiveImage(image?.src, image?.src || image?.thumb, [320, 640, 960]);
+const displayImage = (image: any) => responsiveImage(image?.src, image?.src || image?.thumb, [320, 640]);
 const imageSet = displayImage(mainImage);
 const thumbnail = (image: any) => responsiveImage(image.src, image.thumb || image.src, [160]).src;
 const ld = {
@@ -91,8 +91,19 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
   {...seo}
   image={seo.image || publicImage(mainImage?.src)}
   type="product"
+  preconnectCloudinary
 >
   <Fragment slot="head">
+    {mainImage?.src && (
+      <link
+        rel="preload"
+        as="image"
+        href={imageSet.srcset ? undefined : imageSet.src}
+        imagesrcset={imageSet.srcset}
+        imagesizes={imageSet.srcset ? gallerySizes : undefined}
+        fetchpriority="high"
+      />
+    )}
     <meta property="product:price:amount" content={String(p.price)} />
     <meta property="product:price:currency" content="BDT" />
     <meta property="product:availability" content={p.inStock ? "in stock" : "out of stock"} />
@@ -113,7 +124,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
       <div>
         <div class="stage">
           <img class="main" data-main {...imageSet} sizes={imageSet.srcset ? gallerySizes : undefined}
-            data-zoom={sizedImage(mainImage?.src, 960)} alt={mainImage?.alt || p.name} width="600" height="600" fetchpriority="high" />
+            data-zoom={sizedImage(mainImage?.src, 960)} alt={mainImage?.alt || p.name} width="600" height="600" decoding="sync" fetchpriority="high" />
         </div>
         {p.images.length > 1 && (
           <div class="gal">

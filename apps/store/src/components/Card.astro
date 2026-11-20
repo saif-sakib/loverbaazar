@@ -1,7 +1,7 @@
 ---
 import { cardSizes, responsiveImage } from "../lib/image-delivery.mjs";
 import { taka, off, attributeValues, languageOf } from "../lib/shop";
-const { p, eager, hidden = false } = Astro.props;
+const { p, eager, priority = false, hidden = false } = Astro.props;
 const d = off(p);
 const photo = responsiveImage(p.images[0]?.src, p.images[0]?.thumb, [160, 320, 640]);
 ---
@@ -13,7 +13,8 @@ const photo = responsiveImage(p.images[0]?.src, p.images[0]?.thumb, [160, 320, 6
       sizes={photo.srcset ? cardSizes : undefined}
       alt={p.images[0]?.alt || p.name}
       loading={eager ? "eager" : "lazy"}
-      decoding="async"
+      decoding={priority ? "sync" : "async"}
+      fetchpriority={priority ? "high" : undefined}
       width="300"
       height="300"
     />

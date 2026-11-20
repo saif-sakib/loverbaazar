@@ -28,6 +28,7 @@ const crumbs = {
   title={title}
   {...seo}
   noindex={seo.noindex || !items.length || thin}
+  preconnectCloudinary
 >
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />

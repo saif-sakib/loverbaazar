@@ -41,7 +41,7 @@ const collection = products.length > 0
   : null;
 ---
 
-<Base title={shopTitle} description={shopDesc}>
+<Base title={shopTitle} description={shopDesc} preconnectCloudinary>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />
     {collection && <script type="application/ld+json" set:html={jsonLd(collection)} />}

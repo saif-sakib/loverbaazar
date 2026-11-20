@@ -20,6 +20,7 @@ export default defineConfig({
   publicDir: process.env.BUILD_PUBLIC_DIR || "./public",
   trailingSlash: "always",
   compressHTML: true,
+  build: { inlineStylesheets: "always" },
   integrations: [{
     name: "release-metadata",
     hooks: {
