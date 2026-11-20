@@ -1,12 +1,33 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { SITE, telOf, waOf } from "../../lib/shop";
+import { jsonLd } from "../../lib/seo";
+import { LIVE, SITE, siteUrl, spacedSiteName, taka, telOf, waOf } from "../../lib/shop";
+
+const contactTitle = SITE.address ? `Contact Us — ${SITE.address}` : "Contact us";
+const contactDesc = `Contact ${spacedSiteName}${SITE.address ? ` in ${SITE.address} (Jessore)` : ""} by phone (${SITE.phone}), WhatsApp, or email for online shopping, product details, and home delivery across Jashore and Bangladesh.`;
+const crumbs = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: siteUrl("/") },
+    { "@type": "ListItem", position: 2, name: "Contact us" },
+  ],
+};
+const contactPageLd = {
+  "@context": "https://schema.org",
+  "@type": "ContactPage",
+  name: contactTitle,
+  description: contactDesc,
+  url: siteUrl("/contact-us/"),
+  mainEntity: { "@id": siteUrl("/#store") },
+};
 ---
 
-<Base
-  title="Contact us"
-  description={`Contact ${SITE.name} by phone (${SITE.phone}), WhatsApp, or email${SITE.address ? ` or visit us at ${SITE.address}` : ""}.`}
->
+<Base title={contactTitle} description={contactDesc}>
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={jsonLd(crumbs)} />
+    <script type="application/ld+json" set:html={jsonLd(contactPageLd)} />
+  </Fragment>
   <div class="wrap">
     <div class="pagehead">
       <h1 class="title">Contact us</h1>
@@ -67,6 +88,22 @@ import { SITE, telOf, waOf } from "../../lib/shop";
             {SITE.hours}
           </p>
         )}
+        {LIVE.delivery?.length > 0 && (
+          <p>
+            <b>Delivery</b>
+            <br />
+            {LIVE.delivery.map((z: any, i: number) => (
+              <>
+                {i > 0 && <br />}
+                {z.label}: {Number(z.fee) > 0 && !(LIVE.freeOver > 0) ? taka(z.fee) : Number(z.fee) === 0 ? "Free" : `${taka(z.fee)} (free over ${taka(LIVE.freeOver)})`}
+                {z.days && ` (${z.days})`}
+              </>
+            ))}
+          </p>
+        )}
+        <p>
+          <a class="link" href="/online-shopping-jashore/">Online shopping in Jashore</a>
+        </p>
       </aside>
     </div>
   </div>

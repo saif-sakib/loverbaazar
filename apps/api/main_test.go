@@ -893,6 +893,75 @@ func TestSEOCatalogEnrichmentKeepsOwnerValues(t *testing.T) {
 	}
 }
 
+func TestJashoreLocalSEOContentUpdateKeepsOwnerEdits(t *testing.T) {
+	reset(t)
+	if _, err := db.Exec(bg, `INSERT INTO content(kind,slug,data) VALUES
+		('page','about-us','{"slug":"about-us","title":"About Us","html":"<p>{name} is a home appliance store. Custom note.</p>"}'),
+		('page','how-to-buy','{"slug":"how-to-buy","title":"How To Buy","html":"<p>ডেলিভারি এলাকা: সারা বাংলাদেশ।</p>"}')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(bg, `INSERT INTO settings VALUES('site','{"tagline":"Home appliances and furniture in Bangladesh","description":"Rice cookers, pressure cookers, nonstick cookware, chairs, tables and wardrobes at wholesale prices in Bangladesh, with cash on delivery.","about":"Your trusted place for home appliances and furniture, at wholesale prices.","hero":{"title":"Everything for your home, at wholesale prices.","text":"Rice cookers, cookware, wardrobes, chairs and more from Kiam, RFL and Akij. Delivered across Bangladesh, and you pay on delivery."}}')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyContentUpdates(bg); err != nil {
+		t.Fatal(err)
+	}
+	var aboutHTML, howHTML, tagline, desc, about, heroText string
+	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='page' AND slug='about-us'`).Scan(&aboutHTML); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(aboutHTML, "Vekutia, Jashore (Jessore)") || !strings.Contains(aboutHTML, "/online-shopping-jashore/") {
+		t.Errorf("about-us not enriched for Jashore: %q", aboutHTML)
+	}
+	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='page' AND slug='how-to-buy'`).Scan(&howHTML); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(howHTML, "/online-shopping-jashore/") || !strings.Contains(howHTML, "যশোর") {
+		t.Errorf("how-to-buy not enriched for Jashore: %q", howHTML)
+	}
+	if err := db.QueryRow(bg, `SELECT data->>'tagline',data->>'description',data->>'about',data->'hero'->>'text' FROM settings WHERE key='site'`).Scan(&tagline, &desc, &about, &heroText); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(tagline, "Online Shopping in Jashore") || !strings.Contains(desc, "Online shopping in Jashore") || !strings.Contains(about, "Vekutia, Jashore") || !strings.Contains(heroText, "Free delivery inside Jashore") {
+		t.Errorf("site settings defaults not updated: tagline=%q desc=%q about=%q hero=%q", tagline, desc, about, heroText)
+	}
+
+	// Owner-customized values must be preserved and the update must never re-run once applied.
+	if _, err := db.Exec(bg, `DELETE FROM applied WHERE name='2026-11-jashore-local-seo'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(bg, `UPDATE content SET data=jsonb_set(data,'{html}','"Owner custom about page"') WHERE kind='page' AND slug='about-us'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(bg, `UPDATE settings SET data='{"tagline":"Owner Tagline","description":"Owner desc","about":"Owner about","hero":{"text":"Owner hero text"}}'::jsonb WHERE key='site'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyContentUpdates(bg); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='page' AND slug='about-us'`).Scan(&aboutHTML); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(bg, `SELECT data->>'tagline',data->>'description',data->>'about',data->'hero'->>'text' FROM settings WHERE key='site'`).Scan(&tagline, &desc, &about, &heroText); err != nil {
+		t.Fatal(err)
+	}
+	if aboutHTML != "Owner custom about page" || tagline != "Owner Tagline" || desc != "Owner desc" || about != "Owner about" || heroText != "Owner hero text" {
+		t.Errorf("owner customizations overwritten: aboutHTML=%q tagline=%q desc=%q about=%q hero=%q", aboutHTML, tagline, desc, about, heroText)
+	}
+	if _, err := db.Exec(bg, `UPDATE content SET data=jsonb_set(data,'{html}','"{name} is a home appliance store."') WHERE kind='page' AND slug='about-us'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyContentUpdates(bg); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='page' AND slug='about-us'`).Scan(&aboutHTML); err != nil {
+		t.Fatal(err)
+	}
+	if aboutHTML != "{name} is a home appliance store." {
+		t.Errorf("jashore local SEO update re-applied after already recorded: %q", aboutHTML)
+	}
+}
+
 func TestImageCleanupAndSafeUploadPlace(t *testing.T) {
 	reset(t)
 	dir := t.TempDir()

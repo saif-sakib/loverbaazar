@@ -1,6 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { categoryChain, gtinOf, jsonLd, merchantReturnPolicy, merchantReturnURL, plainText, primaryCategoryOf, productSeoTitle, publicImage, recordSEO, skuOf } from "../../lib/seo";
+import { categoryChain, deliveryZonesText, gtinOf, jsonLd, merchantReturnPolicy, merchantReturnURL, plainText, primaryCategoryOf, productSeoTitle, publicImage, recordSEO, skuOf } from "../../lib/seo";
 import { gallerySizes, responsiveImage, sizedImage } from "../../lib/image-delivery.mjs";
 import Card from "../../components/Card.astro";
 import { products, cats, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, siteUrl, attributeValues, languageOf, spacedSiteName } from "../../lib/shop";
@@ -24,7 +24,8 @@ const fallbackPool = products.filter(
 const related = [...primaryPool, ...secondaryPool, ...fallbackPool].slice(0, 4);
 const stars = rating(p);
 const snippetText = plainText(p.short || p.desc);
-const description = `${p.name} price in Bangladesh is ${taka(p.price)} at ${spacedSiteName}. ${p.inStock ? "In stock" : "Currently sold out"}. ${snippetText || "Cash on delivery available across Bangladesh."}`;
+const deliverySummary = deliveryZonesText(LIVE);
+const description = `${p.name} price in Bangladesh is ${taka(p.price)} at ${spacedSiteName}. ${p.inStock ? "In stock" : "Currently sold out"}. ${deliverySummary}.${snippetText ? ` ${snippetText}` : ""}`;
 const seo = recordSEO(p, description);
 const brandName = attributeValues(p, "brand")[0];
 const gtin = gtinOf(p);

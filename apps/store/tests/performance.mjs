@@ -13,7 +13,7 @@ let failed = false;
 
 try {
   assert.ok(product && category);
-  for (const path of ["/", "/shop/", category, product, "/how-to-buy/"]) {
+  for (const path of ["/", "/shop/", "/online-shopping-jashore/", category, product, "/how-to-buy/"]) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
     const page = await context.newPage();
     await page.addInitScript(() => {

@@ -115,6 +115,13 @@ try {
   assert.equal(websites[0].url, "https://loverbaazar.com/");
   assert.equal(shops[0].url, "https://loverbaazar.com/");
   assert.equal(websites[0].publisher["@id"], shops[0]["@id"]);
+  assert.equal(shops[0].address.streetAddress, "Vekutia");
+  assert.equal(shops[0].address.addressLocality, "Jashore");
+  assert.equal(shops[0].address.addressRegion, "Khulna Division");
+  assert.equal(shops[0].address.addressCountry, "BD");
+  assert.ok(Array.isArray(shops[0].areaServed) && shops[0].areaServed.some(a => a.name === "Jashore" && a.alternateName?.includes("Jessore")) && shops[0].areaServed.some(a => a.name === "Bangladesh"));
+  assert.match(home, /href="\/online-shopping-jashore\/"/);
+  assert.match(home, /Free delivery in Jashore/);
   const expectedReturnPolicy = {
     "@type": "MerchantReturnPolicy",
     applicableCountry: "BD",
@@ -158,6 +165,7 @@ try {
   assert.match(riceCat, /<title>Rice Cooker Price in Bangladesh \| Lover Baazar<\/title>/);
   assert.match(riceCat, /<h1[^>]*>Rice Cooker Price in Bangladesh<\/h1>/);
   assert.match(riceCat, /<meta name="description" content="Compare \d+ Rice Cooker prices in Bangladesh [^"]*৳[^"]*Lover Baazar/);
+  assert.match(riceCat, /<meta name="description" content="[^"]*Free delivery in Jashore[^"]*">/);
   const riceCatLD = entities(riceCat).find(item => item["@type"] === "CollectionPage");
   assert.ok(riceCatLD && riceCatLD.mainEntity["@type"] === "ItemList" && riceCatLD.mainEntity.numberOfItems >= 1);
   assert.match(riceCat, /Rice Cooker Price List in Bangladesh/);
@@ -165,6 +173,7 @@ try {
   const rcPage = await read("production", "product/fixture-rice-cooker-18l/index.html");
   assert.match(rcPage, /<title>Fixture Kiam Rice Cooker 1\.8L Price in Bangladesh \| Lover Baazar<\/title>/);
   assert.match(rcPage, /<meta name="description" content="Fixture Kiam Rice Cooker 1\.8L price in Bangladesh is ৳1,450 at Lover Baazar\./);
+  assert.match(rcPage, /<meta name="description" content="[^"]*Free delivery in Jashore[^"]*">/);
   const rcLD = entities(rcPage);
   const rcProductLD = rcLD.find(item => item["@type"] === "Product");
   assert.equal(rcProductLD.category, "Rice Cooker");
@@ -186,6 +195,16 @@ try {
   assert.match(shopHTML, /Browse categories/);
   const shopLD = entities(shopHTML).find(item => item["@type"] === "CollectionPage");
   assert.ok(shopLD && shopLD.mainEntity["@type"] === "ItemList" && shopLD.mainEntity.numberOfItems >= 2);
+  const jashorePage = await read("production", "online-shopping-jashore/index.html");
+  assert.match(jashorePage, /<link rel="canonical" href="https:\/\/loverbaazar\.com\/online-shopping-jashore\/">/);
+  assert.match(jashorePage, /<h1[^>]*>Online Shopping in Jashore \(Jessore\)<\/h1>/);
+  assert.match(jashorePage, /lang="bn-BD"/);
+  assert.doesNotMatch(jashorePage, /<link rel="stylesheet"/);
+  const jashoreLD = entities(jashorePage);
+  assert.ok(jashoreLD.some(item => item["@type"] === "CollectionPage"));
+  assert.ok(jashoreLD.some(item => item["@type"] === "FAQPage" && Array.isArray(item.mainEntity) && item.mainEntity.length >= 4));
+  assert.ok(jashoreLD.some(item => item["@type"] === "BreadcrumbList"));
+  assert.ok(sitemap.includes("https://loverbaazar.com/online-shopping-jashore/"));
   const thinTag = await read("production", "product-tag/thin-fixture-tag/index.html");
   assert.match(thinTag, /noindex, follow/);
   assert.doesNotMatch(sitemap, /\/product-tag\/thin-fixture-tag\//);
@@ -193,6 +212,7 @@ try {
   assert.ok(sitemap.includes("https://loverbaazar.com/product/fixture-rice-cooker-18l/"));
   assert.match(await read("production", "robots.txt"), /Sitemap: https:\/\/loverbaazar.com\/sitemap-index.xml/);
   assert.match(await read("production", "_redirects"), /^\/page-sitemap\.xml \/sitemap-index\.xml 301$/m);
+  assert.match(await read("production", "_redirects"), /^\/online-shopping-jessore\/ \/online-shopping-jashore\/ 301$/m);
   const productionHeaders = await read("production", "_headers");
   assert.match(productionHeaders, /https:\/\/:worker\.:account\.workers\.dev\/\*\n  X-Robots-Tag: noindex, nofollow/);
   assert.match(productionHeaders, /\/_astro\/\*\n  Cache-Control: public, max-age=31536000, immutable/);

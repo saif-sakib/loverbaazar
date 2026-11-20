@@ -15,7 +15,8 @@
     "/product/feed/": "/feed.xml",
     "/product-category/chair/page/1/": "/product-category/chair/",
     "/product/kiam-pressure-cooker-kiam-5-5-queen": "/product/kiam-pressure-cooker-kiam-5-5-queen/",
-    "/product/pureit-classic-23l/": "/product/pureit-water-filter-for-drinking-water/"
+    "/product/pureit-classic-23l/": "/product/pureit-water-filter-for-drinking-water/",
+    "/online-shopping-jessore/": "/online-shopping-jashore/"
   },
   "ids": {}
 }

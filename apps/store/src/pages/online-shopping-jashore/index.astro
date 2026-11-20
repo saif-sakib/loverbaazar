@@ -1,0 +1,250 @@
+---
+import Base from "../../layouts/Base.astro";
+import Grid from "../../components/Grid.astro";
+import { sizedImage } from "../../lib/image-delivery.mjs";
+import { deliveryZonesText, freeLocalArea, isMerchandisingCategory, jsonLd, priceBounds } from "../../lib/seo";
+import { cats, catUrl, homeItems, inCat, languageOf, LIVE, MENU, products, SITE, siteUrl, spacedSiteName, taka, telOf, waOf } from "../../lib/shop";
+
+const freeArea = freeLocalArea(LIVE);
+const deliverySummary = deliveryZonesText(LIVE);
+const enabledPayments = LIVE.payments.filter((p: any) => p.enabled);
+const paymentSummary = enabledPayments.map((p: any) => p.label).join(", ");
+const menuTiles = MENU.flatMap((g: any) => g.items);
+const extraTiles = cats.filter((c: any) => !isMerchandisingCategory(c.slug));
+const tiles = [...menuTiles, ...extraTiles]
+  .filter((c: any, i: number, all: any[]) => inCat(c.slug).length > 0 && all.findIndex((x: any) => x.slug === c.slug) === i)
+  .map((c: any) => {
+    const items = inCat(c.slug);
+    const thumbItem = items.find((p: any) => p.images?.[0]);
+    return {
+      ...c,
+      count: items.length,
+      minPrice: priceBounds(items).min,
+      thumb: sizedImage(thumbItem?.images[0]?.src || thumbItem?.images[0]?.thumb, 160),
+    };
+  });
+
+const uniquePool = [...homeItems("popular-item"), ...homeItems("latest-product"), ...products]
+  .filter((p: any, i: number, all: any[]) => all.findIndex((x: any) => x.id === p.id) === i)
+  .sort((a: any, b: any) => Number(Boolean(b.inStock)) - Number(Boolean(a.inStock)));
+const featured = uniquePool.slice(0, 8);
+const listed = uniquePool.slice(0, 12);
+const storeBounds = priceBounds(products);
+
+const pageTitle = "Online Shopping in Jashore (Jessore) — Home Appliances";
+const pageDesc = `Online shopping in Jashore (Jessore) at ${spacedSiteName}${SITE.address ? ` (${SITE.address})` : ""}. Compare ${products.length} kitchen appliances, cookware, chairs and wardrobes${storeBounds.min > 0 ? ` starting from ${taka(storeBounds.min)}` : ""}. ${deliverySummary}.`;
+
+const formatZoneFee = (z: any) =>
+  Number(z.fee) === 0
+    ? "Free"
+    : `${taka(z.fee)}${LIVE.freeOver > 0 ? ` (free over ${taka(LIVE.freeOver)})` : ""}`;
+const zoneParts = (LIVE.delivery || []).map(
+  (z: any) => `${z.label} is ${formatZoneFee(z)}${z.days ? ` (${z.days})` : ""}`,
+);
+
+const faqs = [
+  {
+    q: `How can I shop online in Jashore at ${spacedSiteName}?`,
+    a: `Choose your product, click Add to cart or Buy now, enter your name, mobile number, and full delivery address, select ${freeArea ? freeArea.label : "your delivery area"}, and place your order. No account is required to order.`,
+  },
+  {
+    q: "What is the delivery charge inside Jashore and across Bangladesh?",
+    a: zoneParts.length > 0
+      ? `Current delivery rates: ${zoneParts.join(", ")}. Exact delivery fees appear at checkout before you confirm.`
+      : "Select your delivery area at checkout to see the exact delivery charge before confirming your order.",
+  },
+  {
+    q: `Where is ${spacedSiteName} located in Jashore and how can I contact the shop?`,
+    a: `${spacedSiteName} is based in ${SITE.address || "Jashore"}, Bangladesh. Call us on ${SITE.phone}${SITE.whatsapp && SITE.whatsapp !== SITE.phone ? ` or message WhatsApp ${SITE.whatsapp}` : SITE.whatsapp ? ` or message us on WhatsApp (${SITE.whatsapp})` : ""}${SITE.email ? `, or email ${SITE.email}` : ""}.`,
+  },
+  {
+    q: "What payment methods are accepted for Jashore and Bangladesh orders?",
+    a: paymentSummary
+      ? `We accept ${paymentSummary} for orders in Jashore and across Bangladesh.`
+      : "See available payment methods at checkout or contact the shop before ordering.",
+  },
+];
+
+const crumbs = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: siteUrl("/") },
+    { "@type": "ListItem", position: 2, name: "Online Shopping in Jashore" },
+  ],
+};
+
+const collection = {
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  name: pageTitle,
+  description: pageDesc,
+  url: siteUrl("/online-shopping-jashore/"),
+  about: { "@id": siteUrl("/#store") },
+  ...(listed.length > 0
+    ? {
+        mainEntity: {
+          "@type": "ItemList",
+          numberOfItems: listed.length,
+          itemListElement: listed.map((p: any, i: number) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            url: siteUrl(`/product/${p.slug}/`),
+            name: p.name,
+          })),
+        },
+      }
+    : {}),
+};
+
+const faqLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((item) => ({
+    "@type": "Question",
+    name: item.q,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.a,
+    },
+  })),
+};
+---
+
+<Base title={pageTitle} description={pageDesc} preconnectCloudinary>
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={jsonLd(crumbs)} />
+    <script type="application/ld+json" set:html={jsonLd(collection)} />
+    <script type="application/ld+json" set:html={jsonLd(faqLd)} />
+  </Fragment>
+  <div class="wrap">
+    <p class="crumbs">
+      <a href="/">Home</a> / Online Shopping in Jashore
+    </p>
+    <div class="pagehead">
+      <h1>Online Shopping in Jashore (Jessore)</h1>
+      <p class="cat-summary">
+        <strong>{products.length}</strong> products across <strong>{tiles.length}</strong> categories ·{" "}
+        {deliverySummary}{paymentSummary ? ` · ${paymentSummary}` : ""}
+        {SITE.address ? ` · Local store: ${SITE.address}` : ""}.
+      </p>
+      <div class="drawer-help">
+        <a class="btn" href="/shop/">Browse all products</a>
+        <a class="btn ghost" href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a>
+        {SITE.whatsapp && <a class="btn ghost" href={waOf(SITE.whatsapp)} rel="noopener">WhatsApp</a>}
+      </div>
+    </div>
+
+    {tiles.length > 0 && (
+      <>
+        <div class="sec">
+          <h2>Shop online in Jashore by category</h2>
+          <a href="/shop/">View all</a>
+        </div>
+        <section class="cats">
+          {tiles.map((c: any) => (
+            <a href={catUrl(c)} lang={languageOf(c.name)}>
+              <img src={c.thumb} alt="" loading="lazy" decoding="async" width="150" height="150" />
+              {c.name}
+              <small>{c.count} items{c.minPrice > 0 ? ` · From ${taka(c.minPrice)}` : ""}</small>
+            </a>
+          ))}
+        </section>
+      </>
+    )}
+
+    {featured.length > 0 && (
+      <>
+        <div class="sec">
+          <h2>Popular products in Jashore</h2>
+          <a href="/shop/">Shop all</a>
+        </div>
+        <Grid items={featured} />
+      </>
+    )}
+
+    <section class="prose" aria-labelledby="jashore-store-details-title">
+      <h2 id="jashore-store-details-title">Delivery, payment &amp; store details</h2>
+      <div class="two even">
+        <div class="panel">
+          <h3>Delivery &amp; payment</h3>
+          {LIVE.delivery?.length > 0 && (
+            <ul class="delivery">
+              {LIVE.delivery.map((z: any) => (
+                <li>
+                  {z.label}: <b>{formatZoneFee(z)}</b>
+                  {z.days && `, ${z.days}`}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p>
+            <strong>Payment methods:</strong> {paymentSummary || "Contact the shop for payment options"}.
+          </p>
+          <p>
+            No account needed to order online. See <a href="/how-to-buy/">How to buy</a> or{" "}
+            <a href="/track/">Track your order</a>.
+          </p>
+        </div>
+        <div class="panel">
+          <h3>Visit or contact our Jashore store</h3>
+          {SITE.address && (
+            <p>
+              <strong>Address:</strong> {SITE.address}, Bangladesh
+            </p>
+          )}
+          <p>
+            <strong>Phone:</strong>{" "}
+            <a href={`tel:${telOf(SITE.phone)}`}>{SITE.phone}</a>
+          </p>
+          {SITE.whatsapp && (
+            <p>
+              <strong>WhatsApp:</strong>{" "}
+              <a href={waOf(SITE.whatsapp)} rel="noopener">{SITE.whatsapp}</a>
+            </p>
+          )}
+          {SITE.email && (
+            <p>
+              <strong>Email:</strong>{" "}
+              <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
+            </p>
+          )}
+          {SITE.hours && (
+            <p>
+              <strong>Opening hours:</strong> {SITE.hours}
+            </p>
+          )}
+          <p>
+            Need help choosing? <a href="/contact-us/">Contact us</a>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="prose" lang="bn-BD" aria-labelledby="jashore-bn-title">
+      <h2 id="jashore-bn-title">যশোরে অনলাইন শপিং — {spacedSiteName}</h2>
+      <p>
+        যশোরে অনলাইন শপিং করার বিশ্বস্ত ঠিকানা {spacedSiteName}{SITE.address ? ` (${SITE.address})` : ""}। রাইস কুকার,
+        প্রেশার কুকার, ননস্টিক কুকওয়্যার, ইন্ডাকশন ও ইনফ্রারেড কুকার, গ্যাসের চুলা, কিয়াম (Kiam) কিচেন আইটেম, আরএফএল
+        (RFL) ও আকিজ (Akij) প্লাস্টিক চেয়ার, টেবিল, ওয়ারড্রোব, আলমিরা ও ওয়াটার ফিল্টার সহ{" "}
+        <strong>{products.length}</strong>টি পণ্য অনলাইনে অর্ডার করুন।
+      </p>
+      <p>
+        অ্যাকাউন্ট ছাড়াই সরাসরি অর্ডার করুন। পেমেন্ট:{" "}
+        {paymentSummary || "চেকআউটে দেখানো পেমেন্ট পদ্ধতি"}। যশোর এবং সারা বাংলাদেশে নির্ভরযোগ্য ডেলিভারি।{" "}
+        <a href="/how-to-buy/">অর্ডার করার নিয়ম দেখুন</a> অথবা{" "}
+        <a href="/shop/">সব পণ্য দেখুন</a>।
+      </p>
+    </section>
+
+    <section class="prose" aria-labelledby="jashore-faq-title">
+      <h2 id="jashore-faq-title">Frequently asked questions</h2>
+      {faqs.map((item) => (
+        <>
+          <h3>{item.q}</h3>
+          <p>{item.a}</p>
+        </>
+      ))}
+    </section>
+  </div>
+</Base>

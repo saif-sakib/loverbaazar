@@ -1,7 +1,7 @@
 ---
 import Base from "../layouts/Base.astro";
 import { responsiveImage, sizedImage } from "../lib/image-delivery.mjs";
-import { isMerchandisingCategory, priceBounds } from "../lib/seo";
+import { deliveryZonesText, freeLocalArea, isMerchandisingCategory, priceBounds } from "../lib/seo";
 import Card from "../components/Card.astro";
 import { products, inCat, homeItems, MENU, catUrl, languageOf, SITE, cats, LIVE, spacedSiteName, taka } from "../lib/shop";
 const withPhoto = (l: any[]) => l.filter((p) => p.images[0]);
@@ -27,6 +27,8 @@ const hero = SITE.hero;
 const brandWords = spacedSiteName.trim().split(/\s+/);
 const brandEnd = brandWords.pop();
 const homeDescription = [spacedSiteName, SITE.address].filter(Boolean).join(" in ") + ". " + SITE.description;
+const freeArea = freeLocalArea(LIVE);
+const deliverySummary = deliveryZonesText(LIVE);
 ---
 
 <Base seoTitle={`${spacedSiteName} | ${SITE.tagline}`} description={homeDescription} preconnectCloudinary>
@@ -93,8 +95,8 @@ const homeDescription = [spacedSiteName, SITE.address].filter(Boolean).join(" in
         <span>See available methods at checkout</span>
       </div>
       <div>
-        <b>Delivery</b>
-        <span>Choose your area for the exact charge</span>
+        <b>{freeArea ? `Free delivery in ${freeArea.area}` : "Delivery"}</b>
+        <span>{freeArea ? "Plus nationwide delivery across Bangladesh" : "Choose your area for the exact charge"}</span>
       </div>
       <div>
         <b>Wholesale prices</b>
@@ -123,6 +125,20 @@ const homeDescription = [spacedSiteName, SITE.address].filter(Boolean).join(" in
           </>
         ),
     )}
+    <section class="prose" aria-labelledby="jashore-shopping-title">
+      <h2 id="jashore-shopping-title">Online shopping in Jashore (Jessore) for your home</h2>
+      <p>
+        {spacedSiteName} is a local online home appliance, cookware, and furniture store based in{" "}
+        <strong>{SITE.address || "Jashore"}</strong>. Compare live BDT prices on rice cookers, pressure cookers,
+        nonstick cookware, induction cookers, gas stoves, chairs, tables, wardrobes, and water filters from trusted
+        brands like Kiam, RFL, and Akij.
+      </p>
+      <p>
+        Every order includes {deliverySummary.toLowerCase()} with no account required.{" "}
+        <a href="/online-shopping-jashore/">Online shopping in Jashore</a> · <a href="/shop/">Browse all products</a> ·{" "}
+        <a href="/contact-us/">Contact our Jashore store</a>.
+      </p>
+    </section>
     <section data-recent-wrap hidden>
       <div class="sec">
         <h2>Recently viewed</h2>

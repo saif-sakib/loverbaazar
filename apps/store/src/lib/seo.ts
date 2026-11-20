@@ -196,3 +196,73 @@ export function priceBounds(items: any[]) {
   }
   return { min: min === Infinity ? 0 : min, max, inStockCount };
 }
+
+/** Split a configured store address into PostalAddress fields without inventing missing data. */
+export function postalAddress(address: unknown) {
+  const raw = plainText(address);
+  if (!raw) return undefined;
+  const parts = raw.split(",").map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const addressLocality = parts.pop()!;
+    return {
+      "@type": "PostalAddress",
+      streetAddress: parts.join(", "),
+      addressLocality,
+      ...(/\b(?:jashore|jessore)\b/i.test(addressLocality) ? { addressRegion: "Khulna Division" } : {}),
+      addressCountry: "BD",
+    };
+  }
+  return {
+    "@type": "PostalAddress",
+    streetAddress: raw,
+    addressCountry: "BD",
+  };
+}
+
+/** Find a zero-fee local delivery zone from live store settings. */
+export function freeLocalArea(live: any) {
+  const list = Array.isArray(live?.delivery) ? live.delivery : [];
+  const freeZone = list.find((zone: any) => Number(zone?.fee) === 0 && String(zone?.label || "").trim());
+  if (!freeZone) return null;
+  const label = String(freeZone.label).trim();
+  const area = label.replace(/^inside\s+/i, "").trim();
+  if (!area) return null;
+  return {
+    id: String(freeZone.id || ""),
+    label,
+    area,
+    fee: 0,
+    days: String(freeZone.days || "").trim(),
+  };
+}
+
+/** Describe configured free local delivery and nationwide cash-on-delivery truthfully. */
+export function deliveryZonesText(live: any) {
+  const free = freeLocalArea(live);
+  const payments = Array.isArray(live?.payments) ? live.payments : [];
+  const hasCod = payments.some((p: any) => p?.enabled && /cash on delivery|\bcod\b/i.test(`${p.id || ""} ${p.label || ""}`));
+  if (free && hasCod) return `Free delivery in ${free.area} and cash on delivery across Bangladesh`;
+  if (free) return `Free delivery in ${free.area} and delivery across Bangladesh`;
+  if (hasCod) return "Cash on delivery across Bangladesh";
+  return "Delivery across Bangladesh";
+}
+
+/** Emit structured areaServed entities for Jashore and Bangladesh when configured. */
+export function storeAreaServed(address: unknown, live: any) {
+  const rawAddress = plainText(address);
+  const list = Array.isArray(live?.delivery) ? live.delivery : [];
+  const matchesJashore = /\b(?:jashore|jessore)\b/i.test(rawAddress) ||
+    list.some((zone: any) => /\b(?:jashore|jessore)\b/i.test(`${zone?.id || ""} ${zone?.label || ""}`));
+  if (matchesJashore) {
+    return [
+      {
+        "@type": "AdministrativeArea",
+        name: "Jashore",
+        alternateName: ["Jessore", "যশোর"],
+        containedInPlace: { "@type": "AdministrativeArea", name: "Khulna Division" },
+      },
+      { "@type": "Country", name: "Bangladesh" },
+    ];
+  }
+  return { "@type": "Country", name: "Bangladesh" };
+}

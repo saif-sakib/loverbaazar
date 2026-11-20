@@ -1,7 +1,7 @@
 ---
 import "../styles/fonts.css";
 import "../styles/site.css";
-import { jsonLd, organizationReturnPolicy, publicImage } from "../lib/seo";
+import { jsonLd, organizationReturnPolicy, postalAddress, publicImage, storeAreaServed } from "../lib/seo";
 import "../styles/mobile.css";
 import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf, spacedSiteName } from "../lib/shop";
 const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", preconnectCloudinary = false, language = languageOf(`${title || ""} ${description}`) } = Astro.props;
@@ -41,13 +41,10 @@ const org = {
   currenciesAccepted: "BDT",
   paymentAccepted: payments.map((p: any) => p.label).join(", ") || undefined,
   hasMerchantReturnPolicy: organizationReturnPolicy,
-  address: SITE.address
-    ? {
-        "@type": "PostalAddress",
-        streetAddress: SITE.address,
-        addressCountry: "BD",
-      }
-    : undefined,
+  address: postalAddress(SITE.address),
+  areaServed: storeAreaServed(SITE.address, LIVE),
+  openingHours: SITE.hours || undefined,
+  knowsLanguage: ["en-BD", "bn-BD"],
   sameAs: [SITE.facebook, SITE.youtube].filter(Boolean),
 };
 const webSiteLd = {
@@ -57,6 +54,7 @@ const webSiteLd = {
   name: spacedSiteName,
   alternateName: alternateName ? SITE.name : undefined,
   url: siteUrl("/"),
+  inLanguage: ["en-BD", "bn-BD"],
   publisher: { "@id": storeID },
 };
 const standardSlugs = new Set(["about-us", "how-to-buy", "contact-us", "privacy-policy", "terms-conditions"]);
@@ -261,6 +259,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
           <a href="/how-to-buy/">How to buy</a>
           <a href="/contact-us/">Contact us</a>
           <a href="/blog/">Blog</a>
+          <a href="/online-shopping-jashore/">Online shopping in Jashore</a>
           {["/", "/about-us/", "/about-us"].includes(Astro.url.pathname) && (
             <a class="community-link" href="https://www.hasnahenafoundation.com/about">Hasnahena Foundation in Jashore</a>
           )}

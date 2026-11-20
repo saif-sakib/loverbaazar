@@ -2,6 +2,8 @@
 import {
   categoryChain,
   categoryHeading,
+  deliveryZonesText,
+  freeLocalArea,
   isMerchandisingCategory,
   jsonLd,
   plainText,
@@ -10,7 +12,7 @@ import {
 } from "../../lib/seo";
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { attributeValues, catUrl, cats, fileSlug, inCat, languageOf, LIVE, MENU, siteUrl, spacedSiteName, taka } from "../../lib/shop";
+import { attributeValues, catUrl, cats, fileSlug, inCat, languageOf, LIVE, MENU, SITE, siteUrl, spacedSiteName, taka } from "../../lib/shop";
 export const getStaticPaths = () => cats.map((c) => ({ params: { path: fileSlug(c.path) }, props: { c } }));
 const { c } = Astro.props;
 const items = inCat(c.slug);
@@ -35,6 +37,8 @@ const relatedCats = [...preferredCats, ...popularFallbackCats]
   .slice(0, 8);
 const enabledPayments = LIVE.payments.filter((p: any) => p.enabled).map((p: any) => p.label).join(", ");
 const deliveryLabels = LIVE.delivery.map((z: any) => z.label).join(", ");
+const freeArea = freeLocalArea(LIVE);
+const deliverySummary = deliveryZonesText(LIVE);
 const priceList = isMerchandisingCategory(c.slug)
   ? []
   : [...items]
@@ -43,7 +47,7 @@ const priceList = isMerchandisingCategory(c.slug)
       .slice(0, 15);
 const priceRange = bounds.max > bounds.min ? `from ${taka(bounds.min)} to ${taka(bounds.max)}` : `at ${taka(bounds.min)}`;
 const fallbackDesc = items.length > 0 && bounds.min > 0
-  ? `Compare ${items.length} ${c.name} prices in Bangladesh ${priceRange} at ${spacedSiteName}.${brands.length ? ` Brands: ${brands.slice(0, 4).join(", ")}.` : ""} Cash on delivery across Bangladesh.`
+  ? `Compare ${items.length} ${c.name} prices in Bangladesh ${priceRange} at ${spacedSiteName}.${brands.length ? ` Brands: ${brands.slice(0, 4).join(", ")}.` : ""} ${deliverySummary}.`
   : plainText(c.html) || `Browse ${c.name} at ${spacedSiteName}. See product details, prices and availability.`;
 const seo = recordSEO(c, fallbackDesc);
 const crumbs = {
@@ -103,7 +107,8 @@ const collection = items.length > 0
           <strong>{items.length}</strong> {items.length === 1 ? "product" : "products"}
           {bounds.inStockCount > 0 && ` (${bounds.inStockCount} in stock)`} · Price{" "}
           {bounds.max > bounds.min ? `${taka(bounds.min)} – ${taka(bounds.max)}` : taka(bounds.min)}
-          {brands.length > 0 && ` · Brands: ${brands.slice(0, 5).join(", ")}`} · Cash on delivery across Bangladesh
+          {brands.length > 0 && ` · Brands: ${brands.slice(0, 5).join(", ")}`} ·{" "}
+          {freeArea ? `Free delivery in ${freeArea.area} · ` : ""}Cash on delivery across Bangladesh
         </p>
       )}
       {subcategories.length > 0 && (
@@ -159,6 +164,17 @@ const collection = items.length > 0
         </p>
       </section>
     ))}
+    {items.length > 0 && !isMerchandisingCategory(c.slug) && (
+      <section class="prose" aria-labelledby="cat-local-ordering">
+        <h2 id="cat-local-ordering">Order {c.name} online in Jashore &amp; Bangladesh</h2>
+        <p>
+          Order authentic {c.name} online from {spacedSiteName}
+          {SITE.address ? ` (${SITE.address})` : ""} with {deliverySummary.toLowerCase()}. Explore{" "}
+          <a href="/online-shopping-jashore/">online shopping in Jashore</a> or{" "}
+          <a href="/shop/">view all categories</a>.
+        </p>
+      </section>
+    )}
     {items.length > 0 && relatedCats.length > 0 && (
       <section class="prose" aria-labelledby="related-cats-title">
         <h2 id="related-cats-title">Related categories</h2>

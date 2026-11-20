@@ -20,7 +20,7 @@ try {
   await page.goto("/");
   const product = await page.locator('a[href^="/product/"]').first().getAttribute("href");
   const category = await page.locator('a[href^="/product-category/"]').first().getAttribute("href");
-  for (const route of ["/", category, product, "/shop/", "/search/?q=cooker", "/cart/", "/wishlist/", "/checkout/", "/track/", "/my-account/", "/contact-us/", "/privacy-policy/", "/admin/"]) {
+  for (const route of ["/", category, product, "/shop/", "/online-shopping-jashore/", "/search/?q=cooker", "/cart/", "/wishlist/", "/checkout/", "/track/", "/my-account/", "/contact-us/", "/privacy-policy/", "/admin/"]) {
     await page.goto(route);
     await scan(route);
   }
@@ -60,7 +60,7 @@ try {
   // Reflow at two narrow CSS viewport sizes, including the 320 px WCAG width.
   for (const width of [320, 720]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const route of ["/", "/shop/", product, "/checkout/", "/admin/"]) {
+    for (const route of ["/", "/shop/", "/online-shopping-jashore/", product, "/checkout/", "/admin/"]) {
       await page.goto(route);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${route} overflowed at ${width}px`);
     }

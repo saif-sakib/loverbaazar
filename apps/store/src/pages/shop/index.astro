@@ -1,17 +1,19 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import { isMerchandisingCategory, jsonLd, priceBounds } from "../../lib/seo";
-import { cats, catUrl, inCat, languageOf, products, siteUrl, spacedSiteName, taka } from "../../lib/shop";
+import { deliveryZonesText, freeLocalArea, isMerchandisingCategory, jsonLd, priceBounds } from "../../lib/seo";
+import { cats, catUrl, inCat, languageOf, LIVE, products, siteUrl, spacedSiteName, taka } from "../../lib/shop";
 
 const bounds = priceBounds(products);
+const freeArea = freeLocalArea(LIVE);
+const deliverySummary = deliveryZonesText(LIVE);
 const activeCats = cats
   .filter((c: any) => !isMerchandisingCategory(c.slug))
   .map((c: any) => ({ ...c, count: inCat(c.slug).length }))
   .filter((c: any) => c.count > 0)
   .sort((a: any, b: any) => b.count - a.count || a.name.localeCompare(b.name));
-const shopTitle = "Home Appliances & Furniture Price in Bangladesh";
-const shopDesc = `Browse all ${products.length} kitchen and home appliances, cookware, chairs, tables, and wardrobes${bounds.min > 0 ? ` from ${taka(bounds.min)} to ${taka(bounds.max)}` : ""} in Bangladesh at ${spacedSiteName}.`;
+const shopTitle = "Home Appliances & Furniture Price in Jashore & Bangladesh";
+const shopDesc = `Browse all ${products.length} kitchen and home appliances, cookware, chairs, tables, and wardrobes${bounds.min > 0 ? ` from ${taka(bounds.min)} to ${taka(bounds.max)}` : ""} in Jashore (Jessore) and Bangladesh at ${spacedSiteName}. ${deliverySummary}.`;
 const crumbs = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
@@ -52,7 +54,9 @@ const collection = products.length > 0
       {products.length > 0 && bounds.min > 0 && (
         <p class="cat-summary">
           <strong>{products.length}</strong> products across <strong>{activeCats.length}</strong> categories
-          {bounds.inStockCount > 0 && ` (${bounds.inStockCount} in stock)`} · Price {taka(bounds.min)} – {taka(bounds.max)} · Cash on delivery across Bangladesh
+          {bounds.inStockCount > 0 && ` (${bounds.inStockCount} in stock)`} · Price {taka(bounds.min)} – {taka(bounds.max)} ·{" "}
+          {freeArea ? `Free delivery in ${freeArea.area} · ` : ""}Cash on delivery across Bangladesh ·{" "}
+          <a class="link" href="/online-shopping-jashore/">Online shopping in Jashore</a>
         </p>
       )}
       {activeCats.length > 0 && (
