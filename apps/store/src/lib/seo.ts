@@ -72,12 +72,64 @@ export function skuOf(record: { sku?: unknown }) {
   return sku && !/[\p{White_Space}\p{C}]/u.test(sku) ? sku : undefined;
 }
 
+const banglaDigits: Record<string, string> = { "০": "0", "১": "1", "২": "2", "৩": "3", "৪": "4", "৫": "5", "৬": "6", "৭": "7", "৮": "8", "৯": "9" };
+const toAsciiDigits = (text: string) => text.replace(/[০-৯]/g, d => banglaDigits[d] || d);
+
+/** Derive MerchantReturnPolicy JSON-LD truthfully from a public, indexable terms page. */
+export function resolveMerchantReturn(page: any, url: string) {
+  const seo = page && recordSEO(page, "");
+  const text = seo && !seo.noindex && (!seo.canonical || seo.canonical === url) ? plainText(page.html) : "";
+  if (!/\b(?:returns|return policy|refunds)\b|ফেরত/iu.test(text)) {
+    return { url: undefined, offerPolicy: undefined, orgPolicy: undefined };
+  }
+  const normalized = toAsciiDigits(text);
+  const daysMatch =
+    normalized.match(/\b(?:return(?:s)?(?:\s+and\s+refunds?)?|refund(?:s)?(?:\s+and\s+returns?)?)\s+policy\s+lasts\s+(\d{1,3})\s+days?\b/i) ||
+    normalized.match(/\b(?:return(?:ed|s)?|refund(?:ed|s)?|exchange(?:d|s)?)\b[^.]{0,40}\b(?:within|up to|for)\s+(\d{1,3})\s+days?\b/i) ||
+    normalized.match(/(\d{1,3})\s+দিনের\s+মধ্যে\s*(?:ফেরত|রিটার্ন)/u);
+  const days = daysMatch ? Number(daysMatch[1]) : 0;
+  if (Number.isInteger(days) && days >= 1 && days <= 365) {
+    const returnMethod = /\b(?:send(?:ing)?\s+(?:anything|the item|your item|it)\s+back|mail your product|trackable (?:delivery|shipping) service|courier)\b/i.test(normalized)
+      ? "https://schema.org/ReturnByMail"
+      : undefined;
+    const returnFees = /\bfree return(?:s| shipping)?\b/i.test(normalized)
+      ? "https://schema.org/FreeReturn"
+      : /\b(?:responsible for paying your own shipping|customer pays(?:\s+for)?\s+return\s+shipping|return shipping costs? (?:are|is) non-refundable|cost of return shipping will be deducted)\b/i.test(normalized)
+        ? "https://schema.org/ReturnFeesCustomerResponsibility"
+        : undefined;
+    const policy = {
+      "@type": "MerchantReturnPolicy",
+      applicableCountry: "BD",
+      returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+      merchantReturnDays: days,
+      ...(returnMethod ? { returnMethod } : {}),
+      ...(returnFees ? { returnFees } : {}),
+      merchantReturnLink: url,
+    };
+    return { url, offerPolicy: policy, orgPolicy: policy };
+  }
+  if (/\b(?:no returns|returns? (?:are )?not (?:accepted|permitted)|non-returnable)\b/i.test(normalized)) {
+    const policy = {
+      "@type": "MerchantReturnPolicy",
+      applicableCountry: "BD",
+      returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted",
+      merchantReturnLink: url,
+    };
+    return { url, offerPolicy: policy, orgPolicy: policy };
+  }
+  return {
+    url,
+    offerPolicy: undefined,
+    orgPolicy: { "@type": "MerchantReturnPolicy", merchantReturnLink: url },
+  };
+}
+
 const termsPage = pages.find(page => page.slug === "terms-conditions");
 const termsURL = siteUrl("/terms-conditions/");
-const termsSEO = termsPage && recordSEO(termsPage, "");
-export const merchantReturnURL = termsSEO && !termsSEO.noindex &&
-  (!termsSEO.canonical || termsSEO.canonical === termsURL) &&
-  /\b(?:returns|return policy|refunds)\b|ফেরত/iu.test(plainText(termsPage.html)) ? termsURL : undefined;
+const resolvedReturn = resolveMerchantReturn(termsPage, termsURL);
+export const merchantReturnURL = resolvedReturn.url;
+export const merchantReturnPolicy = resolvedReturn.offerPolicy;
+export const organizationReturnPolicy = resolvedReturn.orgPolicy;
 
 export const jsonLd = (object: object) => JSON.stringify(object).replace(/</g, "\\u003c");
 

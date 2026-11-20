@@ -115,9 +115,16 @@ try {
   assert.equal(websites[0].url, "https://loverbaazar.com/");
   assert.equal(shops[0].url, "https://loverbaazar.com/");
   assert.equal(websites[0].publisher["@id"], shops[0]["@id"]);
-  assert.deepEqual(shops[0].hasMerchantReturnPolicy, {
-    "@type": "MerchantReturnPolicy", merchantReturnLink: "https://loverbaazar.com/terms-conditions/",
-  });
+  const expectedReturnPolicy = {
+    "@type": "MerchantReturnPolicy",
+    applicableCountry: "BD",
+    returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+    merchantReturnDays: 30,
+    returnMethod: "https://schema.org/ReturnByMail",
+    returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+    merchantReturnLink: "https://loverbaazar.com/terms-conditions/",
+  };
+  assert.deepEqual(shops[0].hasMerchantReturnPolicy, expectedReturnPolicy);
   const page = await read("production", `product/${product.slug}/index.html`);
   assert.doesNotMatch(page, /name="(?:msvalidate\.01|google-site-verification)"/);
   const htmlLD = entities(page);
@@ -127,6 +134,7 @@ try {
   assert.equal(productLD.offers.availability, "https://schema.org/InStock");
   assert.equal(productLD.offers.url, productURL);
   assert.equal(productLD.offers.seller["@id"], shops[0]["@id"]);
+  assert.equal(productLD.offers.hasMerchantReturnPolicy.returnPolicyCategory, "https://schema.org/MerchantReturnFiniteReturnWindow");
   assert.equal(productLD.gtin, product.gtin);
   assert.equal(productLD.brand.name, "Fixture Brand");
   assert.equal(productLD.image[0], "https://loverbaazar.com/logo/primary-logo.jpg");
@@ -158,7 +166,7 @@ try {
   const rcProductLD = rcLD.find(item => item["@type"] === "Product");
   assert.equal(rcProductLD.category, "Rice Cooker");
   assert.equal(rcProductLD.offers.itemCondition, "https://schema.org/NewCondition");
-  assert.equal(rcProductLD.offers.hasMerchantReturnPolicy.merchantReturnLink, "https://loverbaazar.com/terms-conditions/");
+  assert.deepEqual(rcProductLD.offers.hasMerchantReturnPolicy, expectedReturnPolicy);
   assert.equal(rcProductLD.offers.priceSpecification.price, 1900);
   assert.equal(rcProductLD.offers.priceSpecification.priceType, "https://schema.org/StrikethroughPrice");
   const rcCrumbs = rcLD.find(item => item["@type"] === "BreadcrumbList").itemListElement.map(item => item.name);
@@ -205,6 +213,7 @@ try {
   assert.doesNotMatch(previewHome, /name="(?:msvalidate\.01|google-site-verification)"/);
   await assert.rejects(read("preview", "0123456789abcdef0123456789abcdef.txt"), { code: "ENOENT" });
   assert.ok(!entities(previewHome).find(item => item["@type"] === "Store").hasMerchantReturnPolicy);
+  assert.ok(!nextProduct.offers.hasMerchantReturnPolicy);
   assert.doesNotMatch(await read("preview", "_redirects"), /page-sitemap\.xml/);
   assert.match(next, /noindex, nofollow/);
   await assert.rejects(read("preview", "sitemap-index.xml"), { code: "ENOENT" });

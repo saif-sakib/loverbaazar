@@ -1,6 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { categoryChain, gtinOf, jsonLd, merchantReturnURL, plainText, primaryCategoryOf, productSeoTitle, publicImage, recordSEO, skuOf } from "../../lib/seo";
+import { categoryChain, gtinOf, jsonLd, merchantReturnPolicy, merchantReturnURL, plainText, primaryCategoryOf, productSeoTitle, publicImage, recordSEO, skuOf } from "../../lib/seo";
 import { gallerySizes, responsiveImage, sizedImage } from "../../lib/image-delivery.mjs";
 import Card from "../../components/Card.astro";
 import { products, cats, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, siteUrl, attributeValues, languageOf, spacedSiteName } from "../../lib/shop";
@@ -55,9 +55,7 @@ const ld = {
     priceSpecification: p.regular > p.price
       ? { "@type": "UnitPriceSpecification", priceType: "https://schema.org/StrikethroughPrice", price: p.regular, priceCurrency: "BDT" }
       : undefined,
-    hasMerchantReturnPolicy: merchantReturnURL
-      ? { "@type": "MerchantReturnPolicy", applicableCountry: "BD", merchantReturnLink: merchantReturnURL }
-      : undefined,
+    hasMerchantReturnPolicy: merchantReturnPolicy,
   },
   aggregateRating: p.reviews.length
     ? { "@type": "AggregateRating", ratingValue: stars.toFixed(1), reviewCount: p.reviews.length }
