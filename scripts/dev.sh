@@ -18,12 +18,21 @@ for port in ports[:2]:
 PY
 task_dir=$(mktemp -d); API=''; EDGE=''; db_name=lbpg
 cleanup() {
- [[ -z "$EDGE" ]] || kill -- "-$EDGE" 2>/dev/null || true
- [[ -z "$API" ]] || kill "$API" 2>/dev/null || true
- if [[ ${LB_ISOLATED:-0} == 1 ]]; then docker rm -f "$db_name" >/dev/null 2>&1 || true; fi
+ if [[ -n "$EDGE" ]]; then
+  kill -TERM -- "-$EDGE" 2>/dev/null || true
+  for _ in {1..10}; do kill -0 -- "-$EDGE" 2>/dev/null || break; sleep 0.2; done
+  kill -KILL -- "-$EDGE" 2>/dev/null || true
+ fi
+ if [[ -n "$API" ]]; then
+  kill -TERM "$API" 2>/dev/null || true
+  for _ in {1..10}; do kill -0 "$API" 2>/dev/null || break; sleep 0.2; done
+  kill -KILL "$API" 2>/dev/null || true
+ fi
+ if [[ ${LB_ISOLATED:-0} == 1 && "$db_name" != lbpg ]]; then docker rm -fv "$db_name" >/dev/null 2>&1 || true; fi
  rm -rf "$task_dir"
 }
 trap cleanup EXIT
+trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 if [[ ${LB_ISOLATED:-0} == 1 ]]; then

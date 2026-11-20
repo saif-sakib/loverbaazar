@@ -7,12 +7,13 @@ wordpress_tag="lb-wp-export-test-$$"
 printf 'memory_limit=512M\n' > "$wordpress_work/php-fixture.ini"
 wordpress_uid=$(id -u); wordpress_gid=$(id -g)
 cleanup() {
- docker rm -f "$wordpress_tag-db" >/dev/null 2>&1 || true
+ docker rm -fv "$wordpress_tag-db" >/dev/null 2>&1 || true
  docker volume rm "$wordpress_tag-files" >/dev/null 2>&1 || true
  docker network rm "$wordpress_tag-net" >/dev/null 2>&1 || true
  rm -rf "$wordpress_work"
 }
 trap cleanup EXIT
+trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 docker network create "$wordpress_tag-net" >/dev/null

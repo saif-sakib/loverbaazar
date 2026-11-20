@@ -4,8 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 migration_work=$(mktemp -d)
 migration_container="lb-migration-test-$$"
-cleanup() { docker rm -f "$migration_container" >/dev/null 2>&1 || true; rm -rf "$migration_work"; }
+cleanup() { docker rm -fv "$migration_container" >/dev/null 2>&1 || true; rm -rf "$migration_work"; }
 trap cleanup EXIT
+trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 docker run -d --rm --name "$migration_container" -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb_test -p 127.0.0.1::5432 postgres:17-alpine >/dev/null

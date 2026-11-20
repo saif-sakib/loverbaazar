@@ -22,6 +22,7 @@ cleanup() {
   rm -f "$fixture_log"
 }
 trap cleanup EXIT
+trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 ./scripts/dev.sh >"$fixture_log" 2>&1 & fixture_pid=$!

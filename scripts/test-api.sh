@@ -3,8 +3,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 name="lb-test-$$"
-cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; }
-trap cleanup EXIT INT TERM
+cleanup() { docker rm -fv "$name" >/dev/null 2>&1 || true; }
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 docker run -d --rm --name "$name" -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=lb_test -p 127.0.0.1::5432 postgres:17-alpine >/dev/null
 ready=false
 for i in {1..60}; do if docker exec -e PGPASSWORD=dev "$name" psql -h 127.0.0.1 -U postgres -d lb_test -c 'SELECT 1' >/dev/null 2>&1; then ready=true; break; fi; sleep 0.5; done
