@@ -11,12 +11,18 @@ const isHome = Astro.url.pathname === "/";
 const preview = import.meta.env.BUILD_ENV !== "production";
 const bingVerification = String(import.meta.env.BING_SITE_VERIFICATION || "").trim();
 const googleVerification = String(import.meta.env.GOOGLE_SITE_VERIFICATION || "").trim();
+const cfAnalyticsToken = String(import.meta.env.CLOUDFLARE_WEB_ANALYTICS_TOKEN || "").trim();
 if (bingVerification && !/^[A-Fa-f0-9]{16,64}$/.test(bingVerification)) {
   throw new Error("Invalid BING_SITE_VERIFICATION");
 }
 if (googleVerification && !/^[A-Za-z0-9_-]{16,128}$/.test(googleVerification)) {
   throw new Error("Invalid GOOGLE_SITE_VERIFICATION");
 }
+if (cfAnalyticsToken && !/^[A-Fa-f0-9]{32}$/.test(cfAnalyticsToken)) {
+  throw new Error("Invalid CLOUDFLARE_WEB_ANALYTICS_TOKEN");
+}
+const isPrivateAnalyticsPath = /^\/(admin|cart|checkout|my-account|track|search|wishlist)(\/|$)/.test(Astro.url.pathname);
+const emitAnalytics = !preview && !noindex && !isPrivateAnalyticsPath && cfAnalyticsToken !== "";
 const parts = SITE.name.split(/(?=[A-Z])/);
 const logoEnd = parts.length > 1 ? parts.pop() : "";
 const logoStart = parts.join("");
@@ -113,6 +119,13 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     )}
     <slot name="head" />
     <script is:inline src="/app.js" defer fetchpriority="low"></script>
+    {emitAnalytics && (
+      <script
+        defer
+        src="https://static.cloudflareinsights.com/beacon.min.js"
+        data-cf-beacon={JSON.stringify({ token: cfAnalyticsToken, spa: false })}
+      ></script>
+    )}
   </head>
   <body>
     <a class="skip" href="#main" lang="en-BD">

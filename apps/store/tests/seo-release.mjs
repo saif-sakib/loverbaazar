@@ -63,7 +63,8 @@ const build = async (environment, dir) => {
     CATALOG_URL: `http://127.0.0.1:${server.address().port}/api/catalog`,
     INDEXNOW_KEY: "0123456789abcdef0123456789abcdef",
     BING_SITE_VERIFICATION: "0123456789ABCDEF0123456789ABCDEF",
-    GOOGLE_SITE_VERIFICATION: "fixture_google_verify_token_12345" };
+    GOOGLE_SITE_VERIFICATION: "fixture_google_verify_token_12345",
+    CLOUDFLARE_WEB_ANALYTICS_TOKEN: "0123456789abcdef0123456789abcdef" };
   try {
     await run(process.execPath, ["node_modules/.bin/astro", "build", "--outDir", join(work, dir)], { cwd: assets, env, maxBuffer: 3_000_000 });
   } catch (error) {
@@ -97,6 +98,7 @@ try {
   assert.doesNotMatch(home, /<link rel="icon"[^>]*favicon\.svg/);
   assert.match(home, /<meta name="msvalidate\.01" content="0123456789ABCDEF0123456789ABCDEF">/);
   assert.match(home, /<meta name="google-site-verification" content="fixture_google_verify_token_12345">/);
+  assert.match(home, /src="https:\/\/static\.cloudflareinsights\.com\/beacon\.min\.js"[^>]*0123456789abcdef0123456789abcdef/);
   for (const icon of ["favicon.ico", "favicon-32x32.png", "favicon-48x48.png", "favicon-96x96.png", "icon-192.png", "icon-512.png", "apple-touch-icon.png"]) {
     assert.ok((await readFile(join(work, "production", icon))).length > 0, `${icon} is non-empty`);
   }
@@ -171,6 +173,10 @@ try {
   assert.match(riceCat, /Rice Cooker Price List in Bangladesh/);
   assert.match(riceCat, /<table class="price-table">[\s\S]*Fixture Kiam Rice Cooker 1\.8L/);
   const rcPage = await read("production", "product/fixture-rice-cooker-18l/index.html");
+  assert.match(rcPage, /src="https:\/\/static\.cloudflareinsights\.com\/beacon\.min\.js"[^>]*0123456789abcdef0123456789abcdef/);
+  for (const privateRoute of ["checkout", "cart", "my-account", "track", "search", "wishlist", "seo-hidden-fixture"]) {
+    assert.doesNotMatch(await read("production", `${privateRoute}/index.html`), /cloudflareinsights\.com/, `analytics beacon leaked on /${privateRoute}/`);
+  }
   assert.match(rcPage, /<title>Fixture Kiam Rice Cooker 1\.8L Price in Bangladesh \| Lover Baazar<\/title>/);
   assert.match(rcPage, /<meta name="description" content="Fixture Kiam Rice Cooker 1\.8L price in Bangladesh is ৳1,450 at Lover Baazar\./);
   assert.match(rcPage, /<meta name="description" content="[^"]*Free delivery in Jashore[^"]*">/);
@@ -220,6 +226,10 @@ try {
   assert.match(productionHeaders, /\/logo\/\*\n  Cache-Control: public, max-age=2592000/);
   assert.match(productionHeaders, /\/release\.json\n  Cache-Control: no-store/);
   assert.doesNotMatch(productionHeaders, /^\/\*\n  X-Robots-Tag:/m);
+  const prodCSP = productionHeaders.match(/^  Content-Security-Policy: (.+)$/m)?.[1] || "";
+  assert.match(prodCSP, /script-src[^;]*https:\/\/static\.cloudflareinsights\.com/);
+  assert.doesNotMatch(prodCSP, /script-src[^;]*'unsafe-inline'/);
+  assert.match(prodCSP, /connect-src[^;]*https:\/\/cloudflareinsights\.com/);
   const feed = await read("production", "feed.xml");
   assert.match(feed, /<g:sale_price>1250 BDT<\/g:sale_price>/);
   assert.match(feed, /<g:product_type>Rice Cooker<\/g:product_type>/);
@@ -246,6 +256,7 @@ try {
   const previewHome = await read("preview", "index.html");
   assert.match(previewHome, /noindex, nofollow/);
   assert.doesNotMatch(previewHome, /name="(?:msvalidate\.01|google-site-verification)"/);
+  assert.doesNotMatch(previewHome, /cloudflareinsights\.com/);
   await assert.rejects(read("preview", "0123456789abcdef0123456789abcdef.txt"), { code: "ENOENT" });
   assert.ok(!entities(previewHome).find(item => item["@type"] === "Store").hasMerchantReturnPolicy);
   assert.ok(!nextProduct.offers.hasMerchantReturnPolicy);

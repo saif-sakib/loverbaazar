@@ -58,6 +58,7 @@ func adminDashboard(w http.ResponseWriter, r *http.Request) {
 	SELECT jsonb_build_object(
 		'todayOrders',(SELECT count(*) FROM o,t WHERE day=d),
 		'todaySales',(SELECT coalesce(sum(total),0) FROM o,t WHERE day=d AND counts),
+		'todayVisitors',(SELECT visitors FROM analytics_daily,t WHERE day=d),
 		'monthOrders',(SELECT count(*) FROM o,t WHERE day>d-30),
 		'monthSales',(SELECT coalesce(sum(total),0) FROM o,t WHERE day>d-30 AND counts),
 		'pending',(SELECT count(*) FROM orders WHERE status='pending'),

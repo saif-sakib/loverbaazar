@@ -178,7 +178,7 @@ test('admin sections fit 320, 375 and 414px screens', () => shop(async page => {
   await ready(page, '/admin/');
   for (const width of [320, 375, 414]) {
    await page.setViewportSize({ width, height: 812 });
-  for (const tab of ['dashboard', 'products', 'orders', 'categories', 'home', 'menu', 'shop', 'delivery', 'customers', 'coupons', 'pages', 'blog', 'reviews', 'messages']) {
+  for (const tab of ['dashboard', 'analytics', 'products', 'orders', 'categories', 'home', 'menu', 'shop', 'delivery', 'customers', 'coupons', 'pages', 'blog', 'reviews', 'messages']) {
     await page.locator('#admin-section').selectOption(tab);
     await page.waitForTimeout(150);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `Admin ${tab} overflows`);
@@ -713,4 +713,84 @@ test('returning to products during a slow catalog read finishes the latest navig
   await page.waitForSelector('#rows');
   assert.equal(await page.locator('#head h1').textContent(), 'Products');
   assert.equal(await page.locator('#err').textContent(), '');
+}));
+
+test('admin analytics renders daily, 7-day, monthly, breakdowns, escapes text, and syncs cleanly', () => shop(async (page, context) => {
+  await page.addInitScript(() => { if (location.protocol === 'http:' || location.protocol === 'https:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
+  const days = Array.from({ length: 7 }, (_, i) => ({
+    day: `2026-11-${15 + i}`,
+    visitors: 10 + i * 5,
+    pageviews: 25 + i * 10,
+    orders: i === 6 ? 2 : 1,
+    sales: i === 6 ? 2500 : 1000,
+    hasVisitors: true,
+    sampleRate: 1,
+    finalized: i < 6,
+  }));
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const dt = new Date(Date.UTC(2025, 11 + i, 1));
+    const ym = dt.toISOString().slice(0, 7);
+    const label = dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+    const current = i === 11;
+    const prev = i === 10;
+    return {
+      month: ym,
+      label,
+      current,
+      visitors: current ? 420 : prev ? 350 : 0,
+      pageviews: current ? 1100 : prev ? 900 : 0,
+      orders: current ? 12 : prev ? 10 : 0,
+      sales: current ? 24000 : prev ? 19000 : 0,
+      daysRecorded: current ? 21 : prev ? 31 : 0,
+      daysInPeriod: current ? 21 : 31,
+      sampledDays: 0,
+      avgPerDay: current ? 20 : prev ? 11.3 : null,
+      changePct: current ? 20 : null,
+    };
+  });
+  const basePayload = {
+    configured: true,
+    missingConfig: [],
+    source: 'cloudflare_rum',
+    sourceLabel: 'Cloudflare Web Analytics (human visits, bot-filtered)',
+    timezone: 'Asia/Dhaka',
+    syncedAt: '2026-11-21T11:00:00Z',
+    stale: false,
+    syncError: '',
+    today: days[6],
+    yesterday: days[5],
+    last7Days: { visitors: 175, pageviews: 385, orders: 8, sales: 8500, daysRecorded: 7, prevVisitors: 140, prevPageviews: 300, prevOrders: 6, prevSales: 6000, prevDaysRecorded: 7, days },
+    months,
+    breakdowns: {
+      windowDays: 7,
+      topPages: [{ path: '/product/rice-cooker/', visits: 44, pageviews: 90 }, { path: '/<img src=x onerror=alert(1)>', visits: 3, pageviews: 5 }],
+      referrers: [{ source: 'Direct / bookmark', visits: 80, pageviews: 150 }, { source: 'facebook.com<script>x</script>', visits: 35, pageviews: 70 }],
+      devices: [{ device: 'Mobile', visits: 150, pageviews: 320 }],
+      countries: [{ country: 'Bangladesh', visits: 168, pageviews: 370 }],
+    },
+  };
+  let syncCalls = 0;
+  await context.route('**/api/admin/analytics', r => r.fulfill({ json: basePayload }));
+  await context.route('**/api/admin/analytics/sync', r => {
+    syncCalls++;
+    const updatedDays = days.map((d, idx) => idx === 6 ? { ...d, visitors: 55, pageviews: 120 } : d);
+    return r.fulfill({ json: { ...basePayload, today: updatedDays[6], last7Days: { ...basePayload.last7Days, visitors: 190, days: updatedDays } } });
+  });
+
+  await page.setViewportSize({ width: 320, height: 812 });
+  await ready(page, '/admin/#analytics');
+  await page.waitForSelector('#refresh-analytics');
+  assert.equal(await page.locator('#head h1').textContent(), 'Visitor analytics');
+  assert.match(await page.locator('.analytics-tiles').textContent(), /40/);
+  assert.match(await page.locator('#view').textContent(), /Monthly comparison/);
+  assert.equal(await page.locator('#view img').count(), 0);
+  assert.equal(await page.locator('#view script').count(), 0);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Analytics 320px overflow');
+
+  await page.locator('#refresh-analytics').click();
+  await page.waitForFunction(() => document.querySelector('.analytics-tiles')?.textContent?.includes('55'));
+  assert.equal(syncCalls, 1);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Analytics 1440px overflow');
 }));

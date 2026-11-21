@@ -57,7 +57,7 @@ func clearLimits() {
 func TestEveryAdminRouteNeedsTheToken(t *testing.T) {
 	reset(t)
 	for _, r := range [][2]string{
-		{"GET", "dashboard"}, {"GET", "orders"}, {"GET", "orders.csv"}, {"PUT", "orders/X"}, {"GET", "customers"}, {"POST", "customers/password"},
+		{"GET", "dashboard"}, {"GET", "analytics"}, {"POST", "analytics/sync"}, {"GET", "orders"}, {"GET", "orders.csv"}, {"PUT", "orders/X"}, {"GET", "customers"}, {"POST", "customers/password"},
 		{"GET", "products"}, {"POST", "products"}, {"PUT", "products/1"}, {"PATCH", "products/1"}, {"DELETE", "products/1"},
 		{"GET", "content/page"}, {"PUT", "content/page/x"}, {"DELETE", "content/page/x"}, {"GET", "coupons"}, {"PUT", "coupons/X"}, {"DELETE", "coupons/X"},
 		{"GET", "reviews"}, {"PUT", "reviews/1"}, {"DELETE", "reviews/1"}, {"GET", "messages"}, {"PUT", "messages/1"}, {"DELETE", "messages/1"},

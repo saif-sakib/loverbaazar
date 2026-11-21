@@ -315,6 +315,7 @@ func router() http.Handler {
 	r.Use(observeRequests, middleware.Timeout(45*time.Second), originGuard, requestGuard)
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) { fail(w, http.StatusNotFound, "not found") })
 	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
+	r.Head("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	r.With(middleware.Compress(5)).Get("/api/catalog", catalog)
 	r.With(middleware.Compress(5)).Get("/api/storefront", storefront)
 	r.Get("/api/stock", stockFile)
@@ -335,6 +336,8 @@ func router() http.Handler {
 	r.Route("/api/admin", func(a chi.Router) {
 		a.Use(adminOnly, middleware.Compress(5))
 		a.Get("/dashboard", adminDashboard)
+		a.Get("/analytics", adminAnalytics)
+		a.With(limit(15, time.Minute)).Post("/analytics/sync", adminSyncAnalytics)
 		a.Get("/operations", adminOperations)
 		a.Get("/notifications", adminNotifications)
 		a.With(limit(15, time.Minute)).Post("/notifications/{id}/retry", adminRetryNotification)

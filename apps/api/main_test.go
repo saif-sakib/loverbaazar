@@ -152,9 +152,10 @@ func reset(t *testing.T) {
 	if api == nil {
 		t.Skip("needs TEST_DATABASE_URL")
 	}
-	if _, err := db.Exec(bg, `TRUNCATE product_photo_uploads,product_photo_saves,notification_daily_budget,order_notifications,releases,retired_images,applied,products,users,sessions,orders,order_items,order_events,messages,settings,content,coupons,reviews RESTART IDENTITY CASCADE`); err != nil {
+	if _, err := db.Exec(bg, `TRUNCATE analytics_daily,product_photo_uploads,product_photo_saves,notification_daily_budget,order_notifications,releases,retired_images,applied,products,users,sessions,orders,order_items,order_events,messages,settings,content,coupons,reviews RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatal(err)
 	}
+	resetAnalyticsCache()
 	// Fixed charges here, so the tests don't depend on what the shop happens to charge today.
 	if _, err := db.Exec(bg, `INSERT INTO settings VALUES('live','{"delivery":[{"id":"jashore","label":"Inside Jashore","fee":60},{"id":"outside","label":"Outside Jashore","fee":100}]}')`); err != nil {
 		t.Fatal(err)

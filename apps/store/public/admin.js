@@ -24,7 +24,7 @@
 
   // Direct 1-click grouped navigation; related sections also share top subtabs.
   const NAV_GROUPS = [
-    ["Manage shop", [["dashboard", "Overview"], ["orders", "Orders"], ["products", "Products"], ["customers", "Customers"], ["coupons", "Discounts"]]],
+    ["Manage shop", [["dashboard", "Overview"], ["analytics", "Analytics"], ["orders", "Orders"], ["products", "Products"], ["customers", "Customers"], ["coupons", "Discounts"]]],
     ["Customer care", [["messages", "Messages"], ["reviews", "Reviews"], ["operations", "Operations"]]],
     ["Store setup", [["home", "Website"], ["delivery", "Settings"]]],
   ];
@@ -50,6 +50,7 @@
   const HEADS = {
     operations: ["Operations", "Check API readiness and recover order notifications.", ""],
     dashboard: ["Shop overview", "Your shop today, and quick links to the tasks you do most.", ""],
+    analytics: ["Visitor analytics", "Authentic daily visits, 7-day log, monthly comparison, and order conversion (Bangladesh time).", ""],
     orders: ["Orders", "Find orders, manage fulfillment, and download invoices.", ""],
     messages: ["Messages", "Read and manage customer questions.", ""],
     reviews: ["Reviews", "Customer product reviews waiting for moderation. Approved reviews appear on product pages after you click Publish.", "pub"],
@@ -82,6 +83,7 @@
     ["Show an announcement bar", "#delivery", "notice announcement sale eid message"],
     ["Change the shop logo", "#shop", "logo image brand"],
     ["Publish the website now", "#publish", "publish rebuild update"],
+    ["View visitor analytics", "#analytics", "visitors traffic views analytics monthly weekly daily conversion"],
   ];
 
   const remembered = () => {
@@ -632,8 +634,11 @@
     const hasSeries = d.series.some((x) => x.sales > 0);
     const tile = (label, value, link, tone = "") =>
       `<a class="tile${tone ? " " + tone : ""}" href="${link || "#orders"}"><b>${esc(value)}</b><span>${esc(label)}</span></a>`;
+    const visitorTile = d.todayVisitors !== null && d.todayVisitors !== undefined
+      ? tile("Visitors today", Number(d.todayVisitors).toLocaleString("en-IN"), "#analytics")
+      : "";
     view().innerHTML = `<div class="tiles">
-      ${tile("Sales today", money(d.todaySales), "#orders/all", "primary")}${tile("Waiting for confirmation", d.pending, "#orders/pending", d.pending > 0 ? "warn" : "")}${tile("Ready to ship", d.toShip, "#orders/confirmed", d.toShip > 0 ? "warn" : "")}${tile("New messages", d.unread, "#messages", d.unread > 0 ? "warn" : "")}${tile("Pending reviews", d.reviews, "#reviews", d.reviews > 0 ? "warn" : "")}${tile("Sales, last 30 days", money(d.monthSales), "#orders/all")}
+      ${tile("Sales today", money(d.todaySales), "#orders/all", "primary")}${visitorTile}${tile("Waiting for confirmation", d.pending, "#orders/pending", d.pending > 0 ? "warn" : "")}${tile("Ready to ship", d.toShip, "#orders/confirmed", d.toShip > 0 ? "warn" : "")}${tile("New messages", d.unread, "#messages", d.unread > 0 ? "warn" : "")}${tile("Pending reviews", d.reviews, "#reviews", d.reviews > 0 ? "warn" : "")}${tile("Sales, last 30 days", money(d.monthSales), "#orders/all")}
     </div>
     <h3 class="jobhead">Quick actions</h3>
     <div class="jobs">${JOBS.slice(0, 6)
@@ -650,6 +655,176 @@
       <div class="panel"><h3>Best sellers, last 30 days</h3>${d.top.length ? `<table class="tbl">${d.top.map((t) => `<tr><td>${esc(t.name)}</td><td>${t.qty} sold</td><td>${money(t.sales)}</td></tr>`).join("")}</table>` : `<p class="empty-state">No product sales yet.</p>`}</div>
       <div class="panel"><h3>Low stock (≤ ${lowStock} left)</h3>${d.low.length ? `<table class="tbl">${d.low.map((p) => `<tr><td><a class="link" href="#product/${p.id}">${esc(p.name)}</a></td><td><b>${p.stock}</b> left</td></tr>`).join("")}</table>` : `<p class="empty-state">All products are well stocked.</p>`}</div>
     </div>`;
+  });
+
+  const fmtNum = (n) => Number(n || 0).toLocaleString("en-IN");
+  const shortDay = (d) =>
+    new Date(`${d}T00:00:00+06:00`).toLocaleDateString("en-GB", { timeZone: "Asia/Dhaka", day: "numeric", month: "short" });
+  const convText = (orders, visitors, hasVisitors) =>
+    hasVisitors && visitors > 0 ? `${((orders / visitors) * 100).toFixed(1)}%` : "—";
+  const pctDelta = (cur, prev) => (prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : null);
+  const deltaPill = (pct, suffix = "") => {
+    if (pct === null || pct === undefined || Number.isNaN(pct)) return "—";
+    const cls = pct > 0 ? "delta-up" : pct < 0 ? "delta-down" : "delta-flat";
+    const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
+    return `<span class="delta-pill ${cls}">${sign}${Math.abs(pct).toFixed(1)}%${suffix ? " " + esc(suffix) : ""}</span>`;
+  };
+
+  function renderAnalytics(data) {
+    const today = data.today || {};
+    const yesterday = data.yesterday || {};
+    const l7 = data.last7Days || { days: [] };
+    const days = Array.isArray(l7.days) ? l7.days : [];
+    const months = Array.isArray(data.months) ? data.months : [];
+    const curMonth = months.at(-1) || {};
+    const bd = data.breakdowns || {};
+
+    const todayDelta = today.hasVisitors && yesterday.hasVisitors ? pctDelta(today.visitors, yesterday.visitors) : null;
+    const todaySub = today.hasVisitors
+      ? `${fmtNum(today.pageviews)} pageviews` +
+        (todayDelta !== null
+          ? ` · ${todayDelta >= 0 ? "+" : "−"}${Math.abs(todayDelta).toFixed(1)}% vs yesterday`
+          : yesterday.hasVisitors
+            ? ` · Yesterday: ${fmtNum(yesterday.visitors)}`
+            : "")
+      : data.configured
+        ? "Click Refresh now to sync"
+        : "Connect Cloudflare Analytics below";
+
+    const l7Delta = l7.daysRecorded > 0 && l7.prevDaysRecorded > 0 ? pctDelta(l7.visitors, l7.prevVisitors) : null;
+    const l7Sub = l7.daysRecorded > 0
+      ? `${fmtNum(l7.pageviews)} pageviews` + (l7Delta !== null ? ` · ${l7Delta >= 0 ? "+" : "−"}${Math.abs(l7Delta).toFixed(1)}% vs prev 7 days` : "")
+      : "No visitor history yet";
+
+    const curMonthSub = curMonth.daysRecorded > 0
+      ? `${curMonth.avgPerDay ?? "—"} / day · ${curMonth.daysRecorded}/${curMonth.daysInPeriod} days` +
+        (curMonth.changePct !== null && curMonth.changePct !== undefined
+          ? ` · ${curMonth.changePct >= 0 ? "+" : "−"}${Math.abs(curMonth.changePct).toFixed(1)}% vs prev`
+          : "")
+      : `${fmtNum(curMonth.orders)} orders this month`;
+
+    const conv7 = l7.daysRecorded > 0 && l7.visitors > 0 ? `${((l7.orders / l7.visitors) * 100).toFixed(1)}% conversion` : "Orders (excl. cancelled/returned)";
+    const statTile = (label, value, sub, primary = false) =>
+      `<div class="tile${primary ? " primary" : ""}"><b>${esc(value)}</b><span>${esc(label)}</span><small class="tile-sub">${esc(sub)}</small></div>`;
+
+    const max7 = Math.max(...days.map((x) => (x.hasVisitors ? x.visitors : 0)), 1);
+    const has7Bars = days.some((x) => x.hasVisitors && x.visitors > 0);
+    const maxM = Math.max(...months.map((m) => (m.daysRecorded > 0 ? m.visitors : 0)), 1);
+    const hasMBars = months.some((m) => m.daysRecorded > 0 && m.visitors > 0);
+
+    const dayStatus = (x) => {
+      if (!x.hasVisitors) return "Not tracked";
+      if (!x.finalized) return "Live";
+      return x.sampleRate > 1 ? `Sampled (${Math.round(x.sampleRate)}×)` : "Unsampled";
+    };
+
+    const share = (visits, total) => (total > 0 ? `${((visits / total) * 100).toFixed(1)}%` : "—");
+    const totalRefVisits = (bd.referrers || []).reduce((sum, r) => sum + (r.visits || 0), 0);
+    const totalDevVisits = (bd.devices || []).reduce((sum, r) => sum + (r.visits || 0), 0);
+    const totalCountryVisits = (bd.countries || []).reduce((sum, r) => sum + (r.visits || 0), 0);
+
+    view().innerHTML = `
+      <div class="panel analytics-status">
+        <div class="analytics-status-meta">
+          <span class="analytics-badge${data.configured ? " live" : ""}">${esc(data.configured ? (data.sourceLabel || "Cloudflare Web Analytics") : "Cloudflare Analytics not connected — showing orders & sales")}</span>
+          ${data.syncedAt ? `<small>Last synced: ${esc(when(data.syncedAt))} (BDT)</small>` : ""}
+        </div>
+        ${data.configured ? `<button type="button" id="refresh-analytics" class="btn ghost">Refresh now</button>` : ""}
+      </div>
+      ${data.syncError ? `<p class="hint-box warn" role="status">${esc(data.syncError)} Showing saved daily history.</p>` : ""}
+      ${!data.configured ? `<div class="hint-box"><strong>Setup required for visitor tracking:</strong> Set <code>${esc((data.missingConfig || []).join(", "))}</code> on Render and <code>CLOUDFLARE_WEB_ANALYTICS_TOKEN</code> in GitHub Actions variables, then publish once. Orders and sales below already reflect your live database.</div>` : ""}
+      <div class="tiles analytics-tiles">
+        ${statTile("Visitors today", today.hasVisitors ? fmtNum(today.visitors) : "—", todaySub, true)}
+        ${statTile("Last 7 days", l7.daysRecorded > 0 ? fmtNum(l7.visitors) : "—", l7Sub)}
+        ${statTile(`This month (${curMonth.label || ""})`, curMonth.daysRecorded > 0 ? fmtNum(curMonth.visitors) : "—", curMonthSub)}
+        ${statTile("Orders, last 7 days", fmtNum(l7.orders), `${money(l7.sales)} · ${conv7}`)}
+      </div>
+      <div class="panel analytics-panel">
+        <h3>Last 7 days — daily log (Bangladesh time)</h3>
+        ${has7Bars
+          ? `<div class="bars" role="img" aria-label="Daily visitors for the last 7 days. Peak ${fmtNum(max7)} visitors.">
+              ${days.map((x) => `<div class="barcol" title="${esc(x.day)}: ${x.hasVisitors ? fmtNum(x.visitors) : "not tracked"} visitors, ${x.orders} orders"><span class="val">${x.hasVisitors && x.visitors === max7 && x.visitors > 0 ? fmtNum(x.visitors) : ""}</span><i style="height:${x.hasVisitors ? Math.round((x.visitors / max7) * 100) : 0}%"></i><small>${esc(x.day.slice(8))}</small></div>`).join("")}
+            </div>`
+          : `<p class="empty-state">No visitor counts recorded in the last 7 days yet.</p>`}
+        <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Date</th><th scope="col">Visitors</th><th scope="col">Pageviews</th><th scope="col">Orders</th><th scope="col">Sales</th><th scope="col">Conv.</th><th scope="col">Status</th></tr></thead><tbody>
+          ${[...days].reverse().map((x) => `<tr>
+            <td>${esc(shortDay(x.day))}${x.day === today.day ? ' <span class="tag">Today</span>' : ""}</td>
+            <td>${x.hasVisitors ? fmtNum(x.visitors) : "—"}</td>
+            <td>${x.hasVisitors ? fmtNum(x.pageviews) : "—"}</td>
+            <td>${fmtNum(x.orders)}</td>
+            <td>${money(x.sales)}</td>
+            <td>${convText(x.orders, x.visitors, x.hasVisitors)}</td>
+            <td><small>${esc(dayStatus(x))}</small></td>
+          </tr>`).join("")}
+        </tbody></table></div>
+      </div>
+      <div class="panel analytics-panel">
+        <h3>Monthly comparison (last 12 months)</h3>
+        ${hasMBars
+          ? `<div class="bars bars-months" role="img" aria-label="Monthly visitors over the last 12 months. Best month ${fmtNum(maxM)} visitors.">
+              ${months.map((m) => `<div class="barcol" title="${esc(m.label)}: ${m.daysRecorded > 0 ? fmtNum(m.visitors) : "no data"} visitors, ${m.orders} orders"><span class="val">${m.daysRecorded > 0 && m.visitors === maxM ? fmtNum(m.visitors) : ""}</span><i style="height:${m.daysRecorded > 0 ? Math.round((m.visitors / maxM) * 100) : 0}%"></i><small>${esc((m.label || "").slice(0, 3))}</small></div>`).join("")}
+            </div>`
+          : `<p class="empty-state">Monthly visitor chart will fill automatically as daily logs accumulate.</p>`}
+        <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Month</th><th scope="col">Visitors</th><th scope="col">vs prev</th><th scope="col">Avg / day</th><th scope="col">Pageviews</th><th scope="col">Orders</th><th scope="col">Sales</th><th scope="col">Conv.</th><th scope="col">Coverage</th></tr></thead><tbody>
+          ${[...months].reverse().map((m) => `<tr>
+            <td>${esc(m.label)}${m.current ? ' <span class="tag">Current</span>' : ""}</td>
+            <td>${m.daysRecorded > 0 ? fmtNum(m.visitors) : "—"}</td>
+            <td>${deltaPill(m.changePct)}</td>
+            <td>${m.avgPerDay !== null && m.avgPerDay !== undefined ? fmtNum(m.avgPerDay) : "—"}</td>
+            <td>${m.daysRecorded > 0 ? fmtNum(m.pageviews) : "—"}</td>
+            <td>${fmtNum(m.orders)}</td>
+            <td>${money(m.sales)}</td>
+            <td>${convText(m.orders, m.visitors, m.daysRecorded > 0)}</td>
+            <td><small>${m.daysRecorded}/${m.daysInPeriod} d${m.sampledDays > 0 ? ` · ${m.sampledDays} sampled` : ""}</small></td>
+          </tr>`).join("")}
+        </tbody></table></div>
+      </div>
+      <div class="split">
+        <div class="panel"><h3>Top pages (last 7 days)</h3>${(bd.topPages || []).length
+          ? `<div class="scroll"><table class="tbl"><thead><tr><th scope="col">Page</th><th scope="col">Visits</th><th scope="col">Views</th></tr></thead><tbody>${bd.topPages.map((p) => `<tr><td><code>${esc(p.path)}</code></td><td>${fmtNum(p.visits)}</td><td>${fmtNum(p.pageviews)}</td></tr>`).join("")}</tbody></table></div>`
+          : `<p class="empty-state">${data.configured ? "No page breakdown data yet." : "Available after connecting Cloudflare Analytics."}</p>`}</div>
+        <div class="panel"><h3>Traffic sources (last 7 days)</h3>${(bd.referrers || []).length
+          ? `<div class="scroll"><table class="tbl"><thead><tr><th scope="col">Source</th><th scope="col">Visits</th><th scope="col">Share</th></tr></thead><tbody>${bd.referrers.map((r) => `<tr><td>${esc(r.source)}</td><td>${fmtNum(r.visits)}</td><td>${share(r.visits, totalRefVisits)}</td></tr>`).join("")}</tbody></table></div>`
+          : `<p class="empty-state">${data.configured ? "No referrer breakdown data yet." : "Available after connecting Cloudflare Analytics."}</p>`}</div>
+      </div>
+      <div class="split">
+        <div class="panel"><h3>Devices (last 7 days)</h3>${(bd.devices || []).length
+          ? `<div class="scroll"><table class="tbl"><thead><tr><th scope="col">Device</th><th scope="col">Visits</th><th scope="col">Share</th></tr></thead><tbody>${bd.devices.map((x) => `<tr><td>${esc(x.device)}</td><td>${fmtNum(x.visits)}</td><td>${share(x.visits, totalDevVisits)}</td></tr>`).join("")}</tbody></table></div>`
+          : `<p class="empty-state">${data.configured ? "No device data yet." : "Available after connecting Cloudflare Analytics."}</p>`}</div>
+        <div class="panel"><h3>Countries (last 7 days)</h3>${(bd.countries || []).length
+          ? `<div class="scroll"><table class="tbl"><thead><tr><th scope="col">Country</th><th scope="col">Visits</th><th scope="col">Share</th></tr></thead><tbody>${bd.countries.map((c) => `<tr><td>${esc(c.country)}</td><td>${fmtNum(c.visits)}</td><td>${share(c.visits, totalCountryVisits)}</td></tr>`).join("")}</tbody></table></div>`
+          : `<p class="empty-state">${data.configured ? "No country data yet." : "Available after connecting Cloudflare Analytics."}</p>`}</div>
+      </div>
+      <details class="optional-fields">
+        <summary>How these numbers stay authentic &amp; Google Search Console<small>Bot filtering, Bangladesh time bucketing, and search keyword reports</small></summary>
+        <p class="fhelp">Visitor counts come from Cloudflare Web Analytics with bot filtering enabled (<code>bot: 0</code>), exclude preview/admin/checkout/cart/account/track pages, and group hourly data into exact <code>Asia/Dhaka</code> (UTC+6) dates. Completed days from Cloudflare's 7-day unsampled window are archived permanently in PostgreSQL so monthly comparisons never expire.</p>
+        <p class="fhelp">Privacy-focused browser beacons cannot count visitors with strict ad/script blockers (typically ~5–15%), and Cloudflare does not use cookies. Orders and sales come directly from committed store orders (excluding cancelled and returned).</p>
+        <p><a class="btn ghost small" href="https://search.google.com/search-console" target="_blank" rel="noopener">Open Google Search Console ↗</a></p>
+      </details>`;
+
+    const refreshBtn = $("#refresh-analytics");
+    if (refreshBtn) {
+      refreshBtn.onclick = run(async () => {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = "Refreshing…";
+        try {
+          const fresh = await api("/analytics/sync", { method: "POST", body: {} });
+          renderAnalytics(fresh);
+          say(fresh.stale ? "Showing archived totals; Cloudflare refresh failed." : "Analytics refreshed from Cloudflare.");
+        } finally {
+          const btn = $("#refresh-analytics");
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = "Refresh now";
+          }
+        }
+      });
+    }
+  }
+
+  const analytics = run(async () => {
+    const data = await api("/analytics");
+    renderAnalytics(data);
   });
 
   const operations = run(async () => {
@@ -2072,6 +2247,7 @@
   const blog = writing("post", "post");
   const routes = {
     dashboard,
+    analytics,
     operations,
     orders,
     products,

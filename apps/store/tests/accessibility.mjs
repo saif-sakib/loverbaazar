@@ -55,6 +55,9 @@ try {
     await page.waitForSelector("#pf");
     await page.locator("#pf summary").filter({ hasText: "Search and social settings" }).click();
     await scan("admin product editor and search settings");
+    await page.goto("/admin/#analytics");
+    await page.waitForSelector(".analytics-status");
+    await scan("admin visitor analytics");
   }
 
   // Reflow at two narrow CSS viewport sizes, including the 320 px WCAG width.
