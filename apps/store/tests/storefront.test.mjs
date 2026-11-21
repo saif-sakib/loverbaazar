@@ -807,3 +807,103 @@ test('admin analytics renders business insights, enriched products, countries, e
   await page.setViewportSize({ width: 1440, height: 900 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Analytics 1440px overflow');
 }));
+
+test('front page silently recovers when /api/stock returns 503 during cold start', () => shop(async (page, context) => {
+  let requests = 0;
+  await page.clock.install();
+  await context.route('**/api/stock', r => {
+    requests++;
+    if (requests === 1) return r.fulfill({ status: 503, json: { error: 'The shop is busy' } });
+    return r.fulfill({
+      json: {
+        products: { 1: [1000, 1200, 10] },
+        settings: { ...settings, payments: [{ id: 'bkash', label: 'bKash', enabled: true, number: '017' }] },
+      },
+    });
+  });
+  const first = page.waitForResponse(r => r.url().includes('/api/stock'));
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await first;
+  await page.evaluate(() => new Promise(queueMicrotask));
+  assert.equal(requests, 1);
+  assert.equal(await page.locator('[data-stock-notice]').count(), 0);
+  const second = page.waitForResponse(r => r.url().includes('/api/stock'));
+  await page.clock.runFor(4100);
+  await second;
+  await page.waitForFunction(() => document.querySelector('[data-payment-feature]')?.textContent === 'bKash');
+  assert.equal(requests, 2);
+  assert.equal(await page.locator('[data-stock-notice]').count(), 0);
+}));
+
+test('prolonged stock outage shows notice only after retries exhaust, and Try again recovers', () => shop(async (page, context) => {
+  let requests = 0;
+  let healthy = false;
+  await page.clock.install();
+  await context.route('**/api/stock', r => {
+    requests++;
+    if (!healthy) return r.fulfill({ status: 503, json: { error: 'The shop is busy' } });
+    return r.fulfill({
+      json: {
+        products: { 1: [1000, 1200, 10] },
+        settings: { ...settings, payments: [{ id: 'nagad', label: 'Nagad', enabled: true, number: '015' }] },
+      },
+    });
+  });
+  const first = page.waitForResponse(r => r.url().includes('/api/stock'));
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await first;
+  await page.evaluate(() => new Promise(queueMicrotask));
+  assert.equal(requests, 1);
+  assert.equal(await page.locator('[data-stock-notice]').count(), 0);
+
+  const delays = [4000, 6000, 8000, 10000, 12000, 15000];
+  for (let i = 0; i < delays.length; i++) {
+    const next = page.waitForResponse(r => r.url().includes('/api/stock'));
+    await page.clock.runFor(delays[i] + 100);
+    await next;
+    await page.evaluate(() => new Promise(queueMicrotask));
+    assert.equal(requests, i + 2);
+    if (i < delays.length - 1) {
+      assert.equal(await page.locator('[data-stock-notice]').count(), 0);
+    }
+  }
+  await page.locator('[data-stock-notice]').waitFor();
+
+  healthy = true;
+  const recovered = page.waitForResponse(r => r.url().includes('/api/stock'));
+  await page.locator('[data-stock-notice] button').click();
+  await recovered;
+  await page.waitForFunction(() => !document.querySelector('[data-stock-notice]') && document.querySelector('[data-payment-feature]')?.textContent === 'Nagad');
+  assert.equal(requests, 8);
+}));
+
+test('failed stale background refresh does not show notice when stock is already loaded', () => shop(async (page, context) => {
+  let requests = 0;
+  await page.clock.install();
+  await context.route('**/api/stock', r => {
+    requests++;
+    if (requests === 1) {
+      return r.fulfill({ headers: { 'X-Stock-Stale': '1' }, json: { products: { 1: [1000, 1200, 10] }, settings } });
+    }
+    return r.fulfill({ status: 503, json: { error: 'The shop is busy' } });
+  });
+  const first = page.waitForResponse(r => r.url().includes('/api/stock'));
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await first;
+  await page.evaluate(() => new Promise(queueMicrotask));
+  for (const delay of [5500, 10000, 15000, 20000]) {
+    const next = page.waitForResponse(r => r.url().includes('/api/stock'));
+    await page.clock.runFor(delay + 100);
+    await next;
+    await page.evaluate(() => new Promise(queueMicrotask));
+  }
+  assert.equal(requests, 5);
+  assert.equal(await page.locator('[data-stock-notice]').count(), 0);
+}));
+
+test('search-index failure in Recently Viewed on front page does not trigger stock notice', () => shop(async (page, context) => {
+  await page.addInitScript(() => localStorage.setItem('seen', JSON.stringify([1])));
+  await context.route('**/search-index.json', r => r.fulfill({ status: 503, body: '' }));
+  await ready(page, '/');
+  assert.equal(await page.locator('[data-stock-notice]').count(), 0);
+}));

@@ -17,6 +17,39 @@ const forward = (request, env, url, init = {}) => {
 
 // Kept for a day: if the API is asleep or down, browsers still get recent prices straight away.
 const staleKey = (key) => new Request(key.url.replace("/api/stock", "/api/stock-stale"));
+const globalStaleKey = (originURL) => new Request(new URL("/api/stock-stale", originURL));
+const stockForegroundMs = (env) => Number(env?.STOCK_FOREGROUND_MS) || 5000;
+const stockUpstreamMs = (env) => Number(env?.STOCK_UPSTREAM_MS) || 28000;
+
+function waitWithin(promise, ms) {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ done: false }), ms);
+  });
+  return Promise.race([
+    promise.then((value) => ({ done: true, value })),
+    timeout,
+  ]).finally(() => clearTimeout(timer));
+}
+
+async function findStale(cache, key, globalStale) {
+  const releaseStale = staleKey(key);
+  const direct = await cache.match(releaseStale).catch(() => undefined);
+  if (direct) return direct;
+  if (globalStale && globalStale.url !== releaseStale.url) {
+    return cache.match(globalStale).catch(() => undefined);
+  }
+  return undefined;
+}
+
+function publicStockRequest(request, originURL) {
+  const headers = new Headers({ Accept: "application/json" });
+  for (const name of ["X-Request-ID", "CF-Connecting-IP"]) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  return new Request(originURL, { method: "GET", headers });
+}
 
 async function stockKey(env, url) {
   const key = new URL(url);
@@ -32,32 +65,54 @@ async function stockKey(env, url) {
 
 // Share an origin request while it is in flight, including across background refreshes.
 const pendingStock = new Map();
-function refreshStock(request, env, url, cache, key) {
+function refreshStock(request, env, originURL, cache, key, globalStale = globalStaleKey(originURL)) {
   if (pendingStock.has(key.url)) return pendingStock.get(key.url);
   const pending = (async () => {
     let res;
     try {
-      res = await forward(request, env, url, { signal: AbortSignal.timeout(5000) });
+      res = await forward(publicStockRequest(request, originURL), env, originURL, { signal: AbortSignal.timeout(stockUpstreamMs(env)) });
       if (res.ok && res.headers.get("Content-Type")?.includes("application/json")) {
-        const stale = new Response(res.clone().body, res);
-        stale.headers.set("Cache-Control", "public, max-age=86400");
-        await Promise.all([cache.put(key, res.clone()), cache.put(staleKey(key), stale)]).catch(() => {});
-        return res;
+        const body = await res.text();
+        const freshHeaders = new Headers(res.headers);
+        freshHeaders.set("Content-Type", "application/json");
+        freshHeaders.set("Cache-Control", res.headers.get("Cache-Control") || "public, max-age=60");
+        const fresh = new Response(body, { status: res.status, headers: freshHeaders });
+
+        const staleHeaders = new Headers(freshHeaders);
+        staleHeaders.set("Cache-Control", "public, max-age=86400");
+        const releaseStale = staleKey(key);
+        const writes = [
+          cache.put(key, fresh.clone()),
+          cache.put(releaseStale, new Response(body, { status: res.status, headers: staleHeaders })),
+        ];
+        if (globalStale && globalStale.url !== releaseStale.url) {
+          writes.push(cache.put(globalStale, new Response(body, { status: res.status, headers: staleHeaders })));
+        }
+        await Promise.all(writes).catch(() => {});
+        return fresh;
       }
     } catch {
       // An asleep or unavailable origin must not interrupt cached browsing.
     }
-    const saved = await cache.match(staleKey(key)).catch(() => undefined);
+    const saved = await findStale(cache, key, globalStale);
     if (saved) {
-      const fallback = new Response(saved.body, saved);
+      const body = await saved.text();
+      const headers = new Headers(saved.headers);
+      headers.set("Content-Type", "application/json");
       // Briefly cache the fallback too, so a sleeping API is not retried on every visit.
       // Do not extend the day-long stale copy's lifetime.
-      fallback.headers.set("Cache-Control", "public, max-age=15");
-      fallback.headers.set("X-Stock-Stale", "1");
+      headers.set("Cache-Control", "public, max-age=15");
+      headers.set("X-Stock-Stale", "1");
+      const fallback = new Response(body, { status: 200, headers });
       await cache.put(key, fallback.clone()).catch(() => {});
       return fallback;
     }
-    return res && !res.ok ? res : busy(503);
+    if (res && !res.ok) {
+      const text = await res.text().catch(() => "");
+      return new Response(text, { status: res.status, headers: res.headers });
+    }
+    await res?.body?.cancel().catch(() => {});
+    return busy(503);
   })().finally(() => pendingStock.delete(key.url));
   pendingStock.set(key.url, pending);
   return pending;
@@ -68,18 +123,32 @@ async function stock(request, env, url, ctx) {
   // Use one cache entry so arbitrary query strings cannot bypass the cache.
   const originURL = new URL("/api/stock", url.origin);
   const key = await stockKey(env, originURL);
+  const globalStale = globalStaleKey(originURL);
   const cache = caches.default;
   const hit = await cache.match(key).catch(() => undefined);
   if (hit) return hit;
   const saved = await cache.match(staleKey(key)).catch(() => undefined);
   if (saved) {
-    ctx.waitUntil(refreshStock(request, env, originURL, cache, key));
+    ctx?.waitUntil?.(refreshStock(request, env, originURL, cache, key, globalStale));
     const copy = new Response(saved.body, saved);
     copy.headers.set("Cache-Control", "no-store");
     copy.headers.set("X-Stock-Stale", "1");
     return copy; // do not make the customer wait for the API to wake up
   }
-  return (await refreshStock(request, env, originURL, cache, key)).clone();
+  const pending = refreshStock(request, env, originURL, cache, key, globalStale);
+  ctx?.waitUntil?.(pending);
+  const raced = await waitWithin(pending, stockForegroundMs(env));
+  if (raced.done) return raced.value.clone();
+  if (globalStale.url !== staleKey(key).url) {
+    const prior = await cache.match(globalStale).catch(() => undefined);
+    if (prior) {
+      const copy = new Response(prior.body, prior);
+      copy.headers.set("Cache-Control", "no-store");
+      copy.headers.set("X-Stock-Stale", "1");
+      return copy;
+    }
+  }
+  return busy(503, 5);
 }
 
 // Only the homepage and old WP entry points enter the Worker for query links.
@@ -131,11 +200,11 @@ async function apiResponse(request, env, url, ctx) {
   return result;
 }
 
-function busy(status) {
+function busy(status, retryAfter = status === 429 ? 30 : 60) {
   return Response.json({ error: status === 429
     ? "Too many attempts. Please wait before trying again."
     : "The shop is busy right now. Please try again in a minute." }, {
-    status, headers: {"Cache-Control": "no-store", "Retry-After": status === 429 ? "30" : "60"},
+    status, headers: {"Cache-Control": "no-store", "Retry-After": String(retryAfter)},
   });
 }
 

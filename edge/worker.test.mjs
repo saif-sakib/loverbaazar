@@ -156,3 +156,91 @@ test("a sleeping origin's success-status HTML is not cached as stock", async () 
   assert.equal((await f.request()).status, 503);
   assert.equal(f.entries.size, 0);
 });
+
+test('slow cold origin returns 503 after foreground deadline while completing background wake-up', async () => {
+  const f = await fixture();
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return f.fresh();
+  };
+  const env = { API_ORIGIN: 'https://api.test', ORIGIN_SECRET: 'test-origin-secret', STOCK_FOREGROUND_MS: 40, STOCK_UPSTREAM_MS: 500 };
+  const ctx = { waitUntil: task => f.background.push(task) };
+  const res1 = await f.worker.fetch(new Request('https://shop.test/api/stock'), env, ctx);
+  assert.equal(res1.status, 503);
+  assert.equal(res1.headers.get('Retry-After'), '5');
+  await Promise.all(f.background);
+  const res2 = await f.worker.fetch(new Request('https://shop.test/api/stock'), env, ctx);
+  assert.equal(res2.status, 200);
+  assert.equal((await res2.json()).products['1'][2], 5);
+  assert.equal(calls, 1);
+});
+
+test('new release falls back to previous-release stale stock when origin is slow, then caches fresh stock', async () => {
+  const f = await fixture();
+  let release = 'a'.repeat(32);
+  let versionNum = 0;
+  let delayMs = 0;
+  globalThis.fetch = async () => {
+    if (delayMs) await new Promise(resolve => setTimeout(resolve, delayMs));
+    return Response.json({ products: { 1: [++versionNum, 100, 5] } }, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
+  };
+  const env = {
+    API_ORIGIN: 'https://api.test',
+    ORIGIN_SECRET: 'test-origin-secret',
+    STOCK_FOREGROUND_MS: 40,
+    STOCK_UPSTREAM_MS: 500,
+    ASSETS: { fetch: async () => Response.json({ id: release }) },
+  };
+  const ctx = { waitUntil: task => f.background.push(task) };
+
+  const res1 = await f.worker.fetch(new Request('https://shop.test/api/stock'), env, ctx);
+  assert.equal(res1.status, 200);
+  assert.equal(res1.headers.get('X-Stock-Stale'), null);
+  assert.equal((await res1.json()).products['1'][0], 1);
+
+  release = 'b'.repeat(32);
+  delayMs = 100;
+  const res2 = await f.worker.fetch(new Request('https://shop.test/api/stock'), env, ctx);
+  assert.equal(res2.status, 200);
+  assert.equal(res2.headers.get('X-Stock-Stale'), '1');
+  assert.equal(res2.headers.get('Cache-Control'), 'no-store');
+  assert.equal((await res2.json()).products['1'][0], 1);
+
+  await Promise.all(f.background);
+  const res3 = await f.worker.fetch(new Request('https://shop.test/api/stock'), env, ctx);
+  assert.equal(res3.status, 200);
+  assert.equal(res3.headers.get('X-Stock-Stale'), null);
+  assert.equal((await res3.json()).products['1'][0], 2);
+});
+
+test('browser cookie and conditional headers are stripped from shared stock upstream requests', async () => {
+  const f = await fixture();
+  let seenHeaders;
+  globalThis.fetch = async (_url, init) => {
+    seenHeaders = init.headers;
+    return f.fresh();
+  };
+  const ctx = { waitUntil: task => f.background.push(task) };
+  const req = new Request('https://shop.test/api/stock', {
+    headers: {
+      Cookie: 'session=abc',
+      'If-None-Match': '"etag"',
+      'If-Modified-Since': 'Wed, 21 Oct 2015 07:28:00 GMT',
+      Range: 'bytes=0-10',
+      'CF-Connecting-IP': '1.2.3.4',
+    },
+  });
+  const res = await f.worker.fetch(req, { API_ORIGIN: 'https://api.test', ORIGIN_SECRET: 'test-origin-secret' }, ctx);
+  assert.equal(res.status, 200);
+  assert.equal(seenHeaders.get('Cookie'), null);
+  assert.equal(seenHeaders.get('If-None-Match'), null);
+  assert.equal(seenHeaders.get('If-Modified-Since'), null);
+  assert.equal(seenHeaders.get('Range'), null);
+  assert.equal(seenHeaders.get('Accept'), 'application/json');
+  assert.equal(seenHeaders.get('X-Origin-Secret'), 'test-origin-secret');
+  assert.equal(seenHeaders.get('X-Shop-Host'), 'shop.test');
+  assert.equal(seenHeaders.get('X-Client-IP'), '1.2.3.4');
+  await Promise.all(f.background);
+});

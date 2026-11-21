@@ -66,7 +66,11 @@
   let index = null; // the search index, with live prices merged in
   let rawIndex = null;
   let stockLoaded = false;
-  let retriedStaleStock = false;
+  const STOCK_WAKE_DELAYS = [4000, 6000, 8000, 10000, 12000, 15000];
+  const STOCK_STALE_DELAYS = [5500, 10000, 15000, 20000];
+  let stockRetryTimer = null;
+  let stockVersion = 0;
+  let staleRetries = 0;
   let stock = {}; // id: [price, regular, units], units capped at 99
   let live = null; // settings that take effect without a rebuild
   let repaintCheckout = () => {};
@@ -185,9 +189,12 @@
       e.textContent = !units ? "Sold out" : left ? `Only ${units} left` : "In stock";
       e.classList.toggle("no", !units);
     });
-    $$("[data-qty]").forEach((i) => {
-      i.max = maxFor($("[data-add]").dataset.add);
-    });
+    const addBtn = $("[data-add]");
+    if (addBtn) {
+      $$("[data-qty]").forEach((i) => {
+        i.max = maxFor(addBtn.dataset.add);
+      });
+    }
     $$("[data-card]").forEach((c) => {
       const s = stock[c.dataset.id];
       c.dataset.price = s ? s[0] : c.dataset.price;
@@ -203,13 +210,14 @@
       n.hidden = !live.notice;
     }
     // Payment numbers are live settings: an old number here could send money to the wrong place.
+    const payments = Array.isArray(live?.payments) ? live.payments : [];
     const summary = $("[data-payment-summary]");
-    if (summary && live) summary.textContent = live.payments.filter(p => p.enabled).map(p => p.label).join(" · ") || "Contact the shop for payment options";
+    if (summary && live) summary.textContent = payments.filter(p => p.enabled).map(p => p.label).join(" · ") || "Contact the shop for payment options";
     const feature = $("[data-payment-feature]");
-    if (feature && live) feature.textContent = live.payments.find(p => p.enabled)?.label || "Payment options";
+    if (feature && live) feature.textContent = payments.find(p => p.enabled)?.label || "Payment options";
     const pay = $("[data-payments]");
     if (pay && live)
-      pay.innerHTML = live.payments
+      pay.innerHTML = payments
         .filter((p) => p.enabled)
         .map((p) => esc(p.label) + (p.number ? `: ${esc(p.number)}` : ""))
         .join("<br>");
@@ -734,7 +742,7 @@
     const selected = Math.max(1, Math.floor(+$("[data-qty]", product).value) || 1);
     const quantity = Math.min(maxFor(product.dataset.product) || 1, selected);
     const price = stock[product.dataset.product]?.[0] ?? +product.dataset.price;
-    const delivery = live.delivery.map((zone) => ({ ...zone, fee: deliveryCharge(zone, live, price * quantity, quantity) }));
+    const delivery = (Array.isArray(live.delivery) ? live.delivery : []).map((zone) => ({ ...zone, fee: deliveryCharge(zone, live, price * quantity, quantity) }));
     const free = live.freeOver > 0 ? `<li>Free delivery on orders of ${taka(live.freeOver)} or more</li>` : "";
     const heavy = quantity > 1 && delivery.some((zone) => zone.fee > 0) ? `<li>${heavyDeliveryNote(quantity)}</li>` : "";
     el.innerHTML =
@@ -954,41 +962,67 @@
     };
   }
 
-  async function loadStock(reload) {
+  function showStockNotice() {
+    let notice = $("[data-stock-notice]");
+    if (!notice) {
+      notice = document.createElement("div"); notice.dataset.stockNotice = ""; notice.className = "wrap note";
+      notice.setAttribute("role", "status");
+      notice.innerHTML = 'Live availability could not be refreshed. Prices are checked at checkout. <button type="button" class="btn ghost small">Try again</button>';
+      $("button", notice).onclick = () => { notice.remove(); loadStock(true, { manual: true }); };
+      $("main")?.prepend(notice);
+    }
+  }
+
+  async function loadStock(reload = false, { attempt = 0, manual = false } = {}) {
+    clearTimeout(stockRetryTimer);
+    stockRetryTimer = null;
+    const version = ++stockVersion;
     const timeout = new AbortController();
-    const timer = setTimeout(() => timeout.abort(), 8000); // a sleeping API must not hold up the page
+    const timer = setTimeout(() => timeout.abort(), 10000); // a sleeping API must not hold up the page
+    let snap, isStale = false;
     try {
-      const r = await fetch("/api/stock", { signal: timeout.signal, cache: reload ? "reload" : "default", priority: "low" });
+      const r = await fetch("/api/stock", { signal: timeout.signal, cache: reload || attempt > 0 ? "no-store" : "default", priority: "low" });
       if (!r.ok) throw new Error();
-      const snap = await r.json();
-      // A saved snapshot renders immediately. Check once after the Worker's five-second
-      // refresh window so newly published products do not stay disabled on this page.
-      if (r.headers.get("X-Stock-Stale") === "1" && !retriedStaleStock) {
-        retriedStaleStock = true;
-        setTimeout(() => loadStock(true), 5500);
-      }
-      $("[data-stock-notice]")?.remove();
-      stock = snap.products || {};
-      stockLoaded = true;
-      live = snap.settings || null;
-      index = null;
-      applyStock();
-      applyLive();
-      applyDelivery();
-      await Promise.all([renderCart(), renderWish(), search(), renderRecent(), repaintCheckout()]);
+      isStale = r.headers.get("X-Stock-Stale") === "1";
+      snap = await r.json();
+      if (!snap || typeof snap !== "object") throw new Error();
     } catch {
-      // Static browsing stays available; orders are always checked on the server.
-      let notice = $("[data-stock-notice]");
-      if (!notice) {
-        notice = document.createElement("div"); notice.dataset.stockNotice = ""; notice.className = "wrap note";
-        notice.setAttribute("role", "status");
-        notice.innerHTML = 'Live availability could not be refreshed. Prices are checked at checkout. <button type="button" class="btn ghost small">Try again</button>';
-        $("button", notice).onclick = () => { notice.remove(); loadStock(true); };
-        $("main")?.prepend(notice);
+      if (version !== stockVersion) return;
+      if (stockLoaded) {
+        if (staleRetries < STOCK_STALE_DELAYS.length) {
+          stockRetryTimer = setTimeout(() => loadStock(true, { attempt: 1 }), STOCK_STALE_DELAYS[staleRetries++]);
+        }
+        return;
       }
+      if (!manual && attempt < STOCK_WAKE_DELAYS.length) {
+        stockRetryTimer = setTimeout(() => loadStock(true, { attempt: attempt + 1 }), STOCK_WAKE_DELAYS[attempt]);
+        return;
+      }
+      // Static browsing stays available; orders are always checked on the server.
+      showStockNotice();
+      return;
     } finally {
       clearTimeout(timer);
     }
+    if (version !== stockVersion) return;
+    $("[data-stock-notice]")?.remove();
+    stock = snap.products || {};
+    stockLoaded = true;
+    live = snap.settings || null;
+    index = null;
+    applyStock();
+    applyLive();
+    applyDelivery();
+    // A saved snapshot renders immediately. Check again after the Worker's five-second
+    // refresh window so newly published products do not stay disabled on this page.
+    if (isStale) {
+      if (staleRetries < STOCK_STALE_DELAYS.length) {
+        stockRetryTimer = setTimeout(() => loadStock(true, { attempt: 1 }), STOCK_STALE_DELAYS[staleRetries++]);
+      }
+    } else {
+      staleRetries = 0;
+    }
+    await Promise.all([renderDynamic(), Promise.resolve(repaintCheckout())]);
   }
 
   const renderDynamic = () => Promise.allSettled([
@@ -1009,6 +1043,7 @@
   };
   addEventListener("pageshow", (e) => { if (e.persisted) syncCart(); });
   addEventListener("storage", (e) => { if (!e.key || e.key === "cart" || e.key === "wish") syncCart(); });
+  addEventListener("online", () => { if (!stockLoaded || $("[data-stock-notice]")) loadStock(true); });
   $$(".mobile-nav a, .nav > a, .icons a").forEach((a) => {
     if (a.pathname === location.pathname) a.setAttribute("aria-current", "page");
   });
