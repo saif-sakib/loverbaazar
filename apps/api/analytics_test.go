@@ -134,14 +134,17 @@ func TestAnalyticsSyncDhakaBucketingCacheAndFallback(t *testing.T) {
 		case strings.Contains(body.Query, "LoverBaazarBreakdowns"):
 			_, _ = w.Write([]byte(`{"data":{"viewer":{"accounts":[{"pages":[
 				{"count":10,"sum":{"visits":4},"dimensions":{"requestPath":"/checkout/"}},
-				{"count":25,"sum":{"visits":11},"dimensions":{"requestPath":"/product/rice-cooker/"}}
+				{"count":25,"sum":{"visits":11},"dimensions":{"requestPath":"/product/p1/"}}
 			],"referrers":[
 				{"count":15,"sum":{"visits":8},"dimensions":{"refererHost":""}},
-				{"count":10,"sum":{"visits":5},"dimensions":{"refererHost":"Facebook.com"}}
+				{"count":7,"sum":{"visits":3},"dimensions":{"refererHost":"com.google.android.googlequicksearchbox"}},
+				{"count":5,"sum":{"visits":2},"dimensions":{"refererHost":"www.google.com.hk"}},
+				{"count":10,"sum":{"visits":5},"dimensions":{"refererHost":"l.facebook.com"}},
+				{"count":61,"sum":{"visits":0},"dimensions":{"refererHost":"loverbaazar.com"}}
 			],"devices":[
 				{"count":20,"sum":{"visits":12},"dimensions":{"deviceType":"mobile"}}
 			],"countries":[
-				{"count":22,"sum":{"visits":13},"dimensions":{"countryName":"Bangladesh"}}
+				{"count":22,"sum":{"visits":13},"dimensions":{"countryName":"BD"}}
 			]}]}}}`))
 		case strings.Contains(body.Query, "LoverBaazarBackfillRUM"):
 			_, _ = w.Write([]byte(`{"data":{"viewer":{"accounts":[{"rumPageloadEventsAdaptiveGroups":[
@@ -189,14 +192,18 @@ func TestAnalyticsSyncDhakaBucketingCacheAndFallback(t *testing.T) {
 		t.Fatalf("2026-11-05 visitors = %d (%v), want 18", v05, err)
 	}
 
-	// Breakdowns exclude /checkout/ and normalize empty refererHost.
+	// Breakdowns exclude /checkout/ and self-referrers, merge channels, and enrich live product data.
 	bd := res["breakdowns"].(M)
 	pages := bd["topPages"].([]any)
-	if len(pages) != 1 || pages[0].(M)["path"] != "/product/rice-cooker/" {
+	if len(pages) != 1 {
 		t.Fatalf("topPages = %v", pages)
 	}
+	p0 := pages[0].(M)
+	if p0["path"] != "/product/p1/" || p0["title"] != "Product 1" || p0["kind"] != "product" || p0["productId"].(float64) != 1 || p0["price"].(float64) != 1000 || p0["stock"].(float64) != 50 {
+		t.Fatalf("enriched topPage = %v", p0)
+	}
 	refs := bd["referrers"].([]any)
-	if len(refs) != 2 || refs[0].(M)["source"] != "Direct / bookmark" || refs[1].(M)["source"] != "facebook.com" {
+	if len(refs) != 3 || refs[0].(M)["source"] != "Direct / shared link" || refs[1].(M)["source"] != "Google Search" || refs[1].(M)["visits"].(float64) != 5 || refs[2].(M)["source"] != "Facebook" {
 		t.Fatalf("referrers = %v", refs)
 	}
 	devs := bd["devices"].([]any)
@@ -268,5 +275,28 @@ func TestAnalyticsHostResolution(t *testing.T) {
 	t.Setenv("CLOUDFLARE_ANALYTICS_HOST", "https://www.loverbaazar.com")
 	if got := resolveAnalyticsHost(proxyReq); got != "www.loverbaazar.com" {
 		t.Fatalf("CLOUDFLARE_ANALYTICS_HOST = %q, want www.loverbaazar.com", got)
+	}
+}
+
+func TestClassifyReferrer(t *testing.T) {
+	for _, tc := range []struct {
+		raw, site, want string
+		skip            bool
+	}{
+		{"", "loverbaazar.com", "Direct / shared link", false},
+		{"loverbaazar.com", "loverbaazar.com", "", true},
+		{"www.loverbaazar.com", "loverbaazar.com", "", true},
+		{"shop.loverbaazar.com", "loverbaazar.com", "", true},
+		{"com.google.android.googlequicksearchbox", "loverbaazar.com", "Google Search", false},
+		{"www.google.com.hk", "loverbaazar.com", "Google Search", false},
+		{"l.facebook.com", "loverbaazar.com", "Facebook", false},
+		{"m.facebook.com", "loverbaazar.com", "Facebook", false},
+		{"wa.me", "loverbaazar.com", "WhatsApp", false},
+		{"www.bing.com", "loverbaazar.com", "Bing Search", false},
+	} {
+		got, skip := classifyReferrer(tc.raw, tc.site)
+		if got != tc.want || skip != tc.skip {
+			t.Errorf("classifyReferrer(%q, %q) = (%q, %v), want (%q, %v)", tc.raw, tc.site, got, skip, tc.want, tc.skip)
+		}
 	}
 }

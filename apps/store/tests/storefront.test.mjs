@@ -715,7 +715,7 @@ test('returning to products during a slow catalog read finishes the latest navig
   assert.equal(await page.locator('#err').textContent(), '');
 }));
 
-test('admin analytics renders daily, 7-day, monthly, breakdowns, escapes text, and syncs cleanly', () => shop(async (page, context) => {
+test('admin analytics renders business insights, enriched products, countries, escapes text, and toggles months', () => shop(async (page, context) => {
   await page.addInitScript(() => { if (location.protocol === 'http:' || location.protocol === 'https:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
   const days = Array.from({ length: 7 }, (_, i) => ({
     day: `2026-11-${15 + i}`,
@@ -757,16 +757,20 @@ test('admin analytics renders daily, 7-day, monthly, breakdowns, escapes text, a
     syncedAt: '2026-11-21T11:00:00Z',
     stale: false,
     syncError: '',
+    lowStock: 5,
     today: days[6],
     yesterday: days[5],
     last7Days: { visitors: 175, pageviews: 385, orders: 8, sales: 8500, daysRecorded: 7, prevVisitors: 140, prevPageviews: 300, prevOrders: 6, prevSales: 6000, prevDaysRecorded: 7, days },
     months,
     breakdowns: {
       windowDays: 7,
-      topPages: [{ path: '/product/rice-cooker/', visits: 44, pageviews: 90 }, { path: '/<img src=x onerror=alert(1)>', visits: 3, pageviews: 5 }],
-      referrers: [{ source: 'Direct / bookmark', visits: 80, pageviews: 150 }, { source: 'facebook.com<script>x</script>', visits: 35, pageviews: 70 }],
+      topPages: [
+        { path: '/product/rice-cooker/', title: 'Kiam Rice Cooker 1.8L', kind: 'product', productId: 42, price: 2450, stock: 0, sold30d: 4, visits: 44, pageviews: 90 },
+        { path: '/<img src=x onerror=alert(1)>', title: '<img src=x onerror=alert(1)>', kind: 'page', visits: 3, pageviews: 5 },
+      ],
+      referrers: [{ source: 'Google Search', visits: 110, pageviews: 150 }, { source: 'Direct / shared link<script>x</script>', visits: 35, pageviews: 70 }],
       devices: [{ device: 'Mobile', visits: 150, pageviews: 320 }],
-      countries: [{ country: 'Bangladesh', visits: 168, pageviews: 370 }],
+      countries: [{ country: 'BD', visits: 168, pageviews: 370 }],
     },
   };
   let syncCalls = 0;
@@ -777,15 +781,24 @@ test('admin analytics renders daily, 7-day, monthly, breakdowns, escapes text, a
     return r.fulfill({ json: { ...basePayload, today: updatedDays[6], last7Days: { ...basePayload.last7Days, visitors: 190, days: updatedDays } } });
   });
 
-  await page.setViewportSize({ width: 320, height: 812 });
-  await ready(page, '/admin/#analytics');
-  await page.waitForSelector('#refresh-analytics');
-  assert.equal(await page.locator('#head h1').textContent(), 'Visitor analytics');
-  assert.match(await page.locator('.analytics-tiles').textContent(), /40/);
-  assert.match(await page.locator('#view').textContent(), /Monthly comparison/);
+  for (const width of [320, 375, 414]) {
+    await page.setViewportSize({ width, height: 812 });
+    await ready(page, '/admin/#analytics');
+    await page.waitForSelector('#refresh-analytics');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `Analytics ${width}px overflow`);
+  }
+
+  assert.equal(await page.locator('#head h1').textContent(), 'Visitor & sales insights');
+  const viewText = await page.locator('#view').textContent();
+  assert.match(viewText, /Stock opportunity: Kiam Rice Cooker 1\.8L/);
+  assert.match(viewText, /Bangladesh/);
+  assert.match(viewText, /Sold out/);
+  assert.doesNotMatch(viewText, /Dec 2025/);
   assert.equal(await page.locator('#view img').count(), 0);
   assert.equal(await page.locator('#view script').count(), 0);
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Analytics 320px overflow');
+
+  await page.locator('#toggle-months').click();
+  assert.match(await page.locator('#view').textContent(), /Dec 2025/);
 
   await page.locator('#refresh-analytics').click();
   await page.waitForFunction(() => document.querySelector('.analytics-tiles')?.textContent?.includes('55'));

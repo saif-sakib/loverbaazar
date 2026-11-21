@@ -50,7 +50,7 @@
   const HEADS = {
     operations: ["Operations", "Check API readiness and recover order notifications.", ""],
     dashboard: ["Shop overview", "Your shop today, and quick links to the tasks you do most.", ""],
-    analytics: ["Visitor analytics", "Authentic daily visits, 7-day log, monthly comparison, and order conversion (Bangladesh time).", ""],
+    analytics: ["Visitor & sales insights", "See how many shoppers visit your store, where they come from, what products they look at, and how visits turn into sales.", ""],
     orders: ["Orders", "Find orders, manage fulfillment, and download invoices.", ""],
     messages: ["Messages", "Read and manage customer questions.", ""],
     reviews: ["Reviews", "Customer product reviews waiting for moderation. Approved reviews appear on product pages after you click Publish.", "pub"],
@@ -659,7 +659,9 @@
 
   const fmtNum = (n) => Number(n || 0).toLocaleString("en-IN");
   const shortDay = (d) =>
-    new Date(`${d}T00:00:00+06:00`).toLocaleDateString("en-GB", { timeZone: "Asia/Dhaka", day: "numeric", month: "short" });
+    new Date(`${d}T00:00:00+06:00`).toLocaleDateString("en-GB", { timeZone: "Asia/Dhaka", weekday: "short", day: "numeric", month: "short" });
+  const shortWeekday = (d) =>
+    new Date(`${d}T00:00:00+06:00`).toLocaleDateString("en-US", { timeZone: "Asia/Dhaka", weekday: "short" });
   const convText = (orders, visitors, hasVisitors) =>
     hasVisitors && visitors > 0 ? `${((orders / visitors) * 100).toFixed(1)}%` : "—";
   const pctDelta = (cur, prev) => (prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : null);
@@ -669,6 +671,113 @@
     const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
     return `<span class="delta-pill ${cls}">${sign}${Math.abs(pct).toFixed(1)}%${suffix ? " " + esc(suffix) : ""}</span>`;
   };
+  const regionNames = typeof Intl !== "undefined" && Intl.DisplayNames ? new Intl.DisplayNames(["en"], { type: "region" }) : null;
+  const countryLabel = (code) => {
+    const s = String(code || "").trim();
+    if (!s) return "Unknown";
+    if (regionNames && /^[A-Za-z]{2}$/.test(s)) {
+      try {
+        return regionNames.of(s.toUpperCase()) || s;
+      } catch {}
+    }
+    return s;
+  };
+  const kindLabel = (k) => ({ product: "Product", category: "Category", tag: "Tag", blog: "Blog", home: "Home" }[k] || "Page");
+  const safePathUrl = (p) => {
+    const s = String(p || "");
+    return s.startsWith("/") && !s.startsWith("//") ? s : "/";
+  };
+
+  let showAllAnalyticsMonths = false;
+
+  function buildBusinessInsights(data) {
+    const l7 = data.last7Days || {};
+    const bd = data.breakdowns || {};
+    const pages = bd.topPages || [];
+    const refs = bd.referrers || [];
+    const devs = bd.devices || [];
+    const countries = bd.countries || [];
+    const lowLimit = data.lowStock > 0 ? data.lowStock : lowStock;
+    const list = [];
+
+    const restockAlerts = pages
+      .filter((p) => p.kind === "product" && p.productId && p.stock !== null && p.stock !== undefined && p.stock <= lowLimit)
+      .slice(0, 2);
+    for (const p of restockAlerts) {
+      const name = esc(p.title || p.path);
+      const status = p.stock === 0 ? "is <strong>Sold out</strong>" : `has only <strong>${p.stock} left</strong>`;
+      const action = p.stock === 0 ? "Restock now →" : "Update stock →";
+      list.push({
+        alert: true,
+        html: `<strong>Stock opportunity:</strong> ${name} got <strong>${fmtNum(p.visits)} visits</strong> this week and ${status}. <a class="link" href="#product/${p.productId}">${action}</a>`,
+      });
+    }
+
+    const totalRef = refs.reduce((s, r) => s + (r.visits || 0), 0);
+    if (refs.length > 0 && totalRef > 0) {
+      const topRef = refs[0];
+      const pct = ((topRef.visits / totalRef) * 100).toFixed(0);
+      list.push({
+        html: `<strong>Main traffic source:</strong> ${pct}% of shoppers arrived from <strong>${esc(topRef.source)}</strong> (${fmtNum(topRef.visits)} visits).`,
+      });
+      if ((l7.visitors || 0) > 0 && !refs.some((r) => r.source === "Facebook")) {
+        list.push({
+          html: `<strong>Growth tip:</strong> <strong>Facebook</strong> sent 0 visits this week — sharing your top products on your Facebook page can bring quick local buyers.`,
+        });
+      }
+    }
+
+    const topProduct = pages.find((p) => p.kind === "product") || pages.find((p) => p.path !== "/");
+    if (topProduct) {
+      const title = esc(topProduct.title || topProduct.path);
+      const soldPart = topProduct.sold30d > 0 ? ` (${fmtNum(topProduct.sold30d)} sold in 30 days)` : "";
+      const link = topProduct.productId ? ` <a class="link" href="#product/${topProduct.productId}">View product →</a>` : "";
+      list.push({
+        html: `<strong>Most popular interest:</strong> <strong>${title}</strong> drew <strong>${fmtNum(topProduct.visits)} visits</strong> this week${soldPart}.${link}`,
+      });
+    }
+
+    const totalDev = devs.reduce((s, d) => s + (d.visits || 0), 0);
+    const totalCountry = countries.reduce((s, c) => s + (c.visits || 0), 0);
+    const mobileRow = devs.find((d) => /mobile/i.test(d.device || ""));
+    const bdRow = countries.find((c) => /^(bd|bangladesh)$/i.test(String(c.country || "").trim()));
+    const audienceParts = [];
+    if (mobileRow && totalDev > 0) {
+      audienceParts.push(`<strong>${((mobileRow.visits / totalDev) * 100).toFixed(0)}%</strong> browse on <strong>Mobile phones</strong>`);
+    }
+    if (bdRow && totalCountry > 0) {
+      audienceParts.push(`<strong>${((bdRow.visits / totalCountry) * 100).toFixed(0)}%</strong> (${fmtNum(bdRow.visits)} visits) are in <strong>Bangladesh</strong>`);
+    }
+    if (audienceParts.length) {
+      list.push({ html: `<strong>Your shoppers:</strong> ${audienceParts.join(", and ")}.` });
+    }
+
+    if ((l7.orders || 0) > 0) {
+      const aov = money(Math.round((l7.sales || 0) / l7.orders));
+      const ratePart = l7.visitors > 0 ? `, with <strong>${((l7.orders / l7.visitors) * 100).toFixed(1)}%</strong> of visitors ordering online` : "";
+      list.push({ html: `<strong>Order value:</strong> Average order is <strong>${aov}</strong> over the last 7 days${ratePart}.` });
+    } else if ((l7.visitors || 0) >= 20 && (l7.orders || 0) === 0) {
+      list.push({
+        html: `<strong>Online checkout check:</strong> <strong>${fmtNum(l7.visitors)} people</strong> visited in the last 7 days with 0 online orders — check WhatsApp/phone orders and verify delivery fees and pricing on your most-viewed items.`,
+      });
+    }
+    return list;
+  }
+
+  function renderMeters(items, labelFn, emptyMsg) {
+    if (!items || !items.length) return `<p class="empty-state">${esc(emptyMsg)}</p>`;
+    const total = items.reduce((sum, x) => sum + (x.visits || 0), 0);
+    const peak = Math.max(...items.map((x) => x.visits || 0), 1);
+    return `<div class="meter-list">${items.map((x) => {
+      const visits = x.visits || 0;
+      const pct = total > 0 ? ((visits / total) * 100).toFixed(1) : "0.0";
+      const width = Math.max(Math.round((visits / peak) * 100), visits > 0 ? 4 : 0);
+      return `<div class="meter-row">
+        <div class="meter-head"><span>${esc(labelFn(x))}</span><b>${fmtNum(visits)} <small>(${pct}%)</small></b></div>
+        <div class="meter-track" aria-hidden="true"><span class="meter-fill" style="width:${width}%"></span></div>
+      </div>`;
+    }).join("")}</div>`;
+  }
 
   function renderAnalytics(data) {
     const today = data.today || {};
@@ -678,144 +787,193 @@
     const months = Array.isArray(data.months) ? data.months : [];
     const curMonth = months.at(-1) || {};
     const bd = data.breakdowns || {};
+    const lowLimit = data.lowStock > 0 ? data.lowStock : lowStock;
 
     const todayDelta = today.hasVisitors && yesterday.hasVisitors ? pctDelta(today.visitors, yesterday.visitors) : null;
+    const todayTrendText = todayDelta !== null
+      ? `${todayDelta >= 0 ? "Up" : "Down"} ${Math.abs(todayDelta).toFixed(0)}% vs yesterday`
+      : yesterday.hasVisitors
+        ? `Yesterday: ${fmtNum(yesterday.visitors)}`
+        : "";
     const todaySub = today.hasVisitors
-      ? `${fmtNum(today.pageviews)} pageviews` +
-        (todayDelta !== null
-          ? ` · ${todayDelta >= 0 ? "+" : "−"}${Math.abs(todayDelta).toFixed(1)}% vs yesterday`
-          : yesterday.hasVisitors
-            ? ` · Yesterday: ${fmtNum(yesterday.visitors)}`
-            : "")
+      ? `${fmtNum(today.pageviews)} page views${todayTrendText ? ` · ${todayTrendText}` : ""}`
       : data.configured
-        ? "Click Refresh now to sync"
-        : "Connect Cloudflare Analytics below";
+        ? "Click Update numbers to fetch today's visits"
+        : "Connect visitor tracking below";
 
-    const l7Delta = l7.daysRecorded > 0 && l7.prevDaysRecorded > 0 ? pctDelta(l7.visitors, l7.prevVisitors) : null;
+    const l7Delta = l7.daysRecorded > 0 && l7.prevDaysRecorded >= 7 ? pctDelta(l7.visitors, l7.prevVisitors) : null;
+    const pace7 = l7.daysRecorded > 0 ? Math.round(l7.visitors / l7.daysRecorded) : 0;
     const l7Sub = l7.daysRecorded > 0
-      ? `${fmtNum(l7.pageviews)} pageviews` + (l7Delta !== null ? ` · ${l7Delta >= 0 ? "+" : "−"}${Math.abs(l7Delta).toFixed(1)}% vs prev 7 days` : "")
+      ? `${fmtNum(l7.pageviews)} views · ~${fmtNum(pace7)}/day` + (l7Delta !== null ? ` · ${l7Delta >= 0 ? "Up" : "Down"} ${Math.abs(l7Delta).toFixed(0)}% vs prev week` : "")
       : "No visitor history yet";
 
-    const curMonthSub = curMonth.daysRecorded > 0
-      ? `${curMonth.avgPerDay ?? "—"} / day · ${curMonth.daysRecorded}/${curMonth.daysInPeriod} days` +
-        (curMonth.changePct !== null && curMonth.changePct !== undefined
-          ? ` · ${curMonth.changePct >= 0 ? "+" : "−"}${Math.abs(curMonth.changePct).toFixed(1)}% vs prev`
-          : "")
-      : `${fmtNum(curMonth.orders)} orders this month`;
+    const aov7 = l7.orders > 0 ? `Avg ${money(Math.round(l7.sales / l7.orders))}/order` : "Online orders (excl. cancelled)";
+    const buyRate7 = l7.visitors > 0 && l7.orders > 0 ? ` · ${((l7.orders / l7.visitors) * 100).toFixed(1)}% ordered` : "";
+    const sales7Sub = `${fmtNum(l7.orders)} orders · ${aov7}${buyRate7}`;
 
-    const conv7 = l7.daysRecorded > 0 && l7.visitors > 0 ? `${((l7.orders / l7.visitors) * 100).toFixed(1)}% conversion` : "Orders (excl. cancelled/returned)";
+    const curMonthSub = curMonth.daysRecorded > 0
+      ? `${curMonth.avgPerDay ?? "—"} visitors/day · ${fmtNum(curMonth.orders)} orders (${money(curMonth.sales)})` +
+        (curMonth.changePct !== null && curMonth.changePct !== undefined
+          ? ` · ${curMonth.changePct >= 0 ? "Up" : "Down"} ${Math.abs(curMonth.changePct).toFixed(0)}% vs last month`
+          : "")
+      : `${fmtNum(curMonth.orders)} orders (${money(curMonth.sales)}) this month`;
+
     const statTile = (label, value, sub, primary = false) =>
       `<div class="tile${primary ? " primary" : ""}"><b>${esc(value)}</b><span>${esc(label)}</span><small class="tile-sub">${esc(sub)}</small></div>`;
+
+    const insights = buildBusinessInsights(data);
+
+    const rawCountries = bd.countries || [];
+    const shownCountries = rawCountries.slice(0, 5).map((c) => ({ ...c, label: countryLabel(c.country) }));
+    if (rawCountries.length > 5) {
+      const restVisits = rawCountries.slice(5).reduce((s, c) => s + (c.visits || 0), 0);
+      const restViews = rawCountries.slice(5).reduce((s, c) => s + (c.pageviews || 0), 0);
+      if (restVisits > 0) shownCountries.push({ label: `Other countries (${rawCountries.length - 5})`, visits: restVisits, pageviews: restViews });
+    }
 
     const max7 = Math.max(...days.map((x) => (x.hasVisitors ? x.visitors : 0)), 1);
     const has7Bars = days.some((x) => x.hasVisitors && x.visitors > 0);
     const maxM = Math.max(...months.map((m) => (m.daysRecorded > 0 ? m.visitors : 0)), 1);
     const hasMBars = months.some((m) => m.daysRecorded > 0 && m.visitors > 0);
 
-    const dayStatus = (x) => {
-      if (!x.hasVisitors) return "Not tracked";
-      if (!x.finalized) return "Live";
-      return x.sampleRate > 1 ? `Sampled (${Math.round(x.sampleRate)}×)` : "Unsampled";
-    };
+    const activeMonths = months.filter((m, idx) => m.daysRecorded > 0 || m.orders > 0 || idx >= months.length - 3);
+    const visibleMonths = showAllAnalyticsMonths ? months : activeMonths;
+    const hasHiddenMonths = months.length > activeMonths.length;
 
-    const share = (visits, total) => (total > 0 ? `${((visits / total) * 100).toFixed(1)}%` : "—");
-    const totalRefVisits = (bd.referrers || []).reduce((sum, r) => sum + (r.visits || 0), 0);
-    const totalDevVisits = (bd.devices || []).reduce((sum, r) => sum + (r.visits || 0), 0);
-    const totalCountryVisits = (bd.countries || []).reduce((sum, r) => sum + (r.visits || 0), 0);
+    const stockBadge = (p) => {
+      if (p.kind !== "product" || p.stock === null || p.stock === undefined) return "—";
+      if (p.stock === 0) return `<span class="stock-pill stock-out">Sold out</span>`;
+      if (p.stock <= lowLimit) return `<span class="stock-pill stock-low">Low (${p.stock} left)</span>`;
+      return `<span class="stock-pill stock-ok">In stock (${p.stock})</span>`;
+    };
 
     view().innerHTML = `
       <div class="panel analytics-status">
         <div class="analytics-status-meta">
-          <span class="analytics-badge${data.configured ? " live" : ""}">${esc(data.configured ? (data.sourceLabel || "Cloudflare Web Analytics") : "Cloudflare Analytics not connected — showing orders & sales")}</span>
-          ${data.syncedAt ? `<small>Last synced: ${esc(when(data.syncedAt))} (BDT)</small>` : ""}
+          <span class="analytics-badge${data.configured ? " live" : ""}">${data.configured ? '<i class="analytics-dot" aria-hidden="true"></i>Live store traffic · Real human visitors' : "Live visitor tracking not turned on yet — showing orders & sales"}</span>
+          ${data.syncedAt ? `<small>Updated: ${esc(when(data.syncedAt))} (Bangladesh time)</small>` : ""}
         </div>
-        ${data.configured ? `<button type="button" id="refresh-analytics" class="btn ghost">Refresh now</button>` : ""}
+        ${data.configured ? `<button type="button" id="refresh-analytics" class="btn ghost">Update numbers</button>` : ""}
       </div>
       ${data.syncError ? `<p class="hint-box warn" role="status">${esc(data.syncError)} Showing saved daily history.</p>` : ""}
-      ${!data.configured ? `<div class="hint-box"><strong>Setup required for visitor tracking:</strong> Set <code>${esc((data.missingConfig || []).join(", "))}</code> on Render and <code>CLOUDFLARE_WEB_ANALYTICS_TOKEN</code> in GitHub Actions variables, then publish once. Orders and sales below already reflect your live database.</div>` : ""}
+      ${!data.configured ? `<div class="hint-box"><strong>Setup needed for visitor counts:</strong> Set <code>${esc((data.missingConfig || []).join(", "))}</code> on Render and <code>CLOUDFLARE_WEB_ANALYTICS_TOKEN</code> in GitHub Actions variables, then publish once. Orders and sales below already come from your live shop.</div>` : ""}
       <div class="tiles analytics-tiles">
         ${statTile("Visitors today", today.hasVisitors ? fmtNum(today.visitors) : "—", todaySub, true)}
-        ${statTile("Last 7 days", l7.daysRecorded > 0 ? fmtNum(l7.visitors) : "—", l7Sub)}
+        ${statTile("Visitors, last 7 days", l7.daysRecorded > 0 ? fmtNum(l7.visitors) : "—", l7Sub)}
+        ${statTile("Sales, last 7 days", money(l7.sales), sales7Sub)}
         ${statTile(`This month (${curMonth.label || ""})`, curMonth.daysRecorded > 0 ? fmtNum(curMonth.visitors) : "—", curMonthSub)}
-        ${statTile("Orders, last 7 days", fmtNum(l7.orders), `${money(l7.sales)} · ${conv7}`)}
+      </div>
+      ${insights.length ? `<div class="panel insights-panel">
+        <h3>Key business takeaways</h3>
+        <ul class="insight-list">${insights.map((it) => `<li class="insight-item${it.alert ? " alert" : ""}">${it.html}</li>`).join("")}</ul>
+      </div>` : ""}
+      <div class="split">
+        <div class="panel">
+          <h3>Where shoppers come from (last 7 days)</h3>
+          ${renderMeters(bd.referrers || [], (r) => r.source, data.configured ? "No traffic source data yet." : "Connect visitor tracking to see where shoppers come from.")}
+          ${(bd.referrers || []).length ? `<p class="fhelp">“Direct / shared link” includes people typing your web address or tapping a link shared on WhatsApp or Messenger.</p>` : ""}
+        </div>
+        <div class="panel">
+          <h3>Phone vs. computer &amp; locations</h3>
+          <h4 class="subchart-head">Devices</h4>
+          ${renderMeters(bd.devices || [], (x) => x.device, data.configured ? "No device data yet." : "Available after connecting visitor tracking.")}
+          <h4 class="subchart-head">Shopper countries</h4>
+          ${renderMeters(shownCountries, (c) => c.label, data.configured ? "No location data yet." : "Available after connecting visitor tracking.")}
+        </div>
       </div>
       <div class="panel analytics-panel">
-        <h3>Last 7 days — daily log (Bangladesh time)</h3>
+        <h3>What shoppers viewed most (last 7 days)</h3>
+        ${(bd.topPages || []).length
+          ? `<div class="scroll"><table class="tbl"><thead><tr><th scope="col">Product or page</th><th scope="col">Type</th><th scope="col">Visits</th><th scope="col">Price</th><th scope="col">Stock</th><th scope="col">30d sold</th><th scope="col">Action</th></tr></thead><tbody>${bd.topPages.map((p) => {
+              const title = p.title || p.path;
+              const price = p.price !== null && p.price !== undefined ? money(p.price) : "—";
+              const sold = p.kind === "product" ? fmtNum(p.sold30d || 0) : "—";
+              const action = p.productId
+                ? `<a class="link" href="#product/${p.productId}">Edit</a>`
+                : `<a class="link" href="${esc(safePathUrl(p.path))}" target="_blank" rel="noopener">Open ↗</a>`;
+              return `<tr>
+                <td><b>${esc(title)}</b></td>
+                <td><span class="kind-pill">${esc(kindLabel(p.kind))}</span></td>
+                <td>${fmtNum(p.visits)}</td>
+                <td>${price}</td>
+                <td>${stockBadge(p)}</td>
+                <td>${sold}</td>
+                <td>${action}</td>
+              </tr>`;
+            }).join("")}</tbody></table></div>`
+          : `<p class="empty-state">${data.configured ? "No page visits recorded in the last 7 days yet." : "Available after connecting visitor tracking."}</p>`}
+      </div>
+      <div class="panel analytics-panel">
+        <h3>Last 7 days — day by day (Bangladesh time)</h3>
         ${has7Bars
           ? `<div class="bars" role="img" aria-label="Daily visitors for the last 7 days. Peak ${fmtNum(max7)} visitors.">
-              ${days.map((x) => `<div class="barcol" title="${esc(x.day)}: ${x.hasVisitors ? fmtNum(x.visitors) : "not tracked"} visitors, ${x.orders} orders"><span class="val">${x.hasVisitors && x.visitors === max7 && x.visitors > 0 ? fmtNum(x.visitors) : ""}</span><i style="height:${x.hasVisitors ? Math.round((x.visitors / max7) * 100) : 0}%"></i><small>${esc(x.day.slice(8))}</small></div>`).join("")}
+              ${days.map((x) => `<div class="barcol" title="${esc(shortDay(x.day))}: ${x.hasVisitors ? fmtNum(x.visitors) : "not tracked"} visitors, ${x.orders} orders"><span class="val">${x.hasVisitors && x.visitors === max7 && x.visitors > 0 ? fmtNum(x.visitors) : ""}</span><i style="height:${x.hasVisitors ? Math.round((x.visitors / max7) * 100) : 0}%"></i><small>${esc(shortWeekday(x.day))}<br>${esc(x.day.slice(8))}</small></div>`).join("")}
             </div>`
           : `<p class="empty-state">No visitor counts recorded in the last 7 days yet.</p>`}
-        <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Date</th><th scope="col">Visitors</th><th scope="col">Pageviews</th><th scope="col">Orders</th><th scope="col">Sales</th><th scope="col">Conv.</th><th scope="col">Status</th></tr></thead><tbody>
+        <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Date</th><th scope="col">Visitors</th><th scope="col">Page views</th><th scope="col">Orders</th><th scope="col">Sales</th><th scope="col">Buyer rate</th></tr></thead><tbody>
           ${[...days].reverse().map((x) => `<tr>
             <td>${esc(shortDay(x.day))}${x.day === today.day ? ' <span class="tag">Today</span>' : ""}</td>
-            <td>${x.hasVisitors ? fmtNum(x.visitors) : "—"}</td>
+            <td>${x.hasVisitors ? fmtNum(x.visitors) + (x.sampleRate > 1 ? " <small>(est.)</small>" : "") : "—"}</td>
             <td>${x.hasVisitors ? fmtNum(x.pageviews) : "—"}</td>
             <td>${fmtNum(x.orders)}</td>
             <td>${money(x.sales)}</td>
             <td>${convText(x.orders, x.visitors, x.hasVisitors)}</td>
-            <td><small>${esc(dayStatus(x))}</small></td>
           </tr>`).join("")}
         </tbody></table></div>
       </div>
       <div class="panel analytics-panel">
-        <h3>Monthly comparison (last 12 months)</h3>
+        <div class="panel-head-row">
+          <h3>Month-by-month growth</h3>
+          ${hasHiddenMonths ? `<button type="button" id="toggle-months" class="btn ghost small analytics-toggle">${showAllAnalyticsMonths ? "Show active months only" : "Show all 12 months"}</button>` : ""}
+        </div>
         ${hasMBars
           ? `<div class="bars bars-months" role="img" aria-label="Monthly visitors over the last 12 months. Best month ${fmtNum(maxM)} visitors.">
               ${months.map((m) => `<div class="barcol" title="${esc(m.label)}: ${m.daysRecorded > 0 ? fmtNum(m.visitors) : "no data"} visitors, ${m.orders} orders"><span class="val">${m.daysRecorded > 0 && m.visitors === maxM ? fmtNum(m.visitors) : ""}</span><i style="height:${m.daysRecorded > 0 ? Math.round((m.visitors / maxM) * 100) : 0}%"></i><small>${esc((m.label || "").slice(0, 3))}</small></div>`).join("")}
             </div>`
-          : `<p class="empty-state">Monthly visitor chart will fill automatically as daily logs accumulate.</p>`}
-        <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Month</th><th scope="col">Visitors</th><th scope="col">vs prev</th><th scope="col">Avg / day</th><th scope="col">Pageviews</th><th scope="col">Orders</th><th scope="col">Sales</th><th scope="col">Conv.</th><th scope="col">Coverage</th></tr></thead><tbody>
-          ${[...months].reverse().map((m) => `<tr>
-            <td>${esc(m.label)}${m.current ? ' <span class="tag">Current</span>' : ""}</td>
+          : `<p class="empty-state">Monthly visitor chart will fill automatically as daily logs build up.</p>`}
+        <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Month</th><th scope="col">Visitors</th><th scope="col">vs last month</th><th scope="col">Avg / day</th><th scope="col">Orders</th><th scope="col">Sales</th><th scope="col">Avg order</th><th scope="col">Days tracked</th></tr></thead><tbody>
+          ${[...visibleMonths].reverse().map((m) => `<tr>
+            <td>${esc(m.label)}${m.current ? ' <span class="tag">This month</span>' : ""}</td>
             <td>${m.daysRecorded > 0 ? fmtNum(m.visitors) : "—"}</td>
             <td>${deltaPill(m.changePct)}</td>
             <td>${m.avgPerDay !== null && m.avgPerDay !== undefined ? fmtNum(m.avgPerDay) : "—"}</td>
-            <td>${m.daysRecorded > 0 ? fmtNum(m.pageviews) : "—"}</td>
             <td>${fmtNum(m.orders)}</td>
             <td>${money(m.sales)}</td>
-            <td>${convText(m.orders, m.visitors, m.daysRecorded > 0)}</td>
-            <td><small>${m.daysRecorded}/${m.daysInPeriod} d${m.sampledDays > 0 ? ` · ${m.sampledDays} sampled` : ""}</small></td>
+            <td>${m.orders > 0 ? money(Math.round(m.sales / m.orders)) : "—"}</td>
+            <td><small>${m.daysRecorded} of ${m.daysInPeriod} days${m.sampledDays > 0 ? ` · ${m.sampledDays} est.` : ""}</small></td>
           </tr>`).join("")}
         </tbody></table></div>
       </div>
-      <div class="split">
-        <div class="panel"><h3>Top pages (last 7 days)</h3>${(bd.topPages || []).length
-          ? `<div class="scroll"><table class="tbl"><thead><tr><th scope="col">Page</th><th scope="col">Visits</th><th scope="col">Views</th></tr></thead><tbody>${bd.topPages.map((p) => `<tr><td><code>${esc(p.path)}</code></td><td>${fmtNum(p.visits)}</td><td>${fmtNum(p.pageviews)}</td></tr>`).join("")}</tbody></table></div>`
-          : `<p class="empty-state">${data.configured ? "No page breakdown data yet." : "Available after connecting Cloudflare Analytics."}</p>`}</div>
-        <div class="panel"><h3>Traffic sources (last 7 days)</h3>${(bd.referrers || []).length
-          ? `<div class="scroll"><table class="tbl"><thead><tr><th scope="col">Source</th><th scope="col">Visits</th><th scope="col">Share</th></tr></thead><tbody>${bd.referrers.map((r) => `<tr><td>${esc(r.source)}</td><td>${fmtNum(r.visits)}</td><td>${share(r.visits, totalRefVisits)}</td></tr>`).join("")}</tbody></table></div>`
-          : `<p class="empty-state">${data.configured ? "No referrer breakdown data yet." : "Available after connecting Cloudflare Analytics."}</p>`}</div>
-      </div>
-      <div class="split">
-        <div class="panel"><h3>Devices (last 7 days)</h3>${(bd.devices || []).length
-          ? `<div class="scroll"><table class="tbl"><thead><tr><th scope="col">Device</th><th scope="col">Visits</th><th scope="col">Share</th></tr></thead><tbody>${bd.devices.map((x) => `<tr><td>${esc(x.device)}</td><td>${fmtNum(x.visits)}</td><td>${share(x.visits, totalDevVisits)}</td></tr>`).join("")}</tbody></table></div>`
-          : `<p class="empty-state">${data.configured ? "No device data yet." : "Available after connecting Cloudflare Analytics."}</p>`}</div>
-        <div class="panel"><h3>Countries (last 7 days)</h3>${(bd.countries || []).length
-          ? `<div class="scroll"><table class="tbl"><thead><tr><th scope="col">Country</th><th scope="col">Visits</th><th scope="col">Share</th></tr></thead><tbody>${bd.countries.map((c) => `<tr><td>${esc(c.country)}</td><td>${fmtNum(c.visits)}</td><td>${share(c.visits, totalCountryVisits)}</td></tr>`).join("")}</tbody></table></div>`
-          : `<p class="empty-state">${data.configured ? "No country data yet." : "Available after connecting Cloudflare Analytics."}</p>`}</div>
-      </div>
       <details class="optional-fields">
-        <summary>How these numbers stay authentic &amp; Google Search Console<small>Bot filtering, Bangladesh time bucketing, and search keyword reports</small></summary>
-        <p class="fhelp">Visitor counts come from Cloudflare Web Analytics with bot filtering enabled (<code>bot: 0</code>), exclude preview/admin/checkout/cart/account/track pages, and group hourly data into exact <code>Asia/Dhaka</code> (UTC+6) dates. Completed days from Cloudflare's 7-day unsampled window are archived permanently in PostgreSQL so monthly comparisons never expire.</p>
-        <p class="fhelp">Privacy-focused browser beacons cannot count visitors with strict ad/script blockers (typically ~5–15%), and Cloudflare does not use cookies. Orders and sales come directly from committed store orders (excluding cancelled and returned).</p>
+        <summary>How to understand these numbers &amp; Google Search keywords<small>Simple guide to visitors, buyer rate, and seeing what people searched on Google</small></summary>
+        <p class="fhelp"><strong>Visitors vs. Page views:</strong> If one customer opens your home page and then views 3 rice cookers, that counts as <strong>1 visitor</strong> and <strong>4 page views</strong>. Automated bots and your own admin/checkout pages are left out so counts reflect real shoppers.</p>
+        <p class="fhelp"><strong>Why exact order counts matter most:</strong> A small share of phones use ad blockers (~5–15%) that hide visitor counters, while your <strong>Orders and Sales</strong> always come 100% from confirmed orders in your database (excluding cancelled and returned orders). Daily visitor counts are saved permanently every day so monthly comparisons never disappear.</p>
+        <p class="fhelp"><strong>Want to see which Google keywords bring customers?</strong> Open Google Search Console and check <em>Performance → Search results</em>.</p>
         <p><a class="btn ghost small" href="https://search.google.com/search-console" target="_blank" rel="noopener">Open Google Search Console ↗</a></p>
       </details>`;
+
+    const toggleBtn = $("#toggle-months");
+    if (toggleBtn) {
+      toggleBtn.onclick = () => {
+        showAllAnalyticsMonths = !showAllAnalyticsMonths;
+        renderAnalytics(data);
+      };
+    }
 
     const refreshBtn = $("#refresh-analytics");
     if (refreshBtn) {
       refreshBtn.onclick = run(async () => {
         refreshBtn.disabled = true;
-        refreshBtn.textContent = "Refreshing…";
+        refreshBtn.textContent = "Updating…";
         try {
           const fresh = await api("/analytics/sync", { method: "POST", body: {} });
           renderAnalytics(fresh);
-          say(fresh.stale ? "Showing archived totals; Cloudflare refresh failed." : "Analytics refreshed from Cloudflare.");
+          say(fresh.stale ? "Showing saved history; could not reach Cloudflare right now." : "Store numbers updated.");
         } finally {
           const btn = $("#refresh-analytics");
           if (btn) {
             btn.disabled = false;
-            btn.textContent = "Refresh now";
+            btn.textContent = "Update numbers";
           }
         }
       });

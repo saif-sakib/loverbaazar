@@ -132,6 +132,12 @@ func (c analyticsConfig) key() string {
 
 type analyticsPathRow struct {
 	Path      string `json:"path"`
+	Title     string `json:"title,omitempty"`
+	Kind      string `json:"kind,omitempty"`
+	ProductID int64  `json:"productId,omitempty"`
+	Price     *int64 `json:"price,omitempty"`
+	Stock     *int   `json:"stock,omitempty"`
+	Sold30d   int64  `json:"sold30d,omitempty"`
 	Visits    int64  `json:"visits"`
 	Pageviews int64  `json:"pageviews"`
 }
@@ -241,6 +247,7 @@ type analyticsReport struct {
 	SyncedAt      string                  `json:"syncedAt"`
 	Stale         bool                    `json:"stale"`
 	SyncError     string                  `json:"syncError"`
+	LowStock      int                     `json:"lowStock"`
 	Today         analyticsDaySummary     `json:"today"`
 	Yesterday     analyticsDaySummary     `json:"yesterday"`
 	Last7Days     analytics7DaySummary    `json:"last7Days"`
@@ -338,6 +345,318 @@ func cleanDeviceLabel(raw string) string {
 	}
 	lower := strings.ToLower(s)
 	return strings.ToUpper(lower[:1]) + lower[1:]
+}
+
+func hostMatches(host, domain string) bool {
+	return host == domain || strings.HasSuffix(host, "."+domain)
+}
+
+func classifyReferrer(rawHost, siteHost string) (string, bool) {
+	host := strings.ToLower(strings.TrimSpace(rawHost))
+	if host == "" {
+		return "Direct / shared link", false
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	baseSite := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(siteHost)), "www.")
+	cleanHost := strings.TrimPrefix(host, "www.")
+	if baseSite != "" && (cleanHost == baseSite || strings.HasSuffix(cleanHost, "."+baseSite)) {
+		return "", true
+	}
+	switch {
+	case host == "com.google.android.googlequicksearchbox" || host == "search.app.goo.gl" || host == "l.google.com" || strings.HasPrefix(cleanHost, "google."):
+		return "Google Search", false
+	case hostMatches(host, "facebook.com") || hostMatches(host, "fb.com") || host == "fb.me":
+		return "Facebook", false
+	case hostMatches(host, "instagram.com"):
+		return "Instagram", false
+	case hostMatches(host, "youtube.com") || host == "youtu.be":
+		return "YouTube", false
+	case hostMatches(host, "whatsapp.com") || host == "wa.me":
+		return "WhatsApp", false
+	case hostMatches(host, "messenger.com"):
+		return "Messenger", false
+	case hostMatches(host, "bing.com"):
+		return "Bing Search", false
+	case hostMatches(host, "duckduckgo.com"):
+		return "DuckDuckGo", false
+	case hostMatches(host, "yahoo.com"):
+		return "Yahoo Search", false
+	case host == "chatgpt.com" || host == "chat.openai.com":
+		return "ChatGPT", false
+	case hostMatches(host, "tiktok.com"):
+		return "TikTok", false
+	case host == "t.co" || hostMatches(host, "x.com") || hostMatches(host, "twitter.com"):
+		return "X (Twitter)", false
+	case hostMatches(host, "linkedin.com") || host == "lnkd.in":
+		return "LinkedIn", false
+	case hostMatches(host, "pinterest.com"):
+		return "Pinterest", false
+	}
+	return clip(cleanHost, 120), false
+}
+
+func humanizeSlug(raw string) string {
+	trimmed := strings.Trim(strings.TrimSpace(raw), "/")
+	if trimmed == "" {
+		return "Home page"
+	}
+	if dec, err := url.PathUnescape(trimmed); err == nil && dec != "" {
+		trimmed = dec
+	}
+	parts := strings.Split(trimmed, "/")
+	seg := parts[len(parts)-1]
+	words := strings.Fields(strings.NewReplacer("-", " ", "_", " ").Replace(seg))
+	for i, w := range words {
+		if len(w) > 0 && w[0] >= 'a' && w[0] <= 'z' {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	if len(words) == 0 {
+		return raw
+	}
+	return strings.Join(words, " ")
+}
+
+var staticPageTitles = map[string][2]string{
+	"/":                         {"Home page", "home"},
+	"/shop/":                    {"All products (Shop)", "page"},
+	"/shop":                     {"All products (Shop)", "page"},
+	"/offers/":                  {"Offers & Discounts", "page"},
+	"/offers":                   {"Offers & Discounts", "page"},
+	"/blog/":                    {"Blog", "blog"},
+	"/blog":                     {"Blog", "blog"},
+	"/contact-us/":              {"Contact us", "page"},
+	"/contact-us":               {"Contact us", "page"},
+	"/online-shopping-jashore/": {"Online shopping in Jashore", "page"},
+	"/online-shopping-jashore":  {"Online shopping in Jashore", "page"},
+}
+
+func enrichTopPages(ctx context.Context, pages []analyticsPathRow) {
+	if len(pages) == 0 {
+		return
+	}
+	type prodMeta struct {
+		id    int64
+		price int64
+		stock int
+		name  string
+		sold  int64
+	}
+	type contentMeta struct {
+		kind, title string
+	}
+
+	prodKeysMap := map[string]bool{}
+	contentKeysMap := map[string]bool{}
+	for _, p := range pages {
+		trimmed := strings.Trim(strings.TrimSpace(p.Path), "/")
+		if trimmed == "" {
+			continue
+		}
+		addKey := func(m map[string]bool, s string) {
+			if s == "" {
+				return
+			}
+			m[s] = true
+			m[strings.ToLower(s)] = true
+			if dec, err := url.PathUnescape(s); err == nil && dec != "" {
+				m[dec] = true
+				m[strings.ToLower(dec)] = true
+			}
+		}
+		switch {
+		case strings.HasPrefix(trimmed, "product/"):
+			slug := strings.Trim(strings.TrimPrefix(trimmed, "product/"), "/")
+			addKey(prodKeysMap, slug)
+		case strings.HasPrefix(trimmed, "product-category/"):
+			catPath := strings.Trim(strings.TrimPrefix(trimmed, "product-category/"), "/")
+			addKey(contentKeysMap, catPath)
+			parts := strings.Split(catPath, "/")
+			addKey(contentKeysMap, parts[len(parts)-1])
+		case strings.HasPrefix(trimmed, "product-tag/"):
+			addKey(contentKeysMap, strings.Trim(strings.TrimPrefix(trimmed, "product-tag/"), "/"))
+		case strings.HasPrefix(trimmed, "blog/"):
+			addKey(contentKeysMap, strings.Trim(strings.TrimPrefix(trimmed, "blog/"), "/"))
+		default:
+			addKey(contentKeysMap, trimmed)
+		}
+	}
+
+	prodsByKey := map[string]*prodMeta{}
+	prodsByID := map[int64]*prodMeta{}
+	if len(prodKeysMap) > 0 {
+		keys := make([]string, 0, len(prodKeysMap))
+		for k := range prodKeysMap {
+			keys = append(keys, k)
+		}
+		rows, err := db.Query(ctx, `SELECT id, slug, price, stock, coalesce(data->>'name', slug) FROM products WHERE slug = ANY($1) OR lower(slug) = ANY($1)`, keys)
+		if err == nil {
+			for rows.Next() {
+				var pm prodMeta
+				var slug string
+				if rows.Scan(&pm.id, &slug, &pm.price, &pm.stock, &pm.name) == nil {
+					copyPM := pm
+					prodsByID[copyPM.id] = &copyPM
+					prodsByKey[slug] = &copyPM
+					prodsByKey[strings.ToLower(slug)] = &copyPM
+					if dec, e := url.PathUnescape(slug); e == nil && dec != "" {
+						prodsByKey[dec] = &copyPM
+						prodsByKey[strings.ToLower(dec)] = &copyPM
+					}
+				}
+			}
+			rows.Close()
+		}
+		if len(prodsByID) > 0 {
+			ids := make([]int64, 0, len(prodsByID))
+			for id := range prodsByID {
+				ids = append(ids, id)
+			}
+			srows, err := db.Query(ctx, `
+				SELECT oi.product_id, coalesce(sum(oi.qty), 0)
+				FROM order_items oi
+				JOIN orders o ON o.id = oi.order_id
+				WHERE oi.product_id = ANY($1) AND o.status NOT IN `+outStatuses+` AND o.created_at > now() - interval '30 days'
+				GROUP BY oi.product_id`, ids)
+			if err == nil {
+				for srows.Next() {
+					var pid, sold int64
+					if srows.Scan(&pid, &sold) == nil {
+						if pm, ok := prodsByID[pid]; ok {
+							pm.sold = sold
+						}
+					}
+				}
+				srows.Close()
+			}
+		}
+	}
+
+	contentByKey := map[string]contentMeta{}
+	if len(contentKeysMap) > 0 {
+		keys := make([]string, 0, len(contentKeysMap))
+		for k := range contentKeysMap {
+			keys = append(keys, k)
+		}
+		rows, err := db.Query(ctx, `
+			SELECT kind, slug, coalesce(data->>'path',''), coalesce(nullif(data->>'name',''), nullif(data->>'title',''), slug)
+			FROM content
+			WHERE kind IN ('cat','tag','post','page')
+			  AND (slug = ANY($1) OR lower(slug) = ANY($1) OR lower(coalesce(data->>'path','')) = ANY($1))`, keys)
+		if err == nil {
+			for rows.Next() {
+				var kind, slug, cpath, title string
+				if rows.Scan(&kind, &slug, &cpath, &title) == nil {
+					cm := contentMeta{kind: kind, title: title}
+					contentByKey[kind+":"+slug] = cm
+					contentByKey[kind+":"+strings.ToLower(slug)] = cm
+					if dec, e := url.PathUnescape(slug); e == nil && dec != "" {
+						contentByKey[kind+":"+dec] = cm
+						contentByKey[kind+":"+strings.ToLower(dec)] = cm
+					}
+					if cpath != "" {
+						contentByKey[kind+":"+strings.ToLower(strings.Trim(cpath, "/"))] = cm
+					}
+				}
+			}
+			rows.Close()
+		}
+	}
+
+	lookupContent := func(kind, key string) (contentMeta, bool) {
+		for _, cand := range []string{key, strings.ToLower(key)} {
+			if cm, ok := contentByKey[kind+":"+cand]; ok {
+				return cm, true
+			}
+		}
+		if dec, err := url.PathUnescape(key); err == nil && dec != "" {
+			for _, cand := range []string{dec, strings.ToLower(dec)} {
+				if cm, ok := contentByKey[kind+":"+cand]; ok {
+					return cm, true
+				}
+			}
+		}
+		return contentMeta{}, false
+	}
+
+	for i := range pages {
+		p := &pages[i]
+		if static, ok := staticPageTitles[strings.ToLower(p.Path)]; ok {
+			p.Title = static[0]
+			p.Kind = static[1]
+			continue
+		}
+		trimmed := strings.Trim(strings.TrimSpace(p.Path), "/")
+		switch {
+		case strings.HasPrefix(trimmed, "product/"):
+			slug := strings.Trim(strings.TrimPrefix(trimmed, "product/"), "/")
+			p.Kind = "product"
+			var pm *prodMeta
+			for _, cand := range []string{slug, strings.ToLower(slug)} {
+				if hit, ok := prodsByKey[cand]; ok {
+					pm = hit
+					break
+				}
+			}
+			if pm == nil {
+				if dec, err := url.PathUnescape(slug); err == nil && dec != "" {
+					for _, cand := range []string{dec, strings.ToLower(dec)} {
+						if hit, ok := prodsByKey[cand]; ok {
+							pm = hit
+							break
+						}
+					}
+				}
+			}
+			if pm != nil {
+				p.Title = pm.name
+				p.ProductID = pm.id
+				priceVal := pm.price
+				stockVal := pm.stock
+				p.Price = &priceVal
+				p.Stock = &stockVal
+				p.Sold30d = pm.sold
+			} else {
+				p.Title = humanizeSlug(slug)
+			}
+		case strings.HasPrefix(trimmed, "product-category/"):
+			catPath := strings.Trim(strings.TrimPrefix(trimmed, "product-category/"), "/")
+			parts := strings.Split(catPath, "/")
+			p.Kind = "category"
+			if cm, ok := lookupContent("cat", catPath); ok {
+				p.Title = cm.title
+			} else if cm, ok := lookupContent("cat", parts[len(parts)-1]); ok {
+				p.Title = cm.title
+			} else {
+				p.Title = humanizeSlug(catPath)
+			}
+		case strings.HasPrefix(trimmed, "product-tag/"):
+			slug := strings.Trim(strings.TrimPrefix(trimmed, "product-tag/"), "/")
+			p.Kind = "tag"
+			if cm, ok := lookupContent("tag", slug); ok {
+				p.Title = cm.title
+			} else {
+				p.Title = humanizeSlug(slug)
+			}
+		case strings.HasPrefix(trimmed, "blog/"):
+			slug := strings.Trim(strings.TrimPrefix(trimmed, "blog/"), "/")
+			p.Kind = "blog"
+			if cm, ok := lookupContent("post", slug); ok {
+				p.Title = cm.title
+			} else {
+				p.Title = humanizeSlug(slug)
+			}
+		default:
+			p.Kind = "page"
+			if cm, ok := lookupContent("page", trimmed); ok {
+				p.Title = cm.title
+			} else {
+				p.Title = humanizeSlug(trimmed)
+			}
+		}
+	}
 }
 
 func fetchCloudflareHourlyRUM(ctx context.Context, cfg analyticsConfig, todayStart, end time.Time) (map[string]struct {
@@ -450,7 +769,7 @@ func fetchCloudflareBreakdowns(ctx context.Context, cfg analyticsConfig, todaySt
         dimensions { requestPath }
       }
       referrers: rumPageloadEventsAdaptiveGroups(
-        limit: 10
+        limit: 25
         orderBy: [sum_visits_DESC]
         filter: { requestHost: $host, bot: 0, datetime_geq: $start, datetime_lt: $end }
       ) {
@@ -540,13 +859,18 @@ func fetchCloudflareBreakdowns(ctx context.Context, cfg analyticsConfig, todaySt
 
 	refMap := map[string]counts{}
 	for _, g := range acc.Referrers {
-		s := strings.ToLower(clip(strings.TrimSpace(g.Dimensions.RefererHost), 120))
-		if s == "" {
-			s = "Direct / bookmark"
+		visits := roundNonNeg(g.Sum.Visits)
+		views := roundNonNeg(g.Count)
+		if visits == 0 {
+			continue
+		}
+		s, skip := classifyReferrer(g.Dimensions.RefererHost, cfg.host)
+		if skip {
+			continue
 		}
 		c := refMap[s]
-		c.visits += roundNonNeg(g.Sum.Visits)
-		c.views += roundNonNeg(g.Count)
+		c.visits += visits
+		c.views += views
 		refMap[s] = c
 	}
 	for k, c := range refMap {
@@ -1013,6 +1337,11 @@ func buildAnalyticsReport(ctx context.Context, now time.Time, cfg analyticsConfi
 		syncError = cached.syncError
 		stale = syncError != ""
 	}
+	enrichTopPages(ctx, breakdowns.TopPages)
+	lowStock := 5
+	if live, _, err := loadSettings(ctx); err == nil && live.LowStock > 0 {
+		lowStock = live.LowStock
+	}
 
 	return analyticsReport{
 		Configured:    cfg.configured,
@@ -1023,6 +1352,7 @@ func buildAnalyticsReport(ctx context.Context, now time.Time, cfg analyticsConfi
 		SyncedAt:      syncedAt,
 		Stale:         stale,
 		SyncError:     syncError,
+		LowStock:      lowStock,
 		Today:         dayAt(todayStr),
 		Yesterday:     dayAt(yesterdayStr),
 		Last7Days:     last7,
