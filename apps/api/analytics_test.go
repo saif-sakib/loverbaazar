@@ -35,7 +35,6 @@ func TestAnalyticsUnconfiguredReturnsRealOrdersOnly(t *testing.T) {
 	reset(t)
 	t.Setenv("CLOUDFLARE_ANALYTICS_TOKEN", "")
 	t.Setenv("CLOUDFLARE_ACCOUNT_ID", "")
-	t.Setenv("CLOUDFLARE_WEB_ANALYTICS_SITE_TAG", "")
 
 	oldNow := analyticsNow
 	fixedNow := time.Date(2026, 11, 21, 10, 0, 0, 0, dhakaTZ)
@@ -58,7 +57,7 @@ func TestAnalyticsUnconfiguredReturnsRealOrdersOnly(t *testing.T) {
 		t.Fatalf("configured = %v, want false", res["configured"])
 	}
 	missing := res["missingConfig"].([]any)
-	if len(missing) != 3 {
+	if len(missing) != 2 {
 		t.Fatalf("missingConfig = %v", missing)
 	}
 	today := res["today"].(M)
@@ -95,10 +94,10 @@ func TestAnalyticsSyncDhakaBucketingCacheAndFallback(t *testing.T) {
 
 	const secretToken = "super-secret-cf-token-do-not-leak"
 	const accountID = "acct-123"
-	const siteTag = "0123456789abcdef0123456789abcdef"
+	const siteHost = "loverbaazar.com"
 	t.Setenv("CLOUDFLARE_ANALYTICS_TOKEN", secretToken)
 	t.Setenv("CLOUDFLARE_ACCOUNT_ID", accountID)
-	t.Setenv("CLOUDFLARE_WEB_ANALYTICS_SITE_TAG", siteTag)
+	t.Setenv("SITE_URL", "https://loverbaazar.com/")
 
 	var cfCalls int
 	var failCF bool
@@ -167,8 +166,8 @@ func TestAnalyticsSyncDhakaBucketingCacheAndFallback(t *testing.T) {
 		t.Fatalf("expected 3 GraphQL calls (hourly, breakdowns, backfill), got %d", cfCalls)
 	}
 	for _, p := range capturedPayloads {
-		if !strings.Contains(p, "bot: 0") || !strings.Contains(p, siteTag) {
-			t.Fatalf("GraphQL payload missing bot:0 or siteTag: %s", p)
+		if !strings.Contains(p, "bot: 0") || !strings.Contains(p, "requestHost") || !strings.Contains(p, siteHost) {
+			t.Fatalf("GraphQL payload missing bot:0 or requestHost: %s", p)
 		}
 	}
 
@@ -241,5 +240,33 @@ func TestAnalyticsSyncDhakaBucketingCacheAndFallback(t *testing.T) {
 	}
 	if staleRes["today"].(M)["visitors"].(float64) != 14 {
 		t.Fatalf("archived visitors lost after sync failure: %v", staleRes["today"])
+	}
+}
+
+func TestAnalyticsHostResolution(t *testing.T) {
+	t.Setenv("CLOUDFLARE_ANALYTICS_HOST", "")
+	t.Setenv("SITE_URL", "")
+	t.Setenv("CHECKOUT_METRICS_HOST", "")
+
+	localReq := httptest.NewRequest("GET", "http://127.0.0.1:8080/api/admin/analytics", nil)
+	if got := resolveAnalyticsHost(localReq); got != "loverbaazar.com" {
+		t.Fatalf("localhost fallback = %q, want loverbaazar.com", got)
+	}
+
+	proxyReq := httptest.NewRequest("GET", "http://api.internal/api/admin/analytics", nil)
+	proxyReq.Header.Set("X-Origin-Secret", "secret")
+	proxyReq.Header.Set("X-Shop-Host", "shop.loverbaazar.com")
+	if got := resolveAnalyticsHost(proxyReq); got != "shop.loverbaazar.com" {
+		t.Fatalf("X-Shop-Host = %q, want shop.loverbaazar.com", got)
+	}
+
+	t.Setenv("SITE_URL", "https://LoverBaazar.com/shop/")
+	if got := resolveAnalyticsHost(proxyReq); got != "loverbaazar.com" {
+		t.Fatalf("SITE_URL host = %q, want loverbaazar.com", got)
+	}
+
+	t.Setenv("CLOUDFLARE_ANALYTICS_HOST", "https://www.loverbaazar.com")
+	if got := resolveAnalyticsHost(proxyReq); got != "www.loverbaazar.com" {
+		t.Fatalf("CLOUDFLARE_ANALYTICS_HOST = %q, want www.loverbaazar.com", got)
 	}
 }

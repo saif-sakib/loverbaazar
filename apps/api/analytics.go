@@ -10,7 +10,9 @@ import (
 	"io"
 	"log"
 	"math"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -26,7 +28,7 @@ var analyticsSQL string
 const (
 	analyticsCacheTTL      = 5 * time.Minute
 	analyticsSyncTimeout   = 15 * time.Second
-	analyticsErrorFallback = "Could not refresh from Cloudflare Analytics right now. Check CLOUDFLARE_ANALYTICS_TOKEN (Account Analytics: Read), CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_WEB_ANALYTICS_SITE_TAG."
+	analyticsErrorFallback = "Could not refresh from Cloudflare Analytics right now. Check CLOUDFLARE_ANALYTICS_TOKEN (Account Analytics: Read) and CLOUDFLARE_ACCOUNT_ID."
 )
 
 var (
@@ -60,15 +62,51 @@ func resetAnalyticsCache() {
 type analyticsConfig struct {
 	token      string
 	accountID  string
-	siteTag    string
+	host       string
 	configured bool
 	missing    []string
 }
 
-func loadAnalyticsConfig() analyticsConfig {
+func parseAnalyticsHost(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return ""
+	}
+	if !strings.Contains(s, "://") {
+		s = "https://" + s
+	}
+	u, err := url.Parse(s)
+	if err != nil {
+		return ""
+	}
+	h := strings.ToLower(strings.TrimSpace(u.Hostname()))
+	if h == "" || h == "localhost" || net.ParseIP(h) != nil {
+		return ""
+	}
+	return h
+}
+
+func resolveAnalyticsHost(r *http.Request) string {
+	for _, cand := range []string{
+		os.Getenv("CLOUDFLARE_ANALYTICS_HOST"),
+		os.Getenv("SITE_URL"),
+		os.Getenv("CHECKOUT_METRICS_HOST"),
+	} {
+		if h := parseAnalyticsHost(cand); h != "" {
+			return h
+		}
+	}
+	if r != nil {
+		if h := parseAnalyticsHost(requestHost(r)); h != "" {
+			return h
+		}
+	}
+	return "loverbaazar.com"
+}
+
+func loadAnalyticsConfig(r *http.Request) analyticsConfig {
 	token := strings.TrimSpace(os.Getenv("CLOUDFLARE_ANALYTICS_TOKEN"))
 	accountID := strings.TrimSpace(os.Getenv("CLOUDFLARE_ACCOUNT_ID"))
-	siteTag := strings.TrimSpace(os.Getenv("CLOUDFLARE_WEB_ANALYTICS_SITE_TAG"))
 	missing := []string{}
 	if token == "" {
 		missing = append(missing, "CLOUDFLARE_ANALYTICS_TOKEN")
@@ -76,13 +114,10 @@ func loadAnalyticsConfig() analyticsConfig {
 	if accountID == "" {
 		missing = append(missing, "CLOUDFLARE_ACCOUNT_ID")
 	}
-	if siteTag == "" {
-		missing = append(missing, "CLOUDFLARE_WEB_ANALYTICS_SITE_TAG")
-	}
 	return analyticsConfig{
 		token:      token,
 		accountID:  accountID,
-		siteTag:    siteTag,
+		host:       resolveAnalyticsHost(r),
 		configured: len(missing) == 0,
 		missing:    missing,
 	}
@@ -92,7 +127,7 @@ func (c analyticsConfig) key() string {
 	if !c.configured {
 		return ""
 	}
-	return c.accountID + ":" + c.siteTag + ":" + hashTok(c.token)
+	return c.accountID + ":" + c.host + ":" + hashTok(c.token)
 }
 
 type analyticsPathRow struct {
@@ -309,14 +344,14 @@ func fetchCloudflareHourlyRUM(ctx context.Context, cfg analyticsConfig, todaySta
 	visitors, pageviews int64
 	sampleRate          float64
 }, []string, error) {
-	const query = `query LoverBaazarHourlyRUM($accountTag: String!, $siteTag: String!, $hourlyStart: Time!, $end: Time!) {
+	const query = `query LoverBaazarHourlyRUM($accountTag: String!, $host: String!, $hourlyStart: Time!, $end: Time!) {
   viewer {
     accounts(filter: { accountTag: $accountTag }) {
       rumPageloadEventsAdaptiveGroups(
         limit: 500
         orderBy: [datetimeHour_ASC]
         filter: {
-          siteTag: $siteTag
+          requestHost: $host
           bot: 0
           datetime_geq: $hourlyStart
           datetime_lt: $end
@@ -340,7 +375,7 @@ func fetchCloudflareHourlyRUM(ctx context.Context, cfg analyticsConfig, todaySta
 	}
 	err := runCloudflareGraphQL(ctx, cfg.token, query, map[string]any{
 		"accountTag":  cfg.accountID,
-		"siteTag":     cfg.siteTag,
+		"host":        cfg.host,
 		"hourlyStart": hourlyStart.Format(time.RFC3339),
 		"end":         end.Format(time.RFC3339),
 	}, &resp)
@@ -402,13 +437,13 @@ func fetchCloudflareHourlyRUM(ctx context.Context, cfg analyticsConfig, todaySta
 }
 
 func fetchCloudflareBreakdowns(ctx context.Context, cfg analyticsConfig, todayStart, end time.Time) (analyticsBreakdowns, error) {
-	const query = `query LoverBaazarBreakdowns($accountTag: String!, $siteTag: String!, $start: Time!, $end: Time!) {
+	const query = `query LoverBaazarBreakdowns($accountTag: String!, $host: String!, $start: Time!, $end: Time!) {
   viewer {
     accounts(filter: { accountTag: $accountTag }) {
       pages: rumPageloadEventsAdaptiveGroups(
         limit: 12
         orderBy: [sum_visits_DESC]
-        filter: { siteTag: $siteTag, bot: 0, datetime_geq: $start, datetime_lt: $end }
+        filter: { requestHost: $host, bot: 0, datetime_geq: $start, datetime_lt: $end }
       ) {
         count
         sum { visits }
@@ -417,7 +452,7 @@ func fetchCloudflareBreakdowns(ctx context.Context, cfg analyticsConfig, todaySt
       referrers: rumPageloadEventsAdaptiveGroups(
         limit: 10
         orderBy: [sum_visits_DESC]
-        filter: { siteTag: $siteTag, bot: 0, datetime_geq: $start, datetime_lt: $end }
+        filter: { requestHost: $host, bot: 0, datetime_geq: $start, datetime_lt: $end }
       ) {
         count
         sum { visits }
@@ -426,7 +461,7 @@ func fetchCloudflareBreakdowns(ctx context.Context, cfg analyticsConfig, todaySt
       devices: rumPageloadEventsAdaptiveGroups(
         limit: 6
         orderBy: [sum_visits_DESC]
-        filter: { siteTag: $siteTag, bot: 0, datetime_geq: $start, datetime_lt: $end }
+        filter: { requestHost: $host, bot: 0, datetime_geq: $start, datetime_lt: $end }
       ) {
         count
         sum { visits }
@@ -435,7 +470,7 @@ func fetchCloudflareBreakdowns(ctx context.Context, cfg analyticsConfig, todaySt
       countries: rumPageloadEventsAdaptiveGroups(
         limit: 10
         orderBy: [sum_visits_DESC]
-        filter: { siteTag: $siteTag, bot: 0, datetime_geq: $start, datetime_lt: $end }
+        filter: { requestHost: $host, bot: 0, datetime_geq: $start, datetime_lt: $end }
       ) {
         count
         sum { visits }
@@ -457,7 +492,7 @@ func fetchCloudflareBreakdowns(ctx context.Context, cfg analyticsConfig, todaySt
 	}
 	if err := runCloudflareGraphQL(ctx, cfg.token, query, map[string]any{
 		"accountTag": cfg.accountID,
-		"siteTag":    cfg.siteTag,
+		"host":       cfg.host,
 		"start":      start.Format(time.RFC3339),
 		"end":        end.Format(time.RFC3339),
 	}, &resp); err != nil {
@@ -588,14 +623,14 @@ func backfillCloudflare30Days(ctx context.Context, cfg analyticsConfig, todaySta
 	if err := db.QueryRow(ctx, `SELECT count(*) FROM analytics_daily WHERE day BETWEEN $1::date AND $2::date`, backfillStart, backfillEnd).Scan(&existing); err != nil || existing >= 23 {
 		return
 	}
-	const query = `query LoverBaazarBackfillRUM($accountTag: String!, $siteTag: String!, $startDate: Date!, $endDate: Date!) {
+	const query = `query LoverBaazarBackfillRUM($accountTag: String!, $host: String!, $startDate: Date!, $endDate: Date!) {
   viewer {
     accounts(filter: { accountTag: $accountTag }) {
       rumPageloadEventsAdaptiveGroups(
         limit: 40
         orderBy: [date_ASC]
         filter: {
-          siteTag: $siteTag
+          requestHost: $host
           bot: 0
           date_geq: $startDate
           date_leq: $endDate
@@ -618,7 +653,7 @@ func backfillCloudflare30Days(ctx context.Context, cfg analyticsConfig, todaySta
 	}
 	if err := runCloudflareGraphQL(ctx, cfg.token, query, map[string]any{
 		"accountTag": cfg.accountID,
-		"siteTag":    cfg.siteTag,
+		"host":       cfg.host,
 		"startDate":  backfillStart,
 		"endDate":    backfillEnd,
 	}, &resp); err != nil || len(resp.Viewer.Accounts) == 0 {
@@ -688,7 +723,7 @@ func syncCloudflareAnalytics(ctx context.Context, cfg analyticsConfig, force boo
 
 	hourly, orderedDays, err := fetchCloudflareHourlyRUM(syncCtx, cfg, todayStart, end)
 	if err != nil {
-		log.Printf("analytics_sync event=cloudflare_hourly_failed")
+		log.Printf("analytics_sync event=cloudflare_hourly_failed reason=%s", err)
 		analyticsCacheMu.Lock()
 		if analyticsCache.cfgKey != cfgKey {
 			analyticsCache = newEmptyAnalyticsCache()
@@ -997,7 +1032,7 @@ func buildAnalyticsReport(ctx context.Context, now time.Time, cfg analyticsConfi
 }
 
 func adminAnalytics(w http.ResponseWriter, r *http.Request) {
-	cfg := loadAnalyticsConfig()
+	cfg := loadAnalyticsConfig(r)
 	if cfg.configured {
 		syncCloudflareAnalytics(r.Context(), cfg, false)
 	}
@@ -1010,7 +1045,7 @@ func adminAnalytics(w http.ResponseWriter, r *http.Request) {
 }
 
 func adminSyncAnalytics(w http.ResponseWriter, r *http.Request) {
-	cfg := loadAnalyticsConfig()
+	cfg := loadAnalyticsConfig(r)
 	if cfg.configured {
 		syncCloudflareAnalytics(r.Context(), cfg, true)
 	}
