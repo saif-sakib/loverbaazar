@@ -245,12 +245,14 @@ try {
   const prodCSP = productionHeaders.match(/^  Content-Security-Policy: (.+)$/m)?.[1] || "";
   assert.match(prodCSP, /script-src[^;]*https:\/\/static\.cloudflareinsights\.com/);
   assert.match(prodCSP, /script-src[^;]*https:\/\/pagead2\.googlesyndication\.com/);
+  assert.match(prodCSP, /style-src[^;]*https:\/\/fonts\.googleapis\.com/);
+  assert.match(prodCSP, /font-src[^;]*https:\/\/fonts\.gstatic\.com/);
   assert.doesNotMatch(prodCSP, /script-src[^;]*'unsafe-inline'/);
   assert.match(prodCSP, /connect-src[^;]*https:\/\/cloudflareinsights\.com/);
   for (const restrictedPrefix of ["/admin/\\*", "/checkout/\\*", "/cart/\\*", "/my-account/\\*", "/track/\\*"]) {
     const block = productionHeaders.match(new RegExp(`^${restrictedPrefix}\\n  Content-Security-Policy: (.+)$`, "m"))?.[1] || "";
     assert.ok(block, `Missing strict CSP override for ${restrictedPrefix}`);
-    assert.doesNotMatch(block, /googlesyndication\.com|doubleclick\.net/);
+    assert.doesNotMatch(block, /googlesyndication\.com|doubleclick\.net|fonts\.googleapis\.com|fonts\.gstatic\.com/);
     assert.doesNotMatch(block, /script-src[^;]*'unsafe-inline'/);
   }
   const feed = await read("production", "feed.xml");
