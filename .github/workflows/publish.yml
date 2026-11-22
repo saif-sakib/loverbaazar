@@ -58,6 +58,9 @@ jobs:
           BING_SITE_VERIFICATION: ${{ vars.BING_SITE_VERIFICATION }}
           GOOGLE_SITE_VERIFICATION: ${{ vars.GOOGLE_SITE_VERIFICATION }}
           CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ vars.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
+          ADSENSE_CLIENT: ${{ vars.ADSENSE_CLIENT }}
+          ADSENSE_SLOT_CONTENT: ${{ vars.ADSENSE_SLOT_CONTENT }}
+          ADSENSE_SLOT_CATALOG: ${{ vars.ADSENSE_SLOT_CATALOG }}
       - name: Promote version and verify visible artifact
         run: node ../../scripts/release-provider.mjs store
         env:

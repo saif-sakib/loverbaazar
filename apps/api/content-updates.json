@@ -472,5 +472,23 @@
       "UPDATE settings SET data=jsonb_set(data,'{about}','\"Your trusted online shop in Vekutia, Jashore for home appliances, cookware and furniture at wholesale prices.\"'::jsonb) WHERE key='site' AND coalesce(data->>'about','') IN ('','Your trusted place for home appliances and furniture, at wholesale prices.')",
       "UPDATE settings SET data=jsonb_set(data,'{hero,text}','\"Shop online in Jashore (Jessore) for rice cookers, cookware, wardrobes, chairs and more from Kiam, RFL and Akij. Free delivery inside Jashore and cash on delivery across Bangladesh.\"'::jsonb) WHERE key='site' AND jsonb_typeof(data->'hero')='object' AND coalesce(data->'hero'->>'text','') IN ('','Rice cookers, cookware, wardrobes, chairs and more from Kiam, RFL and Akij. Delivered across Bangladesh, and you pay on delivery.')"
     ]
+  },
+  {
+    "id": "2026-11-adsense-privacy-policy",
+    "docs": [
+      {
+        "kind": "page",
+        "slug": "privacy-policy",
+        "replaces": "We do not sell your personal information.",
+        "data": {
+          "title": "Privacy Policy",
+          "html": "<h2>What we collect</h2>\n<p>When you order, we keep your name, mobile number, delivery address, order details and any note you add. If you pay by mobile payment we also keep the transaction ID. If you create an account we keep your name, mobile number and a protected form of your password, never the password itself. If you contact us we keep your message.</p>\n<p>Your cart, wishlist and recent orders are saved in your own browser, on your own device.</p>\n<h2>How we use it</h2>\n<p>We use your information to confirm, deliver and support your order, and to protect the shop from fake orders. We share it only where we need to, such as with the courier who brings your order and the services that run this website. We do not sell your personal information.</p>\n<h2>Advertising</h2>\n<p>We display Google AdSense advertisements on selected public storefront and guide pages (never on checkout, cart, account, or order-tracking pages). Third-party vendors, including Google, use cookies or local identifiers to serve ads based on a visitor's prior visits to this website or other websites. You may opt out of personalized advertising by visiting <a href=\"https://adssettings.google.com/\" rel=\"noopener\">Google Ads Settings</a> or review how Google uses data at <a href=\"https://policies.google.com/technologies/ads\" rel=\"noopener\">Google Advertising Policies</a>.</p>\n<h2>Your rights</h2>\n<p>You have the right to ask what personal data we hold about you. To do so, call <a href=\"tel:{phone}\">{phone}</a> or email <a href=\"mailto:{email}\">{email}</a>.</p>\n<h2>Security</h2>\n<p>No method of sending data over the Internet or storing it electronically is completely secure. While we cannot guarantee security, we work to protect your information and keep reviewing our measures.</p>\n<h2>Children</h2>\n<p>We do not sell products to anyone under 18, and we do not knowingly collect personal data about them. By using this site you confirm that you are at least 18 years old and accept this policy.</p>"
+        }
+      }
+    ],
+    "names": [],
+    "remove": [],
+    "text": [],
+    "sql": []
   }
 ]

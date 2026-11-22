@@ -164,6 +164,8 @@ body.has-buybar { padding-bottom: calc(152px + var(--safe-bottom)); }
   .line { grid-template-columns: 68px minmax(0,1fr) 90px; }
   .steps { grid-template-columns: repeat(4,minmax(0,1fr)); }
   body.has-buybar { padding-bottom: 0; }
+  .ad-slot { padding: 12px 16px 14px; }
+  .ad-slot-frame { min-height: 90px; }
 }
 @media (min-width: 901px) {
   .admin .panel { padding: 24px; }
@@ -179,7 +181,7 @@ body.has-buybar { padding-bottom: calc(152px + var(--safe-bottom)); }
   .admin #olist td[data-l]::before { display: none; }
 }
 @media print {
-  .mobile-nav, .buybar, .category-toggle, .category-drawer { display: none !important; }
+  .mobile-nav, .buybar, .category-toggle, .category-drawer, .ad-slot { display: none !important; }
 }
 
 /* Keep outlines and muted helper text legible against the existing brand backgrounds. */
@@ -206,3 +208,30 @@ body.has-buybar { padding-bottom: calc(152px + var(--safe-bottom)); }
 .prose .table-wrap table.price-table th { font-size: 13px; color: var(--mute); font-weight: 600; }
 .prose .table-wrap table.price-table th:last-child, .prose .table-wrap table.price-table td:last-child { text-align: right; white-space: nowrap; }
 .prose .table-wrap table.price-table tr:last-child td { border-bottom: 0; }
+
+.ad-slot {
+  margin-block: 24px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper, #faf7f4);
+  max-width: 100%;
+  overflow: hidden;
+  text-align: center;
+}
+.ad-slot[hidden], .ad-slot:has(ins[data-ad-status="unfilled"]) { display: none; }
+.ad-slot-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.ad-slot-frame {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100px;
+  overflow: hidden;
+}
+.ad-slot ins.adsbygoogle { max-width: 100%; }

@@ -1,6 +1,7 @@
 ---
 import { jsonLd, recordSEO, summary as snippet, publicImage } from "../lib/seo";
 import Base from "../layouts/Base.astro";
+import AdSlot from "../components/AdSlot.astro";
 import { pages, posts, fileSlug, fill, SITE, siteUrl, languageOf } from "../lib/shop";
 export const getStaticPaths = () => [...pages, ...posts].filter(p => !p.draft).map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
@@ -34,7 +35,7 @@ const article = p.date
 const seo = recordSEO(p, summary);
 ---
 
-<Base title={p.title} {...seo} image={seo.image || p.image} type={p.date ? "article" : "website"}>
+<Base title={p.title} {...seo} image={seo.image || p.image} type={p.date ? "article" : "website"} allowAds={Boolean(p.date)}>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />
     {article && <script type="application/ld+json" set:html={jsonLd(article)} />}
@@ -51,5 +52,6 @@ const seo = recordSEO(p, summary);
     <article class="prose article">
       <Fragment set:html={html} />
     </article>
+    {p.date && <AdSlot kind="content" />}
   </div>
 </Base>

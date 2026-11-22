@@ -4,7 +4,8 @@ import "../styles/site.css";
 import { jsonLd, organizationReturnPolicy, postalAddress, publicImage, storeAreaServed } from "../lib/seo";
 import "../styles/mobile.css";
 import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf, spacedSiteName } from "../lib/shop";
-const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", preconnectCloudinary = false, language = languageOf(`${title || ""} ${description}`) } = Astro.props;
+import { resolveAdsenseClient, resolveAdSlot } from "../lib/adsense.mjs";
+const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", preconnectCloudinary = false, allowAds = false, language = languageOf(`${title || ""} ${description}`) } = Astro.props;
 const full = seoTitle || (title ? `${title} | ${spacedSiteName}` : `${spacedSiteName} | ${SITE.tagline}`);
 const canon = canonical || siteUrl(Astro.url.pathname);
 const isHome = Astro.url.pathname === "/";
@@ -23,6 +24,12 @@ if (cfAnalyticsToken && !/^[A-Fa-f0-9]{32}$/.test(cfAnalyticsToken)) {
 }
 const isPrivateAnalyticsPath = /^\/(admin|cart|checkout|my-account|track|search|wishlist)(\/|$)/.test(Astro.url.pathname);
 const emitAnalytics = !preview && !noindex && !isPrivateAnalyticsPath && cfAnalyticsToken !== "";
+const adsenseClient = preview ? "" : resolveAdsenseClient(import.meta.env.ADSENSE_CLIENT);
+const adsenseSlotContent = resolveAdSlot(import.meta.env.ADSENSE_SLOT_CONTENT);
+const adsenseSlotCatalog = resolveAdSlot(import.meta.env.ADSENSE_SLOT_CATALOG);
+const isAdRestrictedPath = /^\/(admin|cart|checkout|my-account|track|search|wishlist|contact-us|privacy-policy|terms-conditions|about-us|how-to-buy|404)(\/|$)/.test(Astro.url.pathname);
+const emitAds = !preview && !noindex && allowAds && !isAdRestrictedPath && adsenseClient !== "";
+const emitManualAdLoader = emitAds && Boolean(adsenseSlotContent || adsenseSlotCatalog);
 const parts = SITE.name.split(/(?=[A-Z])/);
 const logoEnd = parts.length > 1 ? parts.pop() : "";
 const logoStart = parts.join("");
@@ -119,6 +126,17 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     )}
     <slot name="head" />
     <script is:inline src="/app.js" defer fetchpriority="low"></script>
+    {emitAds && (
+      <>
+        <meta name="google-adsense-account" content={adsenseClient} />
+        <script
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClient}`}
+          crossorigin="anonymous"
+        ></script>
+      </>
+    )}
+    {emitManualAdLoader && <script is:inline src="/ads.js" defer fetchpriority="low"></script>}
     {emitAnalytics && (
       <script
         defer

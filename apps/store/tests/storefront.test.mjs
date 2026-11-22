@@ -907,3 +907,28 @@ test('search-index failure in Recently Viewed on front page does not trigger sto
   await ready(page, '/');
   assert.equal(await page.locator('[data-stock-notice]').count(), 0);
 }));
+
+test('ads.js initializes slots lazily, collapses unfilled slots, and avoids horizontal overflow', () => shop(async page => {
+  await ready(page, '/');
+  await page.evaluate(() => {
+    const main = document.querySelector('main');
+    const aside = document.createElement('aside');
+    aside.className = 'ad-slot';
+    aside.setAttribute('aria-label', 'Advertisement');
+    aside.dataset.adSlotWrap = '';
+    aside.innerHTML = '<span class="ad-slot-label">Advertisement</span><div class="ad-slot-frame"><ins class="adsbygoogle" style="display:block;width:100%"></ins></div>';
+    main.append(aside);
+  });
+  await page.addScriptTag({ url: '/ads.js' });
+  await page.locator('[data-ad-slot-wrap]').scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => Array.isArray(window.adsbygoogle) && window.adsbygoogle.length === 1);
+  for (const width of [320, 375, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `Ad slot overflowed at ${width}px`);
+  }
+  await page.evaluate(() => {
+    document.querySelector('ins.adsbygoogle').dataset.adStatus = 'unfilled';
+  });
+  await page.waitForFunction(() => document.querySelector('[data-ad-slot-wrap]').hidden === true);
+  assert.equal(await page.locator('[data-ad-slot-wrap]').isVisible(), false);
+}));

@@ -1,6 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
+import AdSlot from "../../components/AdSlot.astro";
 import { sizedImage } from "../../lib/image-delivery.mjs";
 import { deliveryZonesText, freeLocalArea, isMerchandisingCategory, jsonLd, priceBounds } from "../../lib/seo";
 import { cats, catUrl, homeItems, inCat, languageOf, LIVE, MENU, products, SITE, siteUrl, spacedSiteName, taka, telOf, waOf } from "../../lib/shop";
@@ -111,7 +112,7 @@ const faqLd = {
 };
 ---
 
-<Base title={pageTitle} description={pageDesc} preconnectCloudinary>
+<Base title={pageTitle} description={pageDesc} preconnectCloudinary allowAds>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />
     <script type="application/ld+json" set:html={jsonLd(collection)} />
@@ -236,6 +237,8 @@ const faqLd = {
         <a href="/shop/">সব পণ্য দেখুন</a>।
       </p>
     </section>
+
+    <AdSlot kind="content" />
 
     <section class="prose" aria-labelledby="jashore-faq-title">
       <h2 id="jashore-faq-title">Frequently asked questions</h2>

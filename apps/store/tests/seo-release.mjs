@@ -64,7 +64,9 @@ const build = async (environment, dir) => {
     INDEXNOW_KEY: "0123456789abcdef0123456789abcdef",
     BING_SITE_VERIFICATION: "0123456789ABCDEF0123456789ABCDEF",
     GOOGLE_SITE_VERIFICATION: "fixture_google_verify_token_12345",
-    CLOUDFLARE_WEB_ANALYTICS_TOKEN: "0123456789abcdef0123456789abcdef" };
+    CLOUDFLARE_WEB_ANALYTICS_TOKEN: "0123456789abcdef0123456789abcdef",
+    ADSENSE_SLOT_CONTENT: "1234567890",
+    ADSENSE_SLOT_CATALOG: "0987654321" };
   try {
     await run(process.execPath, ["node_modules/.bin/astro", "build", "--outDir", join(work, dir)], { cwd: assets, env, maxBuffer: 3_000_000 });
   } catch (error) {
@@ -105,6 +107,14 @@ try {
   const manifest = JSON.parse(await read("production", "site.webmanifest"));
   assert.ok(manifest.icons.some(icon => icon.sizes === "192x192") && manifest.icons.some(icon => icon.sizes === "512x512"));
   assert.equal(await read("production", "0123456789abcdef0123456789abcdef.txt"), "0123456789abcdef0123456789abcdef");
+  assert.equal(await read("production", "ads.txt"), "google.com, pub-2212378495306002, DIRECT, f08c47fec0942fa0\n");
+  for (const adRoute of ["index.html", "shop/index.html", "online-shopping-jashore/index.html", "product-category/rice-cooker/index.html", "product/fixture-rice-cooker-18l/index.html"]) {
+    const adHTML = await read("production", adRoute);
+    assert.match(adHTML, /<meta name="google-adsense-account" content="ca-pub-2212378495306002">/, `${adRoute} missing AdSense meta`);
+    assert.match(adHTML, /src="https:\/\/pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js\?client=ca-pub-2212378495306002"/, `${adRoute} missing AdSense script`);
+    assert.match(adHTML, /<script src="\/ads\.js" defer fetchpriority="low"><\/script>/, `${adRoute} missing ads.js loader`);
+    assert.match(adHTML, /<aside class="ad-slot"[^>]*data-ad-slot-wrap[^>]*>[\s\S]*Advertisement[\s\S]*data-ad-format="horizontal"/, `${adRoute} missing horizontal AdSlot`);
+  }
   const homeEntities = entities(home);
   const websites = homeEntities.filter(item => item["@type"] === "WebSite");
   const shops = homeEntities.filter(item => item["@type"] === "Store");
@@ -174,8 +184,12 @@ try {
   assert.match(riceCat, /<table class="price-table">[\s\S]*Fixture Kiam Rice Cooker 1\.8L/);
   const rcPage = await read("production", "product/fixture-rice-cooker-18l/index.html");
   assert.match(rcPage, /src="https:\/\/static\.cloudflareinsights\.com\/beacon\.min\.js"[^>]*0123456789abcdef0123456789abcdef/);
-  for (const privateRoute of ["checkout", "cart", "my-account", "track", "search", "wishlist", "seo-hidden-fixture"]) {
-    assert.doesNotMatch(await read("production", `${privateRoute}/index.html`), /cloudflareinsights\.com/, `analytics beacon leaked on /${privateRoute}/`);
+  for (const privateRoute of ["checkout", "cart", "my-account", "track", "search", "wishlist", "contact-us", "privacy-policy", "terms-conditions", "about-us", "how-to-buy", "admin", "seo-hidden-fixture"]) {
+    const restrictedHTML = await read("production", `${privateRoute}/index.html`);
+    if (privateRoute !== "contact-us" && privateRoute !== "privacy-policy" && privateRoute !== "terms-conditions" && privateRoute !== "about-us" && privateRoute !== "how-to-buy" && privateRoute !== "admin") {
+      assert.doesNotMatch(restrictedHTML, /cloudflareinsights\.com/, `analytics beacon leaked on /${privateRoute}/`);
+    }
+    assert.doesNotMatch(restrictedHTML, /googlesyndication\.com|google-adsense-account|data-ad-slot-wrap/, `AdSense leaked on /${privateRoute}/`);
   }
   assert.match(rcPage, /<title>Fixture Kiam Rice Cooker 1\.8L Price in Bangladesh \| Lover Baazar<\/title>/);
   assert.match(rcPage, /<meta name="description" content="Fixture Kiam Rice Cooker 1\.8L price in Bangladesh is ৳1,450 at Lover Baazar\./);
@@ -223,13 +237,22 @@ try {
   assert.match(productionHeaders, /https:\/\/:worker\.:account\.workers\.dev\/\*\n  X-Robots-Tag: noindex, nofollow/);
   assert.match(productionHeaders, /\/_astro\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
   assert.match(productionHeaders, /\/app\.js\n  Cache-Control: public, max-age=300, stale-while-revalidate=86400/);
+  assert.match(productionHeaders, /\/ads\.js\n  Cache-Control: public, max-age=300, stale-while-revalidate=86400/);
+  assert.match(productionHeaders, /\/ads\.txt\n  Cache-Control: public, max-age=86400/);
   assert.match(productionHeaders, /\/logo\/\*\n  Cache-Control: public, max-age=2592000/);
   assert.match(productionHeaders, /\/release\.json\n  Cache-Control: no-store/);
   assert.doesNotMatch(productionHeaders, /^\/\*\n  X-Robots-Tag:/m);
   const prodCSP = productionHeaders.match(/^  Content-Security-Policy: (.+)$/m)?.[1] || "";
   assert.match(prodCSP, /script-src[^;]*https:\/\/static\.cloudflareinsights\.com/);
+  assert.match(prodCSP, /script-src[^;]*https:\/\/pagead2\.googlesyndication\.com/);
   assert.doesNotMatch(prodCSP, /script-src[^;]*'unsafe-inline'/);
   assert.match(prodCSP, /connect-src[^;]*https:\/\/cloudflareinsights\.com/);
+  for (const restrictedPrefix of ["/admin/\\*", "/checkout/\\*", "/cart/\\*", "/my-account/\\*", "/track/\\*"]) {
+    const block = productionHeaders.match(new RegExp(`^${restrictedPrefix}\\n  Content-Security-Policy: (.+)$`, "m"))?.[1] || "";
+    assert.ok(block, `Missing strict CSP override for ${restrictedPrefix}`);
+    assert.doesNotMatch(block, /googlesyndication\.com|doubleclick\.net/);
+    assert.doesNotMatch(block, /script-src[^;]*'unsafe-inline'/);
+  }
   const feed = await read("production", "feed.xml");
   assert.match(feed, /<g:sale_price>1250 BDT<\/g:sale_price>/);
   assert.match(feed, /<g:product_type>Rice Cooker<\/g:product_type>/);
@@ -255,8 +278,9 @@ try {
   assert.match(await read("preview", "_headers"), /X-Robots-Tag: noindex, nofollow/);
   const previewHome = await read("preview", "index.html");
   assert.match(previewHome, /noindex, nofollow/);
-  assert.doesNotMatch(previewHome, /name="(?:msvalidate\.01|google-site-verification)"/);
-  assert.doesNotMatch(previewHome, /cloudflareinsights\.com/);
+  assert.doesNotMatch(previewHome, /name="(?:msvalidate\.01|google-site-verification|google-adsense-account)"/);
+  assert.doesNotMatch(previewHome, /cloudflareinsights\.com|googlesyndication\.com|data-ad-slot-wrap/);
+  await assert.rejects(read("preview", "ads.txt"), { code: "ENOENT" });
   await assert.rejects(read("preview", "0123456789abcdef0123456789abcdef.txt"), { code: "ENOENT" });
   assert.ok(!entities(previewHome).find(item => item["@type"] === "Store").hasMerchantReturnPolicy);
   assert.ok(!nextProduct.offers.hasMerchantReturnPolicy);

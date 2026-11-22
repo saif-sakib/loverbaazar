@@ -1,6 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
+import AdSlot from "../../components/AdSlot.astro";
 import { deliveryZonesText, freeLocalArea, isMerchandisingCategory, jsonLd, priceBounds } from "../../lib/seo";
 import { cats, catUrl, inCat, languageOf, LIVE, products, siteUrl, spacedSiteName, taka } from "../../lib/shop";
 
@@ -43,7 +44,7 @@ const collection = products.length > 0
   : null;
 ---
 
-<Base title={shopTitle} description={shopDesc} preconnectCloudinary>
+<Base title={shopTitle} description={shopDesc} preconnectCloudinary allowAds>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />
     {collection && <script type="application/ld+json" set:html={jsonLd(collection)} />}
@@ -68,5 +69,6 @@ const collection = products.length > 0
       )}
     </div>
     <Grid items={products} />
+    <AdSlot kind="catalog" />
   </div>
 </Base>

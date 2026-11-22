@@ -3,6 +3,7 @@ import Base from "../layouts/Base.astro";
 import { responsiveImage, sizedImage } from "../lib/image-delivery.mjs";
 import { deliveryZonesText, freeLocalArea, isMerchandisingCategory, priceBounds } from "../lib/seo";
 import Card from "../components/Card.astro";
+import AdSlot from "../components/AdSlot.astro";
 import { products, inCat, homeItems, MENU, catUrl, languageOf, SITE, cats, LIVE, spacedSiteName, taka } from "../lib/shop";
 const withPhoto = (l: any[]) => l.filter((p) => p.images[0]);
 const heroPics = withPhoto(SITE.home.flatMap((h: any) => homeItems(h.cat)))
@@ -31,7 +32,7 @@ const freeArea = freeLocalArea(LIVE);
 const deliverySummary = deliveryZonesText(LIVE);
 ---
 
-<Base seoTitle={`${spacedSiteName} | ${SITE.tagline}`} description={homeDescription} preconnectCloudinary>
+<Base seoTitle={`${spacedSiteName} | ${SITE.tagline}`} description={homeDescription} preconnectCloudinary allowAds>
   <div class="wrap">
     <section class="hero home-hero">
       <div>
@@ -139,6 +140,7 @@ const deliverySummary = deliveryZonesText(LIVE);
         <a href="/contact-us/">Contact our Jashore store</a>.
       </p>
     </section>
+    <AdSlot kind="content" />
     <section data-recent-wrap hidden>
       <div class="sec">
         <h2>Recently viewed</h2>

@@ -1,10 +1,11 @@
 ---
 import Base from "../../layouts/Base.astro";
+import AdSlot from "../../components/AdSlot.astro";
 import { posts, spacedSiteName } from "../../lib/shop";
 const when = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 ---
 
-<Base title="Home Appliance Buying & Price Guides in Bangladesh" description={`Buying guides, price comparisons, and appliance tips in Bangladesh from ${spacedSiteName}.`}>
+<Base title="Home Appliance Buying & Price Guides in Bangladesh" description={`Buying guides, price comparisons, and appliance tips in Bangladesh from ${spacedSiteName}.`} allowAds>
   <div class="wrap">
     <div class="pagehead">
       <h1 class="title">Blog</h1>
@@ -18,5 +19,6 @@ const when = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "nume
         </a>
       ))}
     </section>
+    <AdSlot kind="content" />
   </div>
 </Base>

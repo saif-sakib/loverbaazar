@@ -3,6 +3,7 @@ import Base from "../../layouts/Base.astro";
 import { categoryChain, deliveryZonesText, gtinOf, jsonLd, merchantReturnPolicy, merchantReturnURL, plainText, primaryCategoryOf, productSeoTitle, publicImage, recordSEO, skuOf } from "../../lib/seo";
 import { gallerySizes, responsiveImage, sizedImage } from "../../lib/image-delivery.mjs";
 import Card from "../../components/Card.astro";
+import AdSlot from "../../components/AdSlot.astro";
 import { products, cats, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, siteUrl, attributeValues, languageOf, spacedSiteName } from "../../lib/shop";
 export const getStaticPaths = () => products.map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
@@ -93,6 +94,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
   image={seo.image || publicImage(mainImage?.src)}
   type="product"
   preconnectCloudinary
+  allowAds
 >
   <Fragment slot="head">
     {mainImage?.src && (
@@ -287,6 +289,7 @@ const waText = encodeURIComponent(`I want to order: ${p.name}\n${url}`);
         </section>
       </>
     )}
+    <AdSlot kind="catalog" />
     <section data-recent-wrap hidden>
       <div class="sec">
         <h2>Recently viewed</h2>

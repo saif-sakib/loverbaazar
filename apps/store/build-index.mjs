@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { adsTxtContent, resolveAdsenseClient } from "./src/lib/adsense.mjs";
 
 const escapeXML = s => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 const xml = content => `<?xml version="1.0" encoding="UTF-8"?>\n${content}\n`;
@@ -12,9 +13,10 @@ function cleanPath(value, site) {
   return new URL(decoded, site).pathname;
 }
 
-export async function buildIndex(dir, pages, site, environment, { indexNowKey = "" } = {}) {
+export async function buildIndex(dir, pages, site, environment, { indexNowKey = "", adsenseClient } = {}) {
   const production = environment === "production";
   const key = String(indexNowKey ?? "").trim();
+  const adsClient = resolveAdsenseClient(adsenseClient);
   if (key && (!/^[A-Za-z0-9-]{8,128}$/.test(key) || key.toLowerCase() === "robots")) {
     throw new Error("INDEXNOW_KEY must be 8–128 ASCII letters, digits or hyphens");
   }
@@ -93,5 +95,11 @@ export async function buildIndex(dir, pages, site, environment, { indexNowKey = 
       throw new Error(`IndexNow key file collides with an existing route: ${keyPath}`);
     }
     await write(`${key}.txt`, key);
+  }
+  if (production && adsClient) {
+    if (generated.has("/ads.txt") || aliases.has("/ads.txt")) {
+      throw new Error("ads.txt collides with an existing route");
+    }
+    await write("ads.txt", adsTxtContent(adsClient));
   }
 }

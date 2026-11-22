@@ -1,6 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
+import AdSlot from "../../components/AdSlot.astro";
 import { deliveryZonesText, freeLocalArea, jsonLd, priceBounds } from "../../lib/seo";
 import { LIVE, onSale, siteUrl, spacedSiteName, taka } from "../../lib/shop";
 const items = onSale();
@@ -41,7 +42,7 @@ const collection = items.length > 0
   : null;
 ---
 
-<Base title={offersTitle} description={offersDesc} preconnectCloudinary>
+<Base title={offersTitle} description={offersDesc} preconnectCloudinary allowAds={items.length > 0}>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />
     {collection && <script type="application/ld+json" set:html={jsonLd(collection)} />}
@@ -57,5 +58,6 @@ const collection = items.length > 0
       )}
     </div>
     {items.length ? <Grid items={items} /> : <p>No offers right now. <a class="link" href="/shop/">See everything we sell</a>.</p>}
+    {items.length > 0 && <AdSlot kind="catalog" />}
   </div>
 </Base>
