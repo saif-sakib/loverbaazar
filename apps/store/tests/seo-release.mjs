@@ -41,7 +41,10 @@ const riceCookerFixture = {
   inStock: true,
   cats: ["latest-product", "rice-cooker"],
   tags: ["thin-fixture-tag"],
-  images: [{ src: "https://res.cloudinary.com/test/image/upload/f_auto,q_auto/loverbaazar/products/rice-cooker/fixture-rice-cooker-18l-1.jpg" }],
+  images: [
+    { src: "https://res.cloudinary.com/test/image/upload/f_auto,q_auto/loverbaazar/products/rice-cooker/fixture-rice-cooker-18l-1.jpg" },
+    { src: "https://res.cloudinary.com/test/image/upload/f_auto,q_auto/loverbaazar/products/rice-cooker/fixture-rice-cooker-18l-2.jpg" },
+  ],
   attrs: [{ name: "Brand", values: ["Kiam"] }],
   reviews: [],
   seo: {},
@@ -259,6 +262,11 @@ try {
   assert.match(feed, /<g:sale_price>1250 BDT<\/g:sale_price>/);
   assert.match(feed, /<g:product_type>Rice Cooker<\/g:product_type>/);
   assert.match(feed, /<g:condition>new<\/g:condition>/);
+  assert.match(feed, /<g:additional_image_link>https:\/\/res\.cloudinary\.com\/test\/image\/upload\/f_auto,q_auto\/loverbaazar\/products\/rice-cooker\/fixture-rice-cooker-18l-2\.jpg<\/g:additional_image_link>/);
+  for (const [entry] of feed.matchAll(/<item>[\s\S]*?<\/item>/g)) {
+    const hasUpi = /<g:(?:brand|gtin|mpn)>/.test(entry);
+    assert.equal(entry.includes("<g:identifier_exists>no</g:identifier_exists>"), !hasUpi);
+  }
   await run("python3", ["-c", "import sys,xml.etree.ElementTree as ET\nfor x in sys.argv[1:]: ET.parse(x)", ...["feed.xml", "blog/feed.xml", "sitemap-index.xml", "sitemap-0.xml"].map(f => join(work, "production", f))]);
 
   product.price = 999;
