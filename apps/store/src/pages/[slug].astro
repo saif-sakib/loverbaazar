@@ -1,5 +1,5 @@
 ---
-import { jsonLd, recordSEO, summary as snippet, publicImage } from "../lib/seo";
+import { jsonLd, merchantReturnURL, recordSEO, summary as snippet, publicImage } from "../lib/seo";
 import Base from "../layouts/Base.astro";
 import AdSlot from "../components/AdSlot.astro";
 import { pages, posts, fileSlug, fill, SITE, siteUrl, languageOf } from "../lib/shop";
@@ -51,6 +51,14 @@ const seo = recordSEO(p, summary);
     </div>
     <article class="prose article">
       <Fragment set:html={html} />
+      {p.slug === "how-to-buy" && (
+        <section id="delivery" aria-labelledby="delivery-guide-title">
+          <h2 id="delivery-guide-title">Delivery charges and order tracking</h2>
+          <p>Choose your delivery area at checkout to see the charge and order total. Where there’s a delivery fee, it’s charged per item. Any free delivery is reflected in the total before you order.</p>
+          <p>Keep your order number and use it with the mobile number you ordered with to <a href="/track/">track your order</a>. {merchantReturnURL && <><a href={merchantReturnURL}>Read the returns and exchanges policy</a>.</>}</p>
+        </section>
+      )}
+      {p.slug === "about-us" && <p><a href="/contact-us/">See the shop’s address and contact details</a>.</p>}
     </article>
     {p.date && <AdSlot kind="content" />}
   </div>

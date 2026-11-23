@@ -2,11 +2,10 @@
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
 import AdSlot from "../../components/AdSlot.astro";
-import { deliveryZonesText, freeLocalArea, isMerchandisingCategory, jsonLd, priceBounds } from "../../lib/seo";
+import { deliveryZonesText, isMerchandisingCategory, jsonLd, priceBounds } from "../../lib/seo";
 import { cats, catUrl, inCat, languageOf, LIVE, products, siteUrl, spacedSiteName, taka } from "../../lib/shop";
 
 const bounds = priceBounds(products);
-const freeArea = freeLocalArea(LIVE);
 const deliverySummary = deliveryZonesText(LIVE);
 const activeCats = cats
   .filter((c: any) => !isMerchandisingCategory(c.slug))
@@ -56,7 +55,7 @@ const collection = products.length > 0
         <p class="cat-summary">
           <strong>{products.length}</strong> products across <strong>{activeCats.length}</strong> categories
           {bounds.inStockCount > 0 && ` (${bounds.inStockCount} in stock)`} · Price {taka(bounds.min)} – {taka(bounds.max)} ·{" "}
-          {freeArea ? `Free delivery in ${freeArea.area} · ` : ""}Cash on delivery across Bangladesh ·{" "}
+          {deliverySummary} ·{" "}
           <a class="link" href="/online-shopping-jashore/">Online shopping in Jashore</a>
         </p>
       )}

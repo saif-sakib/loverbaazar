@@ -32,7 +32,7 @@ const riceCookerFixture = {
   id: 9000002,
   slug: "fixture-rice-cooker-18l",
   name: "Fixture Kiam Rice Cooker 1.8L",
-  short: "Double pot rice cooker for 4 to 6 people.",
+  short: "Cash on delivery available. Delivery time 4-7 days. Free delivery in Jashore. Delivery available only in Jashore. Double pot rice cooker for 4 to 6 people.",
   desc: "<p>Stainless body rice cooker.</p>",
   price: 1450,
   regular: 1900,
@@ -63,6 +63,7 @@ await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const run = promisify(execFile);
 const build = async (environment, dir) => {
   const env = { ...process.env, BUILD_ENV: environment, BUILD_ID: "fixture", BUILD_KEY: buildKey,
+    GITHUB_SHA: "f".repeat(40),
     SITE_ORIGIN: "https://loverbaazar.com", NO_COLOR: "1", PUBLIC_TURNSTILE_SITE: "test-site-key",
     CATALOG_URL: `http://127.0.0.1:${server.address().port}/api/catalog`,
     INDEXNOW_KEY: "0123456789abcdef0123456789abcdef",
@@ -197,7 +198,10 @@ try {
   }
   assert.match(rcPage, /<title>Fixture Kiam Rice Cooker 1\.8L Price in Bangladesh \| Lover Baazar<\/title>/);
   assert.match(rcPage, /<meta name="description" content="Fixture Kiam Rice Cooker 1\.8L price in Bangladesh is ৳1,450 at Lover Baazar\./);
-  assert.match(rcPage, /<meta name="description" content="[^"]*Free delivery in Jashore[^"]*">/);
+  assert.match(rcPage, /<meta name="description" content="[^"]*Delivery in Jashore only[^"]*">/);
+  assert.match(rcPage, /Delivery available only in Jashore\./);
+  assert.match(rcPage, /Double pot rice cooker for 4 to 6 people\./);
+  assert.doesNotMatch(rcPage, /Delivery time 4-7 days|<ul class="delivery" data-delivery>/);
   const rcLD = entities(rcPage);
   const rcProductLD = rcLD.find(item => item["@type"] === "Product");
   assert.equal(rcProductLD.category, "Rice Cooker");
@@ -209,7 +213,7 @@ try {
   assert.ok(rcCrumbs.includes("Rice Cooker") && !rcCrumbs.includes("Latest Products"));
   assert.doesNotMatch(home, /<link rel="stylesheet"/);
   assert.match(home, /<style>/);
-  assert.match(home, /<script src="\/app\.js" defer fetchpriority="low">/);
+  assert.match(home, /<script src="\/app\.js\?v=f{40}" defer fetchpriority="low">/);
   assert.doesNotMatch(rcPage, /<link rel="stylesheet"/);
   assert.match(rcPage, /<link rel="preconnect" href="https:\/\/res\.cloudinary\.com" crossorigin>/);
   assert.match(rcPage, /<link rel="preload" as="image"[^>]*imagesrcset="[^"]*640w"[^>]*fetchpriority="high">/);

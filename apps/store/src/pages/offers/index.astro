@@ -2,11 +2,10 @@
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
 import AdSlot from "../../components/AdSlot.astro";
-import { deliveryZonesText, freeLocalArea, jsonLd, priceBounds } from "../../lib/seo";
+import { deliveryZonesText, jsonLd, priceBounds } from "../../lib/seo";
 import { LIVE, onSale, siteUrl, spacedSiteName, taka } from "../../lib/shop";
 const items = onSale();
 const bounds = priceBounds(items);
-const freeArea = freeLocalArea(LIVE);
 const deliverySummary = deliveryZonesText(LIVE);
 const offersTitle = "Home Appliance & Furniture Offers in Bangladesh";
 const offersDesc = items.length > 0 && bounds.min > 0
@@ -53,7 +52,7 @@ const collection = items.length > 0
       {items.length > 0 && bounds.min > 0 && (
         <p class="cat-summary">
           <strong>{items.length}</strong> discounted {items.length === 1 ? "product" : "products"} · Offer prices {bounds.max > bounds.min ? `${taka(bounds.min)} – ${taka(bounds.max)}` : taka(bounds.min)} ·{" "}
-          {freeArea ? `Free delivery in ${freeArea.area} · ` : ""}Cash on delivery across Bangladesh
+          {deliverySummary}
         </p>
       )}
     </div>

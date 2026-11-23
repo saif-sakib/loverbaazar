@@ -30,7 +30,7 @@
   const taka = (n) => "৳" + Number(n).toLocaleString("en-IN");
   const deliveryCharge = (zone, settings, goods, quantity) =>
     settings.freeOver > 0 && goods >= settings.freeOver ? 0 : zone.fee * quantity;
-  const heavyDeliveryNote = (quantity) => `These products are heavy, so the delivery charge is multiplied by ${quantity}.`;
+  const deliveryQuantityNote = (quantity) => `Delivery is charged per item for this area (${quantity} items).`;
   const esc = (s) =>
     String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const toast = (m) => {
@@ -42,7 +42,6 @@
   };
 
   const PHONE = document.documentElement.dataset.phone || "";
-  const ORDER_PLACED = "Thank you! Your order is placed. We'll call you to confirm.";
   const REVIEW_THANKS = "Thank you! Your review will appear after we check it.";
   const MESSAGE_THANKS = "Message sent. Thank you!";
   const MAX_QTY = 20;
@@ -66,6 +65,7 @@
   let index = null; // the search index, with live prices merged in
   let rawIndex = null;
   let stockLoaded = false;
+  let paymentDetailsFresh = false;
   const STOCK_WAKE_DELAYS = [4000, 6000, 8000, 10000, 12000, 15000];
   const STOCK_STALE_DELAYS = [5500, 10000, 15000, 20000];
   let stockRetryTimer = null;
@@ -209,18 +209,20 @@
       n.textContent = live.notice || "";
       n.hidden = !live.notice;
     }
-    // Payment numbers are live settings: an old number here could send money to the wrong place.
-    const payments = Array.isArray(live?.payments) ? live.payments : [];
-    const summary = $("[data-payment-summary]");
-    if (summary && live) summary.textContent = payments.filter(p => p.enabled).map(p => p.label).join(" · ") || "Contact the shop for payment options";
+    if (!live) return;
+    const payments = (Array.isArray(live.payments) ? live.payments : []).filter(p => p.enabled);
+    const labels = payments.map(p => p.label).join(" · ");
+    $$("[data-payment-summary]").forEach(el => { el.textContent = labels || "Contact the shop for payment options"; });
     const feature = $("[data-payment-feature]");
-    if (feature && live) feature.textContent = payments.find(p => p.enabled)?.label || "Payment options";
+    if (feature) feature.textContent = (payments.find(p => p.id === "cod") || payments[0])?.label || "Payment options";
+    const deliveryFeature = $("[data-delivery-feature]");
+    if (deliveryFeature) {
+      const zone = live.delivery?.find(z => z.fee === 0 && z.label?.trim());
+      const area = zone?.label.replace(/^inside\s+/i, "").trim();
+      deliveryFeature.textContent = area ? `Free delivery in ${area}` : "Delivery charges";
+    }
     const pay = $("[data-payments]");
-    if (pay && live)
-      pay.innerHTML = payments
-        .filter((p) => p.enabled)
-        .map((p) => esc(p.label) + (p.number ? `: ${esc(p.number)}` : ""))
-        .join("<br>");
+    if (pay) pay.textContent = labels;
   }
 
   document.addEventListener("click", (e) => {
@@ -480,6 +482,8 @@
         )
         .join("") || "<p>Your cart is empty. <a class='link' href='/shop/'>Start shopping</a></p>";
     $("[data-sub]").textContent = taka(sub);
+    const summary = $("[data-cart-summary]");
+    if (summary) summary.hidden = !lines.length;
     const go = $("[data-to-checkout]");
     if (go) go.hidden = !lines.length || lines.some((l) => !l.p.inStock || l.qty > maxFor(l.p.id));
     const free = $("[data-free]");
@@ -551,14 +555,15 @@
       const delivery = s.delivery.map((zone) => ({ ...zone, fee: deliveryCharge(zone, s, goods, pieces) }));
       // No area is chosen for the customer: the first one may be free, and a guess would be wrong.
       options(f.area, delivery, delivery.length > 1 ? "Choose your area" : "");
-      options(
-        f.payment,
-        s.payments.filter((p) => p.enabled),
-      );
+      const payments = s.payments.filter((p) => p.enabled);
+      const keepPayment = f.payment.value;
+      options(f.payment, payments);
+      if (!payments.some(p => p.id === keepPayment) && payments.some(p => p.id === "cod")) f.payment.value = "cod";
       const zone = delivery.find((z) => z.id === f.area.value);
-      const pay = s.payments.find((p) => p.id === f.payment.value);
+      const pay = payments.find((p) => p.id === f.payment.value);
+      const manual = !!(pay?.number || pay?.manual);
       const fee = zone?.fee || 0;
-      total = agreed || goods + fee;
+      total = zone ? agreed || goods + fee : goods;
       $("[data-sum]").innerHTML =
         lines
           .map(
@@ -568,25 +573,37 @@
           .join("") +
         (discount ? `<div class="row"><span>Discount (${esc(code)})</span><b>−${taka(discount)}</b></div>` : "") +
         `<div class="row"><span>Delivery charge</span><b>${!zone ? "Choose your area" : fee ? taka(fee) : "Free"}</b></div>` +
-        (fee > 0 && pieces > 1 ? `<p class="meta">${heavyDeliveryNote(pieces)}</p>` : "") +
-        `<div class="row total"><span>Total</span><span>${taka(total)}</span></div>`;
-      $("[data-eta]").textContent = zone?.days ? `Usually arrives in ${zone.days}.` : "";
-      $("[data-txn]").hidden = !pay?.number;
-      f.txnid.required = !!pay?.number;
-      f.txnid.minLength = pay?.number ? 6 : 0;
-      $("[data-pay]").hidden = !pay?.number;
-      $("[data-pay]").textContent = !pay?.number
-        ? ""
-        : zone
-          ? `Send ${taka(total)} to ${pay.number}, then enter the transaction ID. The shop must verify this payment; submitting a reference does not confirm payment.`
-          : "Choose your area to see the amount to send.";
+        (fee > 0 && pieces > 1 ? `<p class="meta">${deliveryQuantityNote(pieces)}</p>` : "") +
+        `<div class="row total"><span>${zone ? "Total" : discount ? "Subtotal after discount" : "Subtotal"}</span><span>${taka(total)}</span></div>`;
+      const estimate = $("[data-checkout-total]", f);
+      if (estimate) {
+        estimate.hidden = !zone;
+        estimate.textContent = zone ? `Delivery ${fee ? taka(fee) : "free"} · Total ${taka(total)}` : "";
+      }
+      const eta = $("[data-eta]", f);
+      eta.hidden = !zone?.days;
+      eta.textContent = zone?.days ? `Usually arrives in ${zone.days}.` : "";
+      const manualReady = !!pay?.number && !!zone && paymentDetailsFresh && s.ordersOpen;
+      $("[data-txn]", f).hidden = !manualReady;
+      f.txnid.required = manualReady;
+      f.txnid.minLength = manualReady ? 6 : 0;
+      const instructions = $("[data-pay]", f);
+      let paymentNote = "";
+      if (s.ordersOpen && manual) {
+        if (!zone) paymentNote = "Choose your delivery area to see the amount to send.";
+        else if (!manualReady) paymentNote = "Current payment details are unavailable. Choose cash on delivery if it’s available, or contact the shop.";
+        else if (agreed && f.txnid.value) paymentNote = "Your total changed. If you already sent a payment, contact the shop before sending any more money.";
+        else paymentNote = `Send ${taka(total)} to ${pay.number}, then enter the transaction ID. The shop must verify this payment. Entering a transaction ID doesn’t confirm payment.`;
+      } else if (s.ordersOpen && pay?.id === "cod") paymentNote = "Pay when your order is delivered.";
+      instructions.textContent = paymentNote;
+      instructions.hidden = !paymentNote;
       const sold = lines.find((l) => !l.p.inStock);
       const over = lines.find((l) => l.qty > maxFor(l.p.id));
       const short = data.sub < s.minOrder;
       const closed = $("[data-closed]");
       closed.hidden = s.ordersOpen;
       closed.textContent = s.ordersOpen ? "" : s.closedNote;
-      submit.disabled = placing || applying || !s.ordersOpen || !!sold || !!over || short || !pay;
+      submit.disabled = placing || applying || !s.ordersOpen || !!sold || !!over || short || !pay || (manual && !manualReady);
       $("[data-apply]").disabled = placing || applying;
       err.textContent = sold
         ? `${sold.p.name} is sold out. Please remove it from your cart.`
@@ -744,9 +761,9 @@
     const price = stock[product.dataset.product]?.[0] ?? +product.dataset.price;
     const delivery = (Array.isArray(live.delivery) ? live.delivery : []).map((zone) => ({ ...zone, fee: deliveryCharge(zone, live, price * quantity, quantity) }));
     const free = live.freeOver > 0 ? `<li>Free delivery on orders of ${taka(live.freeOver)} or more</li>` : "";
-    const heavy = quantity > 1 && delivery.some((zone) => zone.fee > 0) ? `<li>${heavyDeliveryNote(quantity)}</li>` : "";
+    const quantityNote = quantity > 1 && delivery.some((zone) => zone.fee > 0) ? `<li>${deliveryQuantityNote(quantity)}</li>` : "";
     el.innerHTML =
-      delivery.map((z) => `<li>${esc(z.label)}: <b>${z.fee ? taka(z.fee) : "Free"}</b>${z.days ? `, ${esc(z.days)}` : ""}</li>`).join("") + free + heavy;
+      delivery.map((z) => `<li>${esc(z.label)}: <b>${z.fee ? taka(z.fee) : "Free"}</b>${z.days ? `, ${esc(z.days)}` : ""}</li>`).join("") + free + quantityNote;
   }
 
   function rememberProduct() {
@@ -844,6 +861,16 @@
     const q = new URLSearchParams(location.search),
       out = $("[data-order]"),
       err = $("[data-err]");
+    const receipt = $("[data-order-received]");
+    const newOrder = q.get("new") === "1" ? q.get("order") : null;
+    let lastOrder;
+    try { lastOrder = JSON.parse(sessionStorage.getItem("lastOrder")); } catch {}
+    const showReceipt = (number) => {
+      if (!receipt) return;
+      $("[data-receipt-number]", receipt).textContent = number || "";
+      receipt.hidden = !number;
+    };
+    if (newOrder && newOrder === lastOrder?.number) showReceipt(newOrder);
     let tracking = false;
     const go = async () => {
       if (tracking) return;
@@ -853,10 +880,13 @@
       button.textContent = "Finding order…";
       err.textContent = "";
       out.innerHTML = "";
+      const number = f.order.value;
+      const phone = normalizePhone(f.phone.value);
+      if (number !== lastOrder?.number || phone !== lastOrder?.phone) showReceipt(null);
       try {
-        const o = await api(`/track?order=${encodeURIComponent(f.order.value)}&phone=${encodeURIComponent(normalizePhone(f.phone.value))}`);
-        out.innerHTML =
-          (q.get("new") ? `<p class="note">${esc(ORDER_PLACED)}</p>` : "") + orderHtml(o);
+        const o = await api(`/track?order=${encodeURIComponent(number)}&phone=${encodeURIComponent(phone)}`);
+        if (newOrder === o.number) showReceipt(o.number);
+        out.innerHTML = orderHtml(o);
       } catch (x) {
         showError(err, x.message);
       } finally { tracking = false; button.disabled = false; button.textContent = "Track order"; }
@@ -878,12 +908,7 @@
     if (!q.get("order")) return;
     f.order.value = q.get("order");
     f.phone.value = q.get("phone") || "";
-    if (!f.phone.value) {
-      try {
-        const last = JSON.parse(sessionStorage.getItem("lastOrder"));
-        if (last?.number === f.order.value) f.phone.value = last.phone;
-      } catch {}
-    }
+    if (!f.phone.value && lastOrder?.number === f.order.value) f.phone.value = lastOrder.phone || "";
     if (!f.phone.value) f.phone.value = mine.find(o => o.number === f.order.value)?.phone || "";
     if (f.phone.value) go();
   }
@@ -988,6 +1013,10 @@
       if (!snap || typeof snap !== "object") throw new Error();
     } catch {
       if (version !== stockVersion) return;
+      if (paymentDetailsFresh) {
+        paymentDetailsFresh = false;
+        repaintCheckout();
+      }
       if (stockLoaded) {
         if (staleRetries < STOCK_STALE_DELAYS.length) {
           stockRetryTimer = setTimeout(() => loadStock(true, { attempt: 1 }), STOCK_STALE_DELAYS[staleRetries++]);
@@ -1009,6 +1038,7 @@
     stock = snap.products || {};
     stockLoaded = true;
     live = snap.settings || null;
+    paymentDetailsFresh = !isStale && Array.isArray(live?.payments);
     index = null;
     applyStock();
     applyLive();

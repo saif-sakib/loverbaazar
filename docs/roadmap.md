@@ -851,3 +851,13 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 - Keep `/api/health` database-free for both `GET` and `HEAD` (compatible with UptimeRobot monitors without consuming Worker quota or waking Neon).
 - Add an opt-in production-only Cloudflare Web Analytics beacon (`CLOUDFLARE_WEB_ANALYTICS_TOKEN`) restricted strictly to indexable public discovery pages (excluding preview, noindex, `/admin/`, `/cart/`, `/checkout/`, `/my-account/`, `/track/`, `/search/`, and `/wishlist/`) with matching CSP directives and zero inline script relaxation.
 - Sync human-only (`bot: 0`, `requestHost` matching `SITE_URL` / `loverbaazar.com`) hourly metrics into exact `Asia/Dhaka` calendar days in `analytics_daily` (PostgreSQL migration v7), preserving 7-day unsampled accuracy permanently for 12-month comparisons, live order conversion, and 7-day breakdowns in **Admin → Analytics** (`#analytics`). Enrich viewed pages with human titles, live prices/stock, and 30-day sales; classify channels cleanly; and surface plain-English business takeaways for non-technical owners.
+
+### Task 68 — Make shopping and checkout information easier to verify
+
+**Status:** In progress — production and physical-phone review pending · **Depends on:** 12, 14, 15, 39, 65
+
+- Review the live storefront from discovery through tracking. Put the shop’s location, support channels, available payments, delivery information and published returns terms near the relevant shopping decisions.
+- Show the product name, price and stock above the gallery on phones. Keep product-specific delivery limits visible and use the live settings for general delivery rates and payment methods. Suppress the imported generic 4–7 day estimate in the product template while retaining saved catalog text.
+- Keep guest checkout. Show a subtotal until the shopper chooses a delivery area. Show mobile payment instructions once a current stock snapshot confirms the payment details. Keep the order number visible if tracking is temporarily unavailable after a successful checkout.
+
+**Baseline, 23 November 2026.** Seventeen representative public routes returned HTTP 200 in mobile Chromium. The public catalog contained five products with approved reviews. Of 274 products, 48 short descriptions contained the Jashore-only delivery notice while the store offered a general outside-Jashore delivery option. The owner needs to confirm whether those restrictions still apply before checkout can enforce them per product.

@@ -343,29 +343,6 @@ h3 {
 .hero .pics a:hover img {
   transform: scale(1.04);
 }
-.perks {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  border-block: 1px solid var(--line);
-  margin: 0 0 24px;
-}
-.perks div {
-  padding: 20px 24px;
-  border-left: 1px solid var(--line);
-}
-.perks div:first-child {
-  border-left: 0;
-  padding-left: 0;
-}
-.perks b {
-  display: block;
-  font-weight: 600;
-  font-size: 14px;
-}
-.perks span {
-  color: var(--mute);
-  font-size: 13px;
-}
 .sec {
   display: flex;
   justify-content: space-between;
@@ -1431,17 +1408,6 @@ main {
     aspect-ratio: 1;
     border-radius: 14px;
   }
-  .perks {
-    grid-template-columns: 1fr 1fr;
-  }
-  .perks div,
-  .perks div:first-child {
-    padding: 14px 0;
-    border-left: 0;
-  }
-  .perks div:nth-child(n + 3) {
-    border-top: 1px solid var(--line);
-  }
   .sec {
     margin-top: 44px;
   }
@@ -1532,8 +1498,7 @@ main {
 .card .btn.small { min-height: 42px; border-radius: 10px; }
 .card .name { font-weight: 600; }
 .mobile-nav { display: none; }
-.checkout-heading { display: flex; gap: 10px; align-items: center; margin: 0 0 22px; font-size: 18px; }
-.checkout-heading > span { width: 30px; height: 30px; border-radius: 50%; background: var(--blush); color: var(--brand2); display: grid; place-items: center; font-size: 13px; }
+.checkout-heading { margin: 0 0 18px; font-size: 19px; }
 body:has([data-checkout]) .floats { display: none; }
 .checkout-edit { display: inline-block; font-size: 13px; margin: -8px 0 18px; }
 [data-checkout] > aside { position: sticky; top: 145px; }

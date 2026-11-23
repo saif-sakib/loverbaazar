@@ -154,7 +154,7 @@ try {
   assert.ok(paidZone, 'Fixture requires a paid delivery zone');
   const delivery = buyer.locator('[data-delivery]');
   const quantity = buyer.locator('[data-qty]');
-  assert.doesNotMatch(await delivery.textContent(), /per piece|multiplied by/i);
+  assert.doesNotMatch(await delivery.textContent(), /charged per item/i);
   await quantity.fill('2');
   const freeForTwo = stock.settings.freeOver > 0 && 2000 >= stock.settings.freeOver;
   const deliveryAmount = freeForTwo ? 'Free' : '৳' + (paidZone.fee * 2).toLocaleString('en-IN');
@@ -164,9 +164,9 @@ try {
   { label: paidZone.label, amount: deliveryAmount });
   const zoneRow = delivery.locator('li').filter({ hasText: paidZone.label });
   assert.equal(await zoneRow.locator('b').textContent(), deliveryAmount);
-  assert.equal((await delivery.textContent()).includes('delivery charge is multiplied by 2'), !freeForTwo);
+  assert.equal((await delivery.textContent()).includes('Delivery is charged per item for this area (2 items).'), !freeForTwo);
   await quantity.fill('1');
-  assert.doesNotMatch(await delivery.textContent(), /per piece|multiplied by/i);
+  assert.doesNotMatch(await delivery.textContent(), /charged per item/i);
   await buyer.locator('.buy button[data-add]:not([data-buy])').click();
   await buyer.goto('/cart/');
   await buyer.locator('[data-cart]').getByText('Mobile fixture cooker', { exact: true }).waitFor();
