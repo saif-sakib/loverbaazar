@@ -143,6 +143,8 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Verification, 19 November 2026.** Production serves the new Admin confirmation behavior, and Admin image operations reports zero pending or retired images. The isolated publication and guarded rollback tests passed on the deployed revision. Verify a hosted rollback in a safe environment before claiming that rehearsal.
 
+**Publish workflow fix, 23 November 2026.** GitHub [rejected the workflow before jobs started](https://github.com/saif-sakib/loverbaazar/actions/runs/45175073238) because `cancelled()` was used in a step environment expression. The fix uses `job.status` there. Store CI now runs the workflow linter that reproduced the error. Hosted verification requires a successful main release followed by a fresh Admin Publish.
+
 ## Tasks 9–16: mobile-first UI and UX
 
 

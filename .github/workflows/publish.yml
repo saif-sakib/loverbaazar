@@ -87,7 +87,7 @@ jobs:
         env:
           # Shown to the shop owner in admin; keep it plain and free of secrets.
           PUBLISH_FAILURE: >-
-            ${{ cancelled() && 'The publish job was cancelled before it finished.' ||
+            ${{ job.status == 'cancelled' && 'The publish job was cancelled before it finished.' ||
             steps.main.outcome == 'failure' && 'A newer code update replaced this run. Click Publish again.' ||
             steps.deps.outcome == 'failure' && 'Installing the website build tools failed.' ||
             steps.api.outcome == 'failure' && 'The shop API on Render was not ready or is waiting for a code deploy to finish.' ||

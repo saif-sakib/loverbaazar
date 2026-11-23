@@ -1,8 +1,7 @@
 // Reads the isolated fixture API and builds preview/production artifacts into temporary folders.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
@@ -52,13 +51,15 @@ const riceCookerFixture = {
 products.unshift(product);
 products.push(riceCookerFixture);
 const buildKey = "temporary-test-key";
+const buildScratch = join(assets, ".astro");
+await mkdir(buildScratch, { recursive: true });
+const work = await mkdtemp(join(buildScratch, "lb-seo-release-"));
 const server = createServer((request, response) => {
   if (request.url !== "/api/build/fixture" || request.headers["x-build-key"] !== buildKey) return response.writeHead(404).end();
   response.setHeader("Content-Type", "application/json");
   response.end(JSON.stringify({ products, store }));
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
-const work = await mkdtemp(join(tmpdir(), "lb-seo-release-"));
 const run = promisify(execFile);
 const build = async (environment, dir) => {
   const env = { ...process.env, BUILD_ENV: environment, BUILD_ID: "fixture", BUILD_KEY: buildKey,
