@@ -34,21 +34,26 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: { node-version-file: .nvmrc, cache: npm, cache-dependency-path: apps/store/package-lock.json }
       - name: Require current main revision
+        id: main
         run: |
           git fetch --no-tags origin main
           test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
-      - run: npm ci --no-audit --no-fund
+      - id: deps
+        run: npm ci --no-audit --no-fund
       - name: Coordinate Render and verify API readiness
+        id: api
         run: node ../../scripts/release-provider.mjs api
         env:
           DEPLOY_RENDER: ${{ needs.test.result == 'success' }}
           RENDER_API_KEY: ${{ needs.test.result == 'success' && secrets.RENDER_API_KEY || '' }}
           RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
       - name: Prepare frozen release
+        id: prepare
         run: node ../../scripts/release.mjs init
         env:
           PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
       - name: Build frozen catalog
+        id: build
         run: npm run build
         env:
           PUBLIC_TURNSTILE_SITE: ${{ vars.TURNSTILE_SITE }}
@@ -62,6 +67,7 @@ jobs:
           ADSENSE_SLOT_CONTENT: ${{ vars.ADSENSE_SLOT_CONTENT }}
           ADSENSE_SLOT_CATALOG: ${{ vars.ADSENSE_SLOT_CATALOG }}
       - name: Promote version and verify visible artifact
+        id: promote
         run: node ../../scripts/release-provider.mjs store
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -76,8 +82,20 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Record failed publication
-        if: (failure() || cancelled()) && steps.confirm.outcome == 'skipped'
+        if: (failure() || cancelled()) && steps.confirm.outcome != 'success'
         run: node ../../scripts/release.mjs failed
+        env:
+          # Shown to the shop owner in admin; keep it plain and free of secrets.
+          PUBLISH_FAILURE: >-
+            ${{ cancelled() && 'The publish job was cancelled before it finished.' ||
+            steps.main.outcome == 'failure' && 'A newer code update replaced this run. Click Publish again.' ||
+            steps.deps.outcome == 'failure' && 'Installing the website build tools failed.' ||
+            steps.api.outcome == 'failure' && 'The shop API on Render was not ready or is waiting for a code deploy to finish.' ||
+            steps.prepare.outcome == 'failure' && 'Could not read the saved catalog from the shop API.' ||
+            steps.build.outcome == 'failure' && 'The website build failed. Check recently edited products, pages or settings.' ||
+            steps.promote.outcome == 'failure' && 'Cloudflare deployment or the live-site check failed.' ||
+            steps.confirm.outcome == 'failure' && 'The new website could not be confirmed as live.' ||
+            'The publish job failed.' }}
       - name: Notify IndexNow
         if: success() && vars.STORE_ENV == 'production' && vars.INDEXNOW_KEY != ''
         continue-on-error: true

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -251,6 +252,215 @@ func TestCodeReleaseDoesNotSupersedeNewerEditorialPublish(t *testing.T) {
 	}
 	if state != "published" {
 		t.Fatalf("editorial release state = %q, want published", state)
+	}
+}
+
+func TestPublishSkipsUnchangedContentAndRecordsFailures(t *testing.T) {
+	reset(t)
+	if dirty, err := publicationDirty(bg); err != nil || !dirty {
+		t.Fatal("never-published shop must need Publish", dirty, err)
+	}
+	id, key, err := freezeRelease(bg, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var existing sameRelease
+	if _, _, err := freezeRelease(bg, true, true); !errors.As(err, &existing) || existing.id != id || existing.state != "queued" {
+		t.Fatal("identical in-flight content dispatched again", err)
+	}
+	if err := finishRelease(bg, id, key, "published", "base"); err != nil {
+		t.Fatal(err)
+	}
+	// Live-only edits (price, stock, live settings) and no-op saves never need a rebuild.
+	if _, err := db.Exec(bg, `UPDATE products SET price=price+5,stock=stock-1 WHERE id=1`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(bg, `UPDATE settings SET data=data||'{"lowStock":3}' WHERE key='live'`); err != nil {
+		t.Fatal(err)
+	}
+	if dirty, err := publicationDirty(bg); err != nil || dirty {
+		t.Fatal("live-only edit marked dirty", dirty, err)
+	}
+	if _, _, err := freezeRelease(bg, true, true); !errors.As(err, &existing) || existing.state != "published" {
+		t.Fatal("unchanged content queued a build", err)
+	}
+	// An edit, then its exact revert, is again nothing to publish.
+	if _, err := db.Exec(bg, `UPDATE products SET data=data||'{"name":"Renamed"}' WHERE id=1`); err != nil {
+		t.Fatal(err)
+	}
+	if dirty, err := publicationDirty(bg); err != nil || !dirty {
+		t.Fatal("editorial change not detected", dirty, err)
+	}
+	if _, err := db.Exec(bg, `UPDATE products SET data=data||'{"name":"Product 1"}' WHERE id=1`); err != nil {
+		t.Fatal(err)
+	}
+	if dirty, err := publicationDirty(bg); err != nil || dirty {
+		t.Fatal("reverted edit still dirty", dirty, err)
+	}
+	// A real change is queued once; its failure keeps the edit pending with a readable reason.
+	if _, err := db.Exec(bg, `UPDATE products SET data=data||'{"name":"Renamed"}' WHERE id=1`); err != nil {
+		t.Fatal(err)
+	}
+	id2, key2, err := freezeRelease(bg, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := "https://github.com/owner/repo/actions/runs/123/attempts/2"
+	if err := finishArtifact(bg, id2, key2, "failed", "abc", "", "The website build failed.", run); err != nil {
+		t.Fatal(err)
+	}
+	var state, failure, gotRun string
+	var finished bool
+	if err := db.QueryRow(bg, `SELECT state,failure,run_url,finished_at IS NOT NULL FROM releases WHERE id=$1`, id2).Scan(&state, &failure, &gotRun, &finished); err != nil {
+		t.Fatal(err)
+	}
+	if state != "failed" || failure != "The website build failed." || gotRun != run || !finished {
+		t.Fatal(state, failure, gotRun, finished)
+	}
+	if dirty, err := publicationDirty(bg); err != nil || !dirty {
+		t.Fatal("failed publication cleared pending edits", dirty, err)
+	}
+	// Retrying the same content after a failure dispatches a new build.
+	if _, _, err := freezeRelease(bg, true, true); err != nil {
+		t.Fatal("retry after failure refused", err)
+	}
+	// Untrusted run links are dropped; empty failures get a generic reason.
+	id3, key3, err := frozenRelease(bg, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := finishArtifact(bg, id3, key3, "failed", "", "", "", "javascript:alert(1)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(bg, `SELECT failure,run_url FROM releases WHERE id=$1`, id3).Scan(&failure, &gotRun); err != nil {
+		t.Fatal(err)
+	}
+	if failure == "" || gotRun != "" {
+		t.Fatal(failure, gotRun)
+	}
+}
+
+func TestPublishHTTPChangeGuardAndFailureStatus(t *testing.T) {
+	reset(t)
+	baseID, baseKey, err := freezeRelease(bg, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := finishRelease(bg, baseID, baseKey, "published", "base"); err != nil {
+		t.Fatal(err)
+	}
+
+	var revBefore int64
+	if err := db.QueryRow(bg, `SELECT revision FROM publication_state WHERE id=1`).Scan(&revBefore); err != nil {
+		t.Fatal(err)
+	}
+	// Toggling product visibility must bump revision and mark the store dirty.
+	expect(t, "hide product", "PATCH", "/api/admin/products/1", M{"active": false}, true, 200)
+	var revAfter int64
+	if err := db.QueryRow(bg, `SELECT revision FROM publication_state WHERE id=1`).Scan(&revAfter); err != nil {
+		t.Fatal(err)
+	}
+	if revAfter <= revBefore {
+		t.Fatalf("visibility toggle did not bump revision: before=%d after=%d", revBefore, revAfter)
+	}
+	expect(t, "dirty after hide", "GET", "/api/admin/publish", nil, true, 200, `"dirty":true`)
+
+	// Reverting visibility back to active leaves nothing customer-visible to publish.
+	expect(t, "unhide product", "PATCH", "/api/admin/products/1", M{"active": true}, true, 200)
+	expect(t, "clean after unhide", "GET", "/api/admin/publish", nil, true, 200, `"dirty":false`)
+
+	t.Setenv("DEV_BUILD_DIR", "")
+	t.Setenv("GITHUB_REPO", "owner/repo")
+	t.Setenv("GITHUB_TOKEN", "dummy-token")
+	var countBefore int
+	if err := db.QueryRow(bg, `SELECT count(*) FROM releases`).Scan(&countBefore); err != nil {
+		t.Fatal(err)
+	}
+	expect(t, "unchanged publish skips github", "POST", "/api/admin/publish", "", true, 200, `"state":"unchanged"`)
+	var countAfter int
+	if err := db.QueryRow(bg, `SELECT count(*) FROM releases`).Scan(&countAfter); err != nil {
+		t.Fatal(err)
+	}
+	if countAfter != countBefore {
+		t.Fatalf("unchanged publish created release rows: before=%d after=%d", countBefore, countAfter)
+	}
+
+	// Queue one editorial change, then ensure another Publish reuses it without calling GitHub.
+	if _, err := db.Exec(bg, `UPDATE products SET data=data||'{"name":"Editorial change"}' WHERE id=1`); err != nil {
+		t.Fatal(err)
+	}
+	edID, edKey, err := freezeRelease(bg, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect(t, "queued publish reuses release", "POST", "/api/admin/publish", "", true, 200, `"state":"queued"`, `"id":"`+edID+`"`)
+	if err := db.QueryRow(bg, `SELECT count(*) FROM releases`).Scan(&countAfter); err != nil {
+		t.Fatal(err)
+	}
+	if countAfter != countBefore+1 {
+		t.Fatalf("duplicate publish created extra release: got %d want %d", countAfter, countBefore+1)
+	}
+
+	// Mark the editorial release running, finish a newer code-only release, and confirm active stays latest.
+	sendBuildResult := func(id, key string, body M) {
+		t.Helper()
+		b, _ := json.Marshal(body)
+		req, _ := http.NewRequest("POST", api.URL+"/api/build/"+id+"/result", strings.NewReader(string(b)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Build-Key", key)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != 200 {
+			t.Fatalf("build result %s status = %d", id, res.StatusCode)
+		}
+	}
+	sendBuildResult(edID, edKey, M{"State": "running", "Commit": "ed11111"})
+
+	codeID, codeKey, err := frozenRelease(bg, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := finishRelease(bg, codeID, codeKey, "published", "code111"); err != nil {
+		t.Fatal(err)
+	}
+
+	out := expect(t, "active release stays latest", "GET", "/api/admin/publish", nil, true, 200, `"dirty":true`)
+	var status struct {
+		Dirty  bool `json:"dirty"`
+		Latest struct {
+			ID       string  `json:"id"`
+			State    string  `json:"state"`
+			Error    string  `json:"error"`
+			Run      string  `json:"run"`
+			Finished *string `json:"finished"`
+		} `json:"latest"`
+		History []struct {
+			ID    string `json:"id"`
+			State string `json:"state"`
+		} `json:"history"`
+	}
+	if err := json.Unmarshal([]byte(out), &status); err != nil {
+		t.Fatal(err)
+	}
+	if status.Latest.ID != edID || status.Latest.State != "running" {
+		t.Fatalf("expected active release %s running, got %+v", edID, status.Latest)
+	}
+
+	// Record failure with reason and run URL, then verify GET /api/admin/publish exposes them and history.
+	runURL := "https://github.com/owner/repo/actions/runs/777"
+	sendBuildResult(edID, edKey, M{"State": "failed", "Commit": "ed11111", "Error": "The website build failed.", "Run": runURL})
+	out = expect(t, "failed publish status", "GET", "/api/admin/publish", nil, true, 200, `"dirty":true`)
+	if err := json.Unmarshal([]byte(out), &status); err != nil {
+		t.Fatal(err)
+	}
+	if status.Latest.ID != edID || status.Latest.State != "failed" || status.Latest.Error != "The website build failed." || status.Latest.Run != runURL || status.Latest.Finished == nil {
+		t.Fatalf("unexpected failed status: %+v", status.Latest)
+	}
+	if len(status.History) < 3 {
+		t.Fatalf("expected release history, got %d items", len(status.History))
 	}
 }
 

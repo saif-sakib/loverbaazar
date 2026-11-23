@@ -304,11 +304,11 @@ test('publication confirms a watched deployment once and keeps pending edits vis
   assert.equal(await page.locator('#dirtybar').isVisible(), true);
   assert.equal(await page.locator('#ok').isVisible(), false, 'An older release is silent on sign-in');
   await page.locator('#pub2').click();
-  await page.getByText(/Publication queued\. Saved changes/).waitFor();
+  await page.getByText('Publish queued…', { exact: true }).waitFor();
   assert.equal(await page.locator('#dirtybar').isVisible(), true);
   latest.state = 'published';
   dirty = false;
-  await page.getByText('Publication confirmed.', { exact: true }).waitFor();
+  await page.getByText('Published. Customers now see your changes.', { exact: true }).waitFor();
   assert.equal(await page.locator('#dirtybar').isVisible(), false);
   await page.waitForFunction(() => document.querySelector('#ok').hidden, null, { timeout: 12000 });
   await page.reload();
@@ -329,7 +329,7 @@ test('a publication that finishes before the first status check still confirms',
   await ready(page, '/admin/');
   assert.equal(await page.locator('#ok').isVisible(), false);
   await page.locator('#pub2').click();
-  await page.getByText('Publication confirmed.', { exact: true }).waitFor();
+  await page.getByText('Published. Customers now see your changes.', { exact: true }).waitFor();
 }));
 
 test('a superseded or mismatched publication clears the queued banner cleanly', () => shop(async (page, context) => {
@@ -345,10 +345,10 @@ test('a superseded or mismatched publication clears the queued banner cleanly', 
   });
   await ready(page, '/admin/');
   await page.locator('#pub2').click();
-  await page.getByText(/Publication queued\. Saved changes/).waitFor();
+  await page.getByText('Publish queued…', { exact: true }).waitFor();
   latest = { id: 'different-newer-release', state: 'published' };
   dirty = false;
-  await page.getByText('Publication confirmed.', { exact: true }).waitFor();
+  await page.getByText('Published. Customers now see your changes.', { exact: true }).waitFor();
   assert.equal(await page.locator('#dirtybar').isVisible(), false);
 }));
 
@@ -356,8 +356,10 @@ test('a stale publication status response cannot clear newly saved edits',()=>sh
  await page.addInitScript(()=>sessionStorage.setItem('t','local-admin-token-for-this-computer-only'));
  let release;
  const gate=new Promise(resolve=>{release=resolve;});
- await context.route('**/api/admin/publish',async r=>{await gate;return r.fulfill({json:{dirty:false,latest:{state:'published'}}});});
- await context.route('**/api/admin/settings',r=>r.request().method()==='PUT'?r.fulfill({json:{}}):r.continue());
+ let saved=false;
+ // Each status answer reflects the moment it was requested, so only the pre-save answer is stale.
+ await context.route('**/api/admin/publish',async r=>{const dirty=saved;await gate;return r.fulfill({json:{dirty,latest:{state:'published'}}});});
+ await context.route('**/api/admin/settings',r=>{if(r.request().method()!=='PUT')return r.continue();saved=true;return r.fulfill({json:{}});});
  try {
   await page.goto('/admin/#shop');
   await page.locator('[name="name"]').fill('Newly saved shop');
@@ -367,6 +369,67 @@ test('a stale publication status response cannot clear newly saved edits',()=>sh
   await page.waitForLoadState('networkidle');
   assert.equal(await page.locator('#dirtybar').isVisible(),true);
  } finally {release();}
+}));
+
+test('publish with nothing new never queues a build and says so', () => shop(async (page, context) => {
+  await page.addInitScript(() => sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'));
+  let posts = 0;
+  await context.route('**/api/admin/publish', route => {
+    if (route.request().method() === 'POST') { posts++; return route.fulfill({ json: { state: 'unchanged', message: 'Nothing new to publish. The website already shows your saved edits.' } }); }
+    return route.fulfill({ json: { dirty: false, latest: { id: 'live', state: 'published' } } });
+  });
+  await ready(page, '/admin/');
+  assert.equal(await page.locator('#dirtybar').isVisible(), false);
+  await page.locator('#pub2').click();
+  await page.getByText(/Nothing new to publish/).waitFor();
+  assert.equal(posts, 1);
+  assert.equal(await page.locator('#dirtybar').isVisible(), false);
+}));
+
+test('a failed publication stays visible with its reason, build log and retry', () => shop(async (page, context) => {
+  await page.addInitScript(() => sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'));
+  const run = 'https://github.com/owner/repo/actions/runs/42';
+  let latest = { id: 'live', state: 'published' };
+  await context.route('**/api/admin/publish', route => {
+    if (route.request().method() === 'POST') { latest = { id: 'try', state: 'running', run }; return route.fulfill({ json: { id: 'try', state: 'queued', message: 'Publish started.' } }); }
+    return route.fulfill({ json: { dirty: true, latest, history: [latest] } });
+  });
+  await ready(page, '/admin/');
+  await page.locator('#pub').click();
+  await page.getByText('Publishing your website…', { exact: true }).waitFor();
+  assert.equal(await page.locator('#pub').isDisabled(), true);
+  assert.equal(await page.locator('#pub2').isDisabled(), true);
+  assert.equal(await page.locator('#publog').getAttribute('href'), run);
+  latest = { id: 'try', state: 'failed', run, error: 'The website build failed. <b>x</b>' };
+  await page.getByText('Publish failed', { exact: true }).waitFor({ timeout: 12000 });
+  assert.match(await page.locator('#dirtymsg').textContent(), /The website build failed\. <b>x<\/b> Your saved edits are safe/);
+  assert.equal(await page.locator('#dirtybar.failed').isVisible(), true);
+  assert.equal(await page.locator('#publog').isVisible(), true);
+  assert.equal(await page.locator('#pub').textContent(), 'Retry publish');
+  assert.equal(await page.locator('#pub').isDisabled(), false);
+  assert.equal(await page.locator('#pub2').isDisabled(), false);
+  await page.reload();
+  await page.getByText('Publish failed', { exact: true }).waitFor();
+}));
+
+test('a non-dirty failed publication can be dismissed from the banner and stays in operations history', () => shop(async (page, context) => {
+  await page.addInitScript(() => sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'));
+  const run = 'https://github.com/owner/repo/actions/runs/99';
+  const failed = { id: 'code-fail', state: 'failed', run, error: 'Cloudflare deployment failed.', created: '2026-11-23T12:00:00Z' };
+  await context.route('**/api/admin/publish', route => route.fulfill({ json: { dirty: false, latest: failed, history: [failed] } }));
+  await ready(page, '/admin/');
+  await page.getByText('Last publish failed', { exact: true }).waitFor();
+  assert.equal(await page.locator('#pub').isVisible(), false);
+  assert.equal(await page.locator('#publog').isVisible(), true);
+  assert.equal(await page.locator('#pubdismiss').isVisible(), true);
+  await page.locator('#pubdismiss').click();
+  assert.equal(await page.locator('#dirtybar').isVisible(), false);
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  assert.equal(await page.locator('#dirtybar').isVisible(), false);
+  await page.goto('/admin/#operations');
+  await page.getByText('Website publishing', { exact: true }).waitFor();
+  assert.match(await page.locator('#pub-panel').textContent(), /Cloudflare deployment failed\./);
 }));
 
 test('phone categories are keyboard accessible and restore focus after closing', () => shop(async page => {

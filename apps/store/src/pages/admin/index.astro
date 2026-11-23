@@ -62,8 +62,12 @@ import "../../styles/mobile.css";
         </aside>
         <main class="adminmain">
           <div class="dirtybar" id="dirtybar" hidden>
-            <span><b>Website changes ready</b><br />Publish your saved edits to make them visible to customers.</span>
-            <button class="btn" id="pub">Publish changes</button>
+            <span id="dirtymsg" role="status"><b>Website changes ready</b><br />Publish your saved edits to make them visible to customers.</span>
+            <span class="dirtyactions">
+              <a class="btn ghost" id="publog" href="#" target="_blank" rel="noopener noreferrer" hidden>View build log ↗</a>
+              <button type="button" class="btn ghost" id="pubdismiss" hidden>Dismiss</button>
+              <button type="button" class="btn" id="pub">Publish changes</button>
+            </span>
           </div>
           <div id="head"></div>
           <p class="note" id="ok" hidden role="status"></p>

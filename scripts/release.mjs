@@ -19,7 +19,10 @@ const identity = ({ id, key }) => {
   if (!/^[A-F0-9]{32}$/.test(id) || !/^[A-F0-9]{64}$/.test(key)) throw new Error("Invalid release identity");
   return { id, key };
 };
-const result = ({id, key}, state, artifact = "") => request(`/api/build/${id}/result`, { State:state, Commit:process.env.GITHUB_SHA, Artifact:artifact }, {"X-Build-Key":key});
+const { GITHUB_SERVER_URL: server, GITHUB_REPOSITORY: repo, GITHUB_RUN_ID: runID, GITHUB_RUN_ATTEMPT: attempt } = process.env;
+// The admin links failures to this exact run; the API accepts only GitHub run URLs.
+const run = server === "https://github.com" && repo && runID ? `${server}/${repo}/actions/runs/${runID}${attempt ? `/attempts/${attempt}` : ""}` : "";
+const result = ({id, key}, state, artifact = "", error = "") => request(`/api/build/${id}/result`, { State:state, Commit:process.env.GITHUB_SHA, Artifact:artifact, Error:error, Run:run }, {"X-Build-Key":key});
 
 if (mode === "init") {
   const release = identity(event.client_payload?.id ? event.client_payload : await request("/api/publish/prepare", {}, {"X-Publish-Token":process.env.PUBLISH_TOKEN || ""}));
@@ -48,8 +51,10 @@ if (mode === "init") {
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
     }
-  } else if (mode === "running" || mode === "failed") {
+  } else if (mode === "running") {
     await result(release, mode);
+  } else if (mode === "failed") {
+    await result(release, mode, "", (process.env.PUBLISH_FAILURE || "").slice(0, 300));
   } else {
     throw new Error("Unknown release stage");
   }

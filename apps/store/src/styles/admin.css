@@ -69,6 +69,7 @@
 .adminactions { display: flex; justify-content: space-between; gap: 8px; padding: 10px 2px 0; border-top: 1px solid #f0f0f2; }
 .adminactions .link { flex: 1; text-align: center; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--line); background: #fff; color: #3f3f46; font-size: 12px; font-weight: 600; transition: border-color 0.15s, background 0.15s, color 0.15s; }
 .adminactions .link:hover { border-color: #18181b; color: #18181b; background: #fafafa; }
+.adminactions .link:disabled { opacity: 0.65; cursor: not-allowed; }
 
 /* Main area & buttons */
 .adminmain { background: none; min-width: 0; }
@@ -405,6 +406,15 @@ figcaption { display: flex; justify-content: space-between; margin-top: 6px; }
 .admin .save-status { font-size: 12px; font-weight: 600; color: var(--mute); margin-right: auto; }
 .admin .stick .btn { min-height: 40px; }
 .admin .dirtybar { padding: 16px 18px; border: 1px solid #edce9f; border-radius: 12px; background: #fff9ed; margin-bottom: 24px; font-size: 13px; }
+.admin .dirtybar.busy { background: #eff6ff; border-color: #bfdbfe; color: #1e3a8a; }
+.admin .dirtybar.failed { background: #fef2f2; border-color: #fca5a5; color: #7f1d1d; }
+.admin .dirtyactions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.admin .dirtyactions .btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.admin .pub-state { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.admin .pub-state.published { background: #dcfce7; color: #166534; }
+.admin .pub-state.failed { background: #fee2e2; color: #991b1b; }
+.admin .pub-state.busy { background: #dbeafe; color: #1e40af; }
+.admin .pub-state.superseded { background: #f4f4f5; color: #52525b; }
 .admin .jobs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .admin .jobs a { background: #fff; padding: 16px; border: 1px solid var(--line); border-radius: 10px; }
 .admin .repbtn button { width: 36px; height: 36px; }
@@ -429,7 +439,8 @@ figcaption { display: flex; justify-content: space-between; margin-top: 6px; }
   .admin .save-status { flex-basis: 100%; }
   .admin .stick .btn { flex: 1; padding: 10px; }
   .admin .stick-hint { line-height: 1.4; }
-  .admin .dirtybar { align-items: stretch; gap: 12px; flex-direction: column; }
+  .admin .dirtybar { position: static; align-items: stretch; gap: 12px; flex-direction: column; }
+  .admin .dirtyactions .btn { flex: 1; }
   .admin .subtabs { width: 100%; gap: 2px; }
   .admin .subtabs a { flex: 1; text-align: center; padding: 8px; font-size: 12px; }
 }

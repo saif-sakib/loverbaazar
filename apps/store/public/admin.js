@@ -189,6 +189,9 @@
     publicationGeneration++;
     clearTimeout(publicationTimer);
     watchedPublicationId = "";
+    publishInFlight = false;
+    publication = { dirty: false, latest: null, history: [] };
+    renderPublication();
     say("");
     clearProductPhotoPreviews();
     cleanupUploads();
@@ -238,62 +241,166 @@
         if (button?.isConnected) button.disabled = wasDisabled;
       }
     };
-  // Saved, but customers only see it after Publish.
+  // Saved, but customers only see it after Publish. The server decides what really changed.
   let publicationGeneration = 0;
+  let publicationTimer;
+  let watchedPublicationId = "";
+  let publishInFlight = false;
+  let publication = { dirty: false, latest: null, history: [] };
+  const DISMISSED_FAIL_KEY = "dismissed_failed_release";
+  const dismissedFailedId = () => {
+    try { return localStorage.getItem(DISMISSED_FAIL_KEY) || ""; } catch { return ""; }
+  };
+  const dismissFailedId = (id) => {
+    try {
+      if (id) localStorage.setItem(DISMISSED_FAIL_KEY, id);
+      else localStorage.removeItem(DISMISSED_FAIL_KEY);
+    } catch {}
+  };
+  const safeRunUrl = (u) => (/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/actions\/runs\/\d+(\/attempts\/\d+)?$/.test(u || "") ? u : "");
+  const publishing = () => ["queued", "running"].includes(publication.latest?.state);
+  const PUB_LABELS = {
+    queued: ["Queued", "busy"],
+    running: ["Publishing", "busy"],
+    published: ["Published", "published"],
+    failed: ["Failed", "failed"],
+    superseded: ["Replaced", "superseded"],
+  };
+
+  function renderPublishPanel() {
+    const panel = $("#pub-panel");
+    if (!panel) return;
+    const { dirty, latest, history = [] } = publication;
+    const busy = publishing();
+    const failed = !busy && latest?.state === "failed";
+    const summary = busy
+      ? (latest.state === "running" ? "Publishing your website now…" : "Publish queued and waiting to run…")
+      : failed
+        ? (dirty ? "Last publish failed. Your saved edits are not live yet." : "Last publish failed. The live website was not changed.")
+        : dirty
+          ? "You have saved website changes waiting to be published."
+          : "Website is up to date. No unpublished edits.";
+    const runUrl = safeRunUrl(latest?.run);
+    const rows = history.map((h) => {
+      const [label, cls] = PUB_LABELS[h.state] || [h.state || "Unknown", "superseded"];
+      const href = safeRunUrl(h.run);
+      const detail = h.error || (h.commit ? (h.commit === "local" ? "Local build" : `Code ${h.commit.slice(0, 7)}`) : "");
+      return `<tr>
+        <td>${h.created ? esc(when(h.created)) : "—"}</td>
+        <td><span class="pub-state ${cls}">${esc(label)}</span></td>
+        <td>${detail ? esc(detail) : "—"}</td>
+        <td>${href ? `<a class="link" href="${esc(href)}" target="_blank" rel="noopener noreferrer">View log ↗</a>` : "—"}</td>
+      </tr>`;
+    }).join("");
+    panel.innerHTML = `<div class="panel-head-row">
+      <h3>Website publishing</h3>
+      <div class="dirtyactions">
+        ${runUrl ? `<a class="btn ghost small" href="${esc(runUrl)}" target="_blank" rel="noopener noreferrer">View build log ↗</a>` : ""}
+        <button type="button" class="btn small" id="pub-panel-btn"${publishInFlight || busy ? " disabled" : ""}>${publishInFlight ? "Checking…" : busy ? "Publishing…" : failed ? "Retry publish" : dirty ? "Publish changes" : "Check for changes"}</button>
+      </div>
+    </div>
+    <p>${esc(summary)}${failed && latest?.error ? `<br><small>${esc(latest.error)}</small>` : ""}</p>
+    <table class="tbl"><thead><tr><th scope="col">Started</th><th scope="col">Status</th><th scope="col">Details</th><th scope="col">Log</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4">No publish runs recorded yet.</td></tr>'}</tbody></table>`;
+    $("#pub-panel-btn").onclick = (e) => { e.preventDefault(); publish(); };
+  }
+
+  function renderPublication() {
+    const { dirty, latest } = publication;
+    const busy = publishing();
+    const failed = !busy && latest?.state === "failed";
+    const showFailed = failed && (dirty || !latest?.id || dismissedFailedId() !== latest.id);
+    const bar = $("#dirtybar");
+    bar.hidden = !(dirty || busy || showFailed);
+    bar.classList.toggle("busy", busy);
+    bar.classList.toggle("failed", showFailed);
+    const [title, body] = busy
+      ? [latest.state === "running" ? "Publishing your website…" : "Publish queued…", "Customers see your saved edits when the build finishes, usually in 2–5 minutes. You can keep working."]
+      : showFailed && dirty
+        ? ["Publish failed", `${latest.error || "The website build did not finish."} Your saved edits are safe but not live yet.`]
+        : showFailed
+          ? ["Last publish failed", `${latest.error || "The last website build did not finish."} No saved edits are pending; the live website was not changed.`]
+          : ["Website changes ready", "Publish your saved edits to make them visible to customers."];
+    const msg = $("#dirtymsg");
+    const html = `<b>${esc(title)}</b><br>${esc(body)}`;
+    if (msg.dataset.html !== html) {
+      msg.dataset.html = html;
+      msg.innerHTML = html;
+      msg.setAttribute("role", showFailed ? "alert" : "status");
+    }
+    const runUrl = safeRunUrl(latest?.run);
+    const log = $("#publog");
+    log.hidden = !runUrl || !(busy || showFailed);
+    if (runUrl) log.href = runUrl;
+    const pubBtn = $("#pub");
+    pubBtn.hidden = showFailed && !dirty;
+    pubBtn.textContent = publishInFlight ? "Checking…" : busy ? "Publishing…" : showFailed ? "Retry publish" : "Publish changes";
+    pubBtn.disabled = publishInFlight || busy;
+    $("#pubdismiss").hidden = !(showFailed && !dirty);
+    const sideBtn = $("#pub2");
+    sideBtn.textContent = publishInFlight ? "Checking…" : busy ? "Publishing…" : showFailed && dirty ? "Retry publish" : "Publish now";
+    sideBtn.disabled = publishInFlight || busy;
+    renderPublishPanel();
+  }
+
   const needsPublish = (m) => {
     publicationGeneration++;
     say(m);
+    // Show the bar at once, then let the server confirm whether anything customer-visible changed.
+    publication.dirty = true;
+    renderPublication();
     try {
       localStorage.setItem("dirty", "1");
     } catch {}
-    $("#dirtybar").hidden = false;
+    clearTimeout(publicationTimer);
+    publicationStatus();
   };
 
-  let publicationTimer;
-  let watchedPublicationId = "";
   async function publicationStatus() {
     const generation = publicationGeneration;
+    clearTimeout(publicationTimer);
     try {
-      const { dirty, latest } = await apiRequest("/publish");
+      const { dirty, latest, history } = await apiRequest("/publish");
       if (generation !== publicationGeneration) return;
-      $("#dirtybar").hidden = !dirty;
-      if (!dirty) {
-        try { localStorage.removeItem("dirty"); } catch {}
-      }
-      if (latest && ["queued", "running"].includes(latest.state)) {
+      publication = { dirty: !!dirty, latest: latest || null, history: Array.isArray(history) ? history : [] };
+      try {
+        if (dirty) localStorage.setItem("dirty", "1");
+        else localStorage.removeItem("dirty");
+      } catch {}
+      renderPublication();
+      if (publishing()) {
         watchedPublicationId = latest.id;
-        say(`Publication ${latest.state}. Saved changes stay pending until deployment finishes.`);
-        clearTimeout(publicationTimer);
         publicationTimer = setTimeout(publicationStatus, 5000);
         return;
       }
-      const finished = latest?.id && latest.id === watchedPublicationId;
       const wasWatching = !!watchedPublicationId;
       watchedPublicationId = "";
-      if (latest?.state === "failed" && dirty) {
-        say("Publication failed. Your saved changes still need Publish. Retry after checking the build.");
-      } else if (latest?.state === "published" && (finished || wasWatching)) {
-        say(dirty ? "Published. Newer edits still need Publish." : "Publication confirmed.", 8000);
-      } else if (wasWatching) {
-        say(dirty ? "Publication ended. Click Publish to retry." : "Previous publication ended. No pending edits remain.", 8000);
-      }
-    } catch { /* Retain the existing pending marker on network failure. */ }
+      if (!wasWatching) return;
+      if (latest?.state === "failed") say("");
+      else if (latest?.state === "published") say(dirty ? "Published. Newer edits still need Publish." : "Published. Customers now see your changes.", 8000);
+      else say(dirty ? "Publication ended. Click Publish to retry." : "Previous publication ended. No pending edits remain.", 8000);
+    } catch {
+      // Keep the current banner on network failure, and keep watching an active build.
+      if (generation === publicationGeneration && watchedPublicationId) publicationTimer = setTimeout(publicationStatus, 15000);
+    }
   }
   const publish = run(async () => {
     if (savingChanges) return say("Please wait for your changes to finish saving.");
+    if (publishInFlight) return;
+    if (publishing()) return say("A publish is already running. Your edits will be checked again when it finishes.", 6000);
+    publishInFlight = true;
     publicationGeneration++;
     clearTimeout(publicationTimer);
-    $("#pub").disabled = true;
-    $("#pub2").disabled = true;
-    say("Publishing…");
+    renderPublication();
+    say("Checking for changes…");
     try {
       const r = await api("/publish", { method: "POST" });
-      watchedPublicationId = r.id;
-      say(r.message);
-      await publicationStatus();
+      if (r.id) watchedPublicationId = r.id;
+      say(r.message, 8000);
     } finally {
-      $("#pub").disabled = false;
-      $("#pub2").disabled = false;
+      publishInFlight = false;
+      await publicationStatus();
+      renderPublication();
     }
   });
 
@@ -986,7 +1093,8 @@
   });
 
   const operations = run(async () => {
-    const [ops, mail, photos] = await Promise.all([api("/operations"), api("/notifications"), api("/image/status")]);
+    const [ops, mail, photos, pub] = await Promise.all([api("/operations"), api("/notifications"), api("/image/status"), api("/publish")]);
+    publication = { dirty: !!pub.dirty, latest: pub.latest || null, history: Array.isArray(pub.history) ? pub.history : [] };
     const count = ops.checkoutResponses;
     const states = { pending: "Pending", sending: "Sending", accepted: "Accepted by Brevo", failed: "Failed", uncertain: "Check Brevo before retrying" };
     const mailKinds = {
@@ -994,10 +1102,10 @@
       customer_shipped: "Customer · shipped",
       customer_cancelled: "Customer · cancelled", customer_returned: "Customer · returned",
     };
-    view().innerHTML = `<div class="panel"><h3>API and checkout</h3>
+    view().innerHTML = `<div class="panel" id="pub-panel"></div>
+    <div class="panel"><h3>API and checkout</h3>
       <p>${ops.ready ? "API ready" : "API starting"} · Build <code>${esc(ops.version)}</code></p>
       <p>Checkout responses since startup: ${count["2xx"]} successful, ${count["4xx"]} request errors, ${count["5xx"]} service errors.</p>
-      <a class="link" href="#publish">Publication status</a>
     </div><div class="panel"><h3>Order email</h3><p>${mail.enabled ? "Order email enabled" : "Order email paused or unavailable"} · ${mail.today} recipient attempts today (UTC).</p>
       ${mail.testConfigured ? '<button type="button" id="testmail" class="btn ghost">Send test email</button>' : ""}
       <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Order</th><th scope="col">Email</th><th scope="col">Status</th><th scope="col">Attempts</th><th scope="col">Action</th></tr></thead><tbody>
@@ -1009,6 +1117,7 @@
     view().insertAdjacentHTML("beforeend", `<div class="panel"><h3>Product photo storage</h3>
       <p>${photos.pending} upload reservations awaiting cleanup. ${photos.retired} retired photo references are tracked for review or rollback.</p>
       <button type="button" id="sweep-photos" class="btn ghost">Check photo cleanup</button></div>`);
+    renderPublication();
     $("#sweep-photos").onclick = run(async event => {
       const button = event.currentTarget;
       button.disabled = true;
@@ -2434,11 +2543,11 @@
     },
     "new-post": () => blog.add(),
     publish: async () => {
-      await dashboard();
-      say("Use Publish changes above to publish your saved website edits.");
+      await operations();
+      $("#pub-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
     },
   };
-  const NAVTAB = { product: "products", "new-product": "products", "new-post": "blog", settings: "delivery", publish: "dashboard" };
+  const NAVTAB = { product: "products", "new-product": "products", "new-post": "blog", settings: "delivery", publish: "operations" };
 
   let here = "";
   function go() {
@@ -2560,8 +2669,9 @@
         items.map(([k, v]) => `<a href="#${k}">${esc(v)}<i data-count="${k}" hidden></i></a>`).join(""),
     ).join("");
     try {
-      $("#dirtybar").hidden = !localStorage.getItem("dirty");
+      publication.dirty = publication.dirty || !!localStorage.getItem("dirty");
     } catch {}
+    renderPublication();
     finder();
     go();
     counts();
@@ -2571,8 +2681,12 @@
   }
 
   addEventListener("hashchange", go);
-  $("#pub").onclick = publish;
-  $("#pub2").onclick = publish;
+  $("#pub").onclick = (e) => { e.preventDefault(); publish(); };
+  $("#pub2").onclick = (e) => { e.preventDefault(); publish(); };
+  $("#pubdismiss").onclick = () => {
+    if (publication.latest?.id) dismissFailedId(publication.latest.id);
+    renderPublication();
+  };
   document.addEventListener("input", (e) => {
     if (e.target.closest("#view form")) unsaved = true;
   });
