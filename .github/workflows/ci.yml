@@ -13,6 +13,11 @@ jobs:
         with: { persist-credentials: false }
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with: { go-version-file: apps/api/go.mod, cache-dependency-path: apps/api/go.sum }
+      - name: Validate GitHub Actions workflows
+        # GitHub supports concurrency.queue before actionlint v1.7.12 does.
+        run: >-
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          -shellcheck= -pyflakes= -ignore 'unexpected key "queue" for "concurrency" section'
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: { node-version-file: .nvmrc, cache: npm, cache-dependency-path: apps/store/package-lock.json }
       - name: Go race, API and JavaScript checks

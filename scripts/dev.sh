@@ -16,7 +16,14 @@ for port in ports[:2]:
         try:s.bind(('127.0.0.1',port))
         except OSError:raise SystemExit(f'Port {port} is in use; leave the existing process running or stop its owner first.')
 PY
-task_dir=$(mktemp -d); API=''; EDGE=''; db_name=lbpg
+if [[ ${LB_ISOLATED:-0} == 1 ]]; then
+ # Astro moves build assets with rename, so keep isolated builds inside the project filesystem.
+ mkdir -p "$ROOT/apps/store/.astro"
+ task_dir=$(mktemp -d "$ROOT/apps/store/.astro/lb-dev.XXXXXX")
+else
+ task_dir=$(mktemp -d)
+fi
+API=''; EDGE=''; db_name=lbpg
 cleanup() {
  if [[ -n "$EDGE" ]]; then
   kill -TERM -- "-$EDGE" 2>/dev/null || true
