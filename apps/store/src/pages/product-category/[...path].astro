@@ -3,7 +3,6 @@ import {
   categoryChain,
   categoryHeading,
   deliveryZonesText,
-  freeLocalArea,
   isMerchandisingCategory,
   jsonLd,
   plainText,
@@ -38,7 +37,6 @@ const relatedCats = [...preferredCats, ...popularFallbackCats]
   .slice(0, 8);
 const enabledPayments = LIVE.payments.filter((p: any) => p.enabled).map((p: any) => p.label).join(", ");
 const deliveryLabels = LIVE.delivery.map((z: any) => z.label).join(", ");
-const freeArea = freeLocalArea(LIVE);
 const deliverySummary = deliveryZonesText(LIVE);
 const priceList = isMerchandisingCategory(c.slug)
   ? []
@@ -109,7 +107,7 @@ const collection = items.length > 0
           {bounds.inStockCount > 0 && ` (${bounds.inStockCount} in stock)`} · Price{" "}
           {bounds.max > bounds.min ? `${taka(bounds.min)} – ${taka(bounds.max)}` : taka(bounds.min)}
           {brands.length > 0 && ` · Brands: ${brands.slice(0, 5).join(", ")}`} ·{" "}
-          {freeArea ? `Free delivery in ${freeArea.area} · ` : ""}Cash on delivery across Bangladesh
+          {deliverySummary}
         </p>
       )}
       {subcategories.length > 0 && (

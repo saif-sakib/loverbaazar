@@ -1,10 +1,10 @@
 ---
 import Base from "../layouts/Base.astro";
 import { responsiveImage, sizedImage } from "../lib/image-delivery.mjs";
-import { deliveryZonesText, freeLocalArea, isMerchandisingCategory, priceBounds } from "../lib/seo";
+import { freeLocalArea, isMerchandisingCategory, merchantReturnURL, priceBounds } from "../lib/seo";
 import Card from "../components/Card.astro";
 import AdSlot from "../components/AdSlot.astro";
-import { products, inCat, homeItems, MENU, catUrl, languageOf, SITE, cats, LIVE, spacedSiteName, taka } from "../lib/shop";
+import { products, inCat, homeItems, MENU, catUrl, languageOf, SITE, cats, LIVE, spacedSiteName, taka, telOf } from "../lib/shop";
 const withPhoto = (l: any[]) => l.filter((p) => p.images[0]);
 const heroPics = withPhoto(SITE.home.flatMap((h: any) => homeItems(h.cat)))
   .filter((p: any, i: number, all: any[]) => all.findIndex((x) => x.id === p.id) === i)
@@ -13,7 +13,7 @@ const heroPics = withPhoto(SITE.home.flatMap((h: any) => homeItems(h.cat)))
 const heroShots = heroPics.map((p: any, i: number) => ({
   href: `/product/${p.slug}/`,
   photo: responsiveImage(p.images[0]?.src, i === 0 ? p.images[0]?.src : p.images[0]?.thumb, i === 0 ? [320, 640] : [160, 320]),
-  alt: p.name,
+  thumbnail: sizedImage(p.images[0]?.src, 160),
   name: p.name,
 }));
 const menuTiles = MENU.flatMap((g: any) => g.items);
@@ -22,14 +22,15 @@ const tiles = [...menuTiles, ...extraTiles]
   .filter((c: any, i: number, all: any[]) => inCat(c.slug).length && all.findIndex((x) => x.slug === c.slug) === i)
   .map((c: any) => {
     const items = inCat(c.slug);
-    return { ...c, count: items.length, minPrice: priceBounds(items).min };
+    const image = items.find((p: any) => p.images[0])?.images[0];
+    return { ...c, count: items.length, minPrice: priceBounds(items).min, thumb: sizedImage(image?.src || image?.thumb, 160) };
   });
 const hero = SITE.hero;
 const brandWords = spacedSiteName.trim().split(/\s+/);
 const brandEnd = brandWords.pop();
 const homeDescription = [spacedSiteName, SITE.address].filter(Boolean).join(" in ") + ". " + SITE.description;
+const payments = LIVE.payments.filter((p: any) => p.enabled);
 const freeArea = freeLocalArea(LIVE);
-const deliverySummary = deliveryZonesText(LIVE);
 ---
 
 <Base seoTitle={`${spacedSiteName} | ${SITE.tagline}`} description={homeDescription} preconnectCloudinary allowAds>
@@ -51,19 +52,25 @@ const deliverySummary = deliveryZonesText(LIVE);
           <a class="hero-offers" href="/offers/">Explore offers <span aria-hidden="true">→</span></a>
         </div>
       </div>
-      <div class="pics">
+      {heroShots.length > 0 && <div class="pics">
         {heroShots.map((h: any, index: number) => (
           <a href={h.href}>
             <picture>
               <source media="(min-width: 861px)" srcset={h.photo.srcset || h.photo.src} sizes={index === 0 ? "33vw" : "16vw"} />
-              <img src="/logo/primary-logo-80.webp" alt={h.alt} width="600" height="600"
+              <img src={index === 0 ? h.thumbnail : h.photo.src} alt="" width="600" height="600"
                 loading={index === 0 ? "eager" : "lazy"} fetchpriority={index === 0 ? "high" : "auto"} />
             </picture>
             <span class="hero-product">{h.name} <span aria-hidden="true">↗</span></span>
           </a>
         ))}
-      </div>
+      </div>}
     </section>
+    <nav class="shop-guide" aria-label="Shopping information">
+      <a href="/contact-us/"><strong>{SITE.address || "Contact the shop"}</strong><span>Call or message the shop</span></a>
+      <a href="/how-to-buy/"><strong data-payment-feature>{(payments.find((p: any) => p.id === "cod") || payments[0])?.label || "Payment options"}</strong><span>Order without an account</span></a>
+      <a href="/how-to-buy/#delivery"><strong data-delivery-feature>{freeArea ? `Free delivery in ${freeArea.area}` : "Delivery charges"}</strong><span>See the cost before ordering</span></a>
+      {merchantReturnURL && <a href={merchantReturnURL}><strong>Returns &amp; exchanges</strong><span>Check the shop’s policy</span></a>}
+    </nav>
     {SITE.banners.length > 0 && (
       <section class="banners">
         {SITE.banners.map((b: any) => (
@@ -82,7 +89,7 @@ const deliverySummary = deliveryZonesText(LIVE);
         <section class="cats">
           {tiles.map((c: any) => (
             <a href={catUrl(c)}>
-              <img src={sizedImage(inCat(c.slug)[0].images[0]?.src || inCat(c.slug)[0].images[0]?.thumb, 160)} alt="" loading="lazy" decoding="async" width="150" height="150" />
+              <img src={c.thumb} alt="" loading="lazy" decoding="async" width="150" height="150" />
               {c.name}
               <small>{c.count} items{c.minPrice > 0 ? ` · From ${taka(c.minPrice)}` : ""}</small>
             </a>
@@ -90,24 +97,6 @@ const deliverySummary = deliveryZonesText(LIVE);
         </section>
       </>
     )}
-    <section class="perks" aria-label="Shopping information">
-      <div>
-        <b data-payment-feature>{LIVE.payments.find((p: any)=>p.enabled)?.label || "Payment options"}</b>
-        <span>See available methods at checkout</span>
-      </div>
-      <div>
-        <b>{freeArea ? `Free delivery in ${freeArea.area}` : "Delivery"}</b>
-        <span>{freeArea ? "Plus nationwide delivery across Bangladesh" : "Choose your area for the exact charge"}</span>
-      </div>
-      <div>
-        <b>Wholesale prices</b>
-        <span>Trusted brands</span>
-      </div>
-      <div>
-        <b>Need help?</b>
-        <span>Call {SITE.phone}</span>
-      </div>
-    </section>
     {SITE.home.map(
       (h: any) =>
         homeItems(h.cat).length > 0 && (
@@ -135,9 +124,8 @@ const deliverySummary = deliveryZonesText(LIVE);
         brands like Kiam, RFL, and Akij.
       </p>
       <p>
-        Every order includes {deliverySummary.toLowerCase()} with no account required.{" "}
-        <a href="/online-shopping-jashore/">Online shopping in Jashore</a> · <a href="/shop/">Browse all products</a> ·{" "}
-        <a href="/contact-us/">Contact our Jashore store</a>.
+        Questions before you order? {SITE.phone && <><a href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a> or{" "}</>}
+        <a href="/contact-us/">contact the shop</a>. Already ordered? <a href="/track/">Track your order</a>.
       </p>
     </section>
     <AdSlot kind="content" />

@@ -83,11 +83,41 @@ test('delivery shows the order fee and explains quantity only for paid multi-ite
       const delivery = summary.locator('.row').filter({ hasText: 'Delivery charge' });
       assert.equal(await delivery.locator('b').textContent(), charge);
       const text = await summary.textContent();
-      assert.doesNotMatch(text, /per piece/i);
-      assert.equal(text.includes('delivery charge is multiplied by 2'), explanation);
+      assert.equal(text.includes('Delivery is charged per item for this area (2 items).'), explanation);
     }, { cart, live: { freeOver } });
   }
 });
+
+test('checkout labels the subtotal until the buyer chooses a delivery area', () => shop(async page => {
+  await ready(page, '/checkout/');
+  const total = page.locator('[data-sum] .total');
+  assert.equal(await total.locator('span').first().textContent(), 'Subtotal');
+  assert.equal(await page.locator('[data-checkout-total]').isVisible(), false);
+  await page.locator('[name="area"]').selectOption('outside');
+  await page.locator('[data-checkout-total]').waitFor();
+  assert.equal(await page.locator('[data-checkout-total]').textContent(), 'Delivery ৳200 · Total ৳1,200');
+  assert.equal(await total.locator('span').first().textContent(), 'Total');
+}, { cart: { 1: 1 }, live: { delivery: [{ id: 'local', label: 'Local', fee: 0 }, { id: 'outside', label: 'Outside', fee: 200 }] } }));
+
+test('a stale snapshot keeps mobile payment details hidden while cash on delivery stays available', () => shop(async (page, context) => {
+  let stale = true;
+  await context.route('**/api/stock', r => r.fulfill({
+    headers: stale ? { 'X-Stock-Stale': '1' } : {},
+    json: { products: { 1: [1000, 1200, 10] }, settings },
+  }));
+  await ready(page, '/checkout/');
+  assert.match(await page.locator('[data-pay]').textContent(), /Pay when your order is delivered/);
+  assert.equal(await page.getByRole('button', { name: 'Place order' }).isEnabled(), true);
+  await page.locator('[name="payment"]').selectOption('mobile');
+  await page.waitForFunction(() => document.querySelector('[data-pay]').textContent.includes('unavailable'));
+  assert.equal(await page.locator('[data-txn]').isVisible(), false);
+  assert.equal(await page.getByRole('button', { name: 'Place order' }).isDisabled(), true);
+  assert.doesNotMatch(await page.locator('footer').textContent(), /test-number/);
+  stale = false;
+  await page.waitForFunction(() => document.querySelector('[data-pay]').textContent.includes('test-number'), null, { timeout: 10000 });
+  assert.equal(await page.locator('[data-txn]').isVisible(), true);
+  assert.equal(await page.getByRole('button', { name: 'Place order' }).isEnabled(), true);
+}, { cart: { 1: 1 } }));
 
 test('manual payments require a transaction reference; duplicate submits send one request', () => shop(async (page, context) => {
   let requests = 0;
@@ -595,6 +625,22 @@ test('tracking rejects a wrong phone without exposing an order and tolerates mal
   assert.equal(await page.locator('[data-order]').textContent(), '');
   assert.equal(await page.locator('[data-mine-order]').count(), 1);
 }));
+
+test('the checkout receipt keeps the order number visible when tracking is temporarily unavailable', () => shop(async (page, context) => {
+  await context.route('**/api/checkout', r => r.fulfill({ json: { number: 'LB-RECEIPT', total: 1060 } }));
+  await context.route('**/api/track?*', r => r.fulfill({ status: 503, json: { error: 'Tracking is unavailable' } }));
+  await ready(page, '/checkout/');
+  await page.locator('[name="name"]').fill('Test buyer');
+  await page.locator('[name="phone"]').fill('01710000000');
+  await page.locator('[name="address"]').fill('Test address, Bangladesh');
+  await page.getByRole('button', { name: 'Place order' }).click();
+  await page.waitForURL('**/track/?order=LB-RECEIPT&new=1');
+  await page.waitForFunction(() => document.querySelector('[data-err]').textContent.includes('unavailable'));
+  assert.equal(await page.locator('[data-receipt-number]').textContent(), 'LB-RECEIPT');
+  assert.equal(await page.getByRole('heading', { name: 'Order received' }).isVisible(), true);
+  await ready(page, '/track/?order=LB-UNKNOWN&new=1');
+  assert.equal(await page.locator('[data-order-received]').isVisible(), false);
+}, { cart: { 1: 1 } }));
 
 test('account loading failures have a retry and expired sessions offer optional login', () => shop(async (page, context) => {
   let fail = true;

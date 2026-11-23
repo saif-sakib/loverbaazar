@@ -1,15 +1,22 @@
 ---
 import Base from "../../layouts/Base.astro";
+import { SITE, telOf } from "../../lib/shop";
 ---
 
 <Base title="Track your order" noindex>
   <div class="wrap narrow">
     <h1 class="title">Track your order</h1>
+    <section class="order-received" data-order-received role="status" aria-label="Order confirmation" hidden>
+      <h2>Order received</h2>
+      <p>Order number <strong data-receipt-number></strong></p>
+      <p>We’ll call the mobile number you provided to confirm your order.</p>
+    </section>
+    <p>Enter your order number and the mobile number used at checkout.</p>
     <div class="mine" data-mine hidden>
       <p class="meta">Your recent orders on this device:</p>
       <div></div>
     </div>
-    <form class="panel" data-track>
+    <form class="panel" method="post" data-track>
       <label class="field">
         Order number
         <input name="order" required placeholder="LB-XXXXXXXX" />
@@ -19,8 +26,9 @@ import Base from "../../layouts/Base.astro";
         <input name="phone" type="tel" maxlength="30" autocomplete="tel" required />
       </label>
       <p class="err" data-err role="alert" tabindex="-1"></p>
-      <button class="btn small">Track</button>
+      <button class="btn small">Track order</button>
     </form>
     <div data-order></div>
+    <p class="track-help meta">Need help with an order? {SITE.phone && <><a href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a> or{" "}</>}<a href="/contact-us/">contact the shop</a>.</p>
   </div>
 </Base>

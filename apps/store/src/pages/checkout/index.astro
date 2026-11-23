@@ -9,8 +9,8 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
   <div class="wrap">
     <div class="pagehead">
       <p class="crumbs"><a href="/cart/">Cart</a> <span aria-hidden="true">/</span> Checkout</p>
-      <h1 class="title">Almost yours.</h1>
-      <p>Enter your delivery details and review your order. No account needed.</p>
+      <h1 class="title">Checkout</h1>
+      <p>Order without an account. Choose your delivery area to see your total.</p>
     </div>
     <p data-empty hidden>
       Your cart is empty.{" "}
@@ -21,10 +21,11 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
     <p class="note" data-closed hidden></p>
     <form
       class="two"
+      method="post"
       data-checkout
       data-live={JSON.stringify({
         delivery: LIVE.delivery,
-        payments: LIVE.payments,
+        payments: LIVE.payments.map(({ number, ...payment }: any) => ({ ...payment, manual: Boolean(number) })),
         freeOver: LIVE.freeOver,
         minOrder: LIVE.minOrder,
         ordersOpen: LIVE.ordersOpen,
@@ -33,14 +34,20 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
     >
       <fieldset class="panel" data-details-fields>
         <legend class="sr-only">Delivery and payment details</legend>
-        <h2 class="checkout-heading"><span>1</span> Delivery &amp; payment</h2>
+        <h2 class="checkout-heading">Delivery &amp; payment</h2>
+        <label class="field">
+          Delivery area<select name="area" required></select>
+        </label>
+        <p class="checkout-estimate" data-checkout-total hidden></p>
+        <p class="meta" data-eta hidden></p>
         <label class="field">
           Full name
           <input name="name" required maxlength="100" autocomplete="name" />
         </label>
         <label class="field">
           Mobile number
-          <input name="phone" type="tel" required maxlength="30" inputmode="tel" placeholder="01XXXXXXXXX" autocomplete="tel" />
+          <input name="phone" type="tel" required maxlength="30" inputmode="tel" placeholder="01XXXXXXXXX" autocomplete="tel" aria-describedby="checkout-phone-help" />
+          <span class="field-help" id="checkout-phone-help">We’ll call this number to confirm your order.</span>
         </label>
         <label class="field">
           Email (optional, for your order confirmation)
@@ -50,13 +57,9 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
           Full address<textarea name="address" rows="3" required minlength="5" maxlength="500" autocomplete="street-address"></textarea>
         </label>
         <label class="field">
-          Delivery area<select name="area" required></select>
+          Payment<select name="payment" aria-describedby="checkout-payment-help"></select>
         </label>
-        <label class="field">
-          Payment<select name="payment"></select>
-        </label>
-        <p class="meta" data-eta></p>
-        <p class="note" data-pay hidden aria-live="polite"></p>
+        <p class="note" id="checkout-payment-help" data-pay hidden aria-live="polite"></p>
         <label class="field" data-txn hidden>
           Transaction ID
           <input name="txnid" maxlength="60" autocomplete="off" />
@@ -66,7 +69,7 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
         </label>
       </fieldset>
       <aside class="panel">
-        <h2 class="checkout-heading"><span>2</span> Review your order</h2>
+        <h2 class="checkout-heading">Review your order</h2>
         <a class="link checkout-edit" href="/cart/">Edit items or quantities</a>
         <div data-sum></div>
         <div class="coupon">

@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { jsonLd } from "../../lib/seo";
-import { LIVE, SITE, siteUrl, spacedSiteName, taka, telOf, waOf } from "../../lib/shop";
+import { SITE, siteUrl, spacedSiteName, telOf, waOf } from "../../lib/shop";
 
 const contactTitle = SITE.address ? `Contact Us — ${SITE.address}` : "Contact us";
 const contactDesc = `Contact ${spacedSiteName}${SITE.address ? ` in ${SITE.address} (Jessore)` : ""} by phone (${SITE.phone}), WhatsApp, or email for online shopping, product details, and home delivery across Jashore and Bangladesh.`;
@@ -33,8 +33,23 @@ const contactPageLd = {
       <h1 class="title">Contact us</h1>
       <p>Questions about a product or an order? Send us a message or give us a call.</p>
     </div>
-    <div class="two">
-      <form class="panel" data-contact>
+    <div class="two contact-layout">
+      <section class="panel contact-details" aria-labelledby="shop-details-title">
+        <h2 id="shop-details-title">{spacedSiteName}</h2>
+        {SITE.address && <p>{SITE.address}</p>}
+        {SITE.hours && <p class="meta">Opening hours · {SITE.hours}</p>}
+        <div class="contact-actions">
+          {SITE.phone && <a class="btn" href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a>}
+          {SITE.whatsapp && <a class="btn ghost" href={waOf(SITE.whatsapp)} rel="noopener">Message on WhatsApp</a>}
+        </div>
+        {SITE.email && <p><a class="link" href={`mailto:${SITE.email}`}>{SITE.email}</a></p>}
+        <div class="purchase-links contact-links">
+          <a class="link" href="/track/">Track your order</a>
+          <a class="link" href="/how-to-buy/#delivery">Delivery information</a>
+        </div>
+      </section>
+      <form class="panel" method="post" data-contact>
+        <h2>Send a message</h2>
         <label class="field">
           Name
           <input name="name" required maxlength="100" autocomplete="name" />
@@ -50,61 +65,6 @@ const contactPageLd = {
         <p class="err" role="alert" tabindex="-1"></p>
         <button class="btn small">Send message</button>
       </form>
-      <aside class="panel">
-        <p>
-          <b>Phone</b>
-          <br />
-          <a class="link" href={`tel:${telOf(SITE.phone)}`}>
-            {SITE.phone}
-          </a>
-        </p>
-        {SITE.whatsapp && (
-          <p>
-            <b>WhatsApp</b>
-            <br />
-            <a class="link" href={waOf(SITE.whatsapp)} rel="noopener">
-              {SITE.whatsapp}
-            </a>
-          </p>
-        )}
-        <p>
-          <b>Email</b>
-          <br />
-          <a class="link" href={`mailto:${SITE.email}`}>
-            {SITE.email}
-          </a>
-        </p>
-        {SITE.address && (
-          <p>
-            <b>Address</b>
-            <br />
-            {SITE.address}
-          </p>
-        )}
-        {SITE.hours && (
-          <p>
-            <b>Opening hours</b>
-            <br />
-            {SITE.hours}
-          </p>
-        )}
-        {LIVE.delivery?.length > 0 && (
-          <p>
-            <b>Delivery</b>
-            <br />
-            {LIVE.delivery.map((z: any, i: number) => (
-              <>
-                {i > 0 && <br />}
-                {z.label}: {Number(z.fee) > 0 && !(LIVE.freeOver > 0) ? taka(z.fee) : Number(z.fee) === 0 ? "Free" : `${taka(z.fee)} (free over ${taka(LIVE.freeOver)})`}
-                {z.days && ` (${z.days})`}
-              </>
-            ))}
-          </p>
-        )}
-        <p>
-          <a class="link" href="/online-shopping-jashore/">Online shopping in Jashore</a>
-        </p>
-      </aside>
     </div>
   </div>
 </Base>

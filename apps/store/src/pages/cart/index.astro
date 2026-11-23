@@ -12,17 +12,18 @@ import Base from "../../layouts/Base.astro";
       <div class="panel" data-cart>
         Loading…
       </div>
-      <aside class="panel">
+      <aside class="panel" data-cart-summary hidden>
         <div class="row total flush">
           <span>Subtotal</span>
           <span data-sub>৳0</span>
         </div>
         <p class="meta" data-free>
-          Delivery and any discounts are confirmed at checkout.
+          Choose your delivery area at checkout to see the final total.
         </p>
         <a class="btn small center" href="/checkout/" data-to-checkout hidden>
           Proceed to checkout
         </a>
+        <p class="meta">No account needed. <a href="/how-to-buy/">Delivery &amp; payment</a></p>
       </aside>
     </div>
   </div>

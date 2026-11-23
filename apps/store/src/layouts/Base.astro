@@ -1,12 +1,13 @@
 ---
 import "../styles/fonts.css";
 import "../styles/site.css";
-import { jsonLd, organizationReturnPolicy, postalAddress, publicImage, storeAreaServed } from "../lib/seo";
+import { jsonLd, merchantReturnURL, organizationReturnPolicy, postalAddress, publicImage, storeAreaServed } from "../lib/seo";
 import "../styles/mobile.css";
 import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf, spacedSiteName } from "../lib/shop";
 import { resolveAdsenseClient, resolveAdSlot } from "../lib/adsense.mjs";
 const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", preconnectCloudinary = false, allowAds = false, language = languageOf(`${title || ""} ${description}`) } = Astro.props;
 const full = seoTitle || (title ? `${title} | ${spacedSiteName}` : `${spacedSiteName} | ${SITE.tagline}`);
+const appScript = process.env.GITHUB_SHA ? `/app.js?v=${encodeURIComponent(process.env.GITHUB_SHA)}` : "/app.js";
 const canon = canonical || siteUrl(Astro.url.pathname);
 const isHome = Astro.url.pathname === "/";
 const preview = import.meta.env.BUILD_ENV !== "production";
@@ -125,7 +126,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
       </>
     )}
     <slot name="head" />
-    <script is:inline src="/app.js" defer fetchpriority="low"></script>
+    <script is:inline src={appScript} defer fetchpriority="low"></script>
     {emitAds && (
       <>
         <meta name="google-adsense-account" content={adsenseClient} />
@@ -152,10 +153,9 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     <div class="notice" data-notice hidden role="status"></div>
     <div class="ticker" lang="en-BD">
       <div>
-        <span>Wholesale prices on home appliances</span>
-        <span>Delivery charge shown before you order</span>
+        <span>{SITE.address ? `Online shop based in ${SITE.address}` : "Order online without an account"}</span>
         <span data-payment-summary>{payments.map((p: any) => p.label).join(" · ") || "Contact the shop for payment options"}</span>
-        <span>Call {SITE.phone}</span>
+        {SITE.phone && <span><a href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a></span>}
       </div>
     </div>
     <header class="top" lang="en-BD">
@@ -233,11 +233,11 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
           </details>
         ))}
         <a href="/offers/">Offers</a>
+        <a href="/contact-us/">Contact</a>
         <a href="/product-category/latest-product/">New</a>
         <a href="/product-category/popular-item/">Popular</a>
         <a href="/blog/">Blog</a>
         <a class="desktop-shopping-link" href="/track/">Track order</a>
-        <a href="/contact-us/">Contact</a>
       </nav>
     </header>
     <dialog lang="en-BD" class="category-drawer" id="category-drawer" aria-labelledby="category-title">
@@ -285,10 +285,22 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
           )}
         </div>
         <div>
+          <h4>Customer support</h4>
+          {SITE.phone && <a href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a>}
+          {SITE.whatsapp && <a href={waOf(SITE.whatsapp)} rel="noopener">Chat on WhatsApp</a>}
+          <a href="/contact-us/">Contact us</a>
+          <a class="desktop-shopping-link" href="/track/">Track your order</a>
+        </div>
+        <div>
+          <h4>Shopping information</h4>
+          <a href="/how-to-buy/">Delivery &amp; payment</a>
+          {merchantReturnURL && <a href={merchantReturnURL}>Returns &amp; exchanges</a>}
+          <a href="/privacy-policy/">Privacy policy</a>
+          <p data-payments>{payments.map((p: any) => p.label).join(" · ")}</p>
+        </div>
+        <div>
           <h4>Company</h4>
           <a href="/about-us/">About us</a>
-          <a href="/how-to-buy/">How to buy</a>
-          <a href="/contact-us/">Contact us</a>
           <a href="/blog/">Blog</a>
           <a href="/online-shopping-jashore/">Online shopping in Jashore</a>
           {["/", "/about-us/", "/about-us"].includes(Astro.url.pathname) && (
@@ -297,24 +309,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
           {extraPages.map((p: any) => (
             <a href={`/${p.slug}/`}>{p.title}</a>
           ))}
-        </div>
-        <div>
-          <h4>Policies</h4>
-          <a href="/privacy-policy/">Privacy policy</a>
-          <a href="/terms-conditions/">Terms and conditions</a>
-          <a class="desktop-shopping-link" href="/track/">Track your order</a>
-        </div>
-        <div>
-          <h4>Payment</h4>
-          <p data-payments>
-            {payments.map((p: any) => (
-              <>
-                {p.label}
-                {p.number && `: ${p.number}`}
-                <br />
-              </>
-            ))}
-          </p>
+          {!merchantReturnURL && <a href="/terms-conditions/">Terms and conditions</a>}
         </div>
       </div>
       <p class="legal">
