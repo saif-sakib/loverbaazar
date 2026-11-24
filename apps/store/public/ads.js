@@ -15,8 +15,22 @@
     });
   };
 
-  const script = document.querySelector('script[src*="pagead2.googlesyndication.com"]');
+  const providerURL = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js";
+  let script = document.querySelector(`script[src^="${providerURL}"]`);
   script?.addEventListener("error", hideAll);
+
+  function loadProvider(client) {
+    if (!/^ca-pub-\d{16}$/.test(client || "")) return false;
+    if (script) return true;
+    script = document.createElement("script");
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.fetchPriority = "low";
+    script.src = `${providerURL}?client=${encodeURIComponent(client)}`;
+    script.addEventListener("error", hideAll, { once: true });
+    document.head.append(script);
+    return true;
+  }
 
   const io = "IntersectionObserver" in window
     ? new IntersectionObserver((entries) => {
@@ -43,7 +57,12 @@
     observer.observe(ins, { attributes: true, attributeFilter: ["data-ad-status"] });
 
     const activate = () => {
-      if (ins.dataset.adInit || wrap.hidden) return;
+      if (ins.dataset.adInit || wrap.hidden || !wrap.getClientRects().length) return;
+      if (wrap.hasAttribute("data-ad-defer-script") && !loadProvider(ins.dataset.adClient)) {
+        wrap.hidden = true;
+        observer.disconnect();
+        return;
+      }
       ins.dataset.adInit = "1";
       try {
         (window.adsbygoogle = window.adsbygoogle || []).push({});

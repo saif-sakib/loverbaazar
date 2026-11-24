@@ -924,7 +924,7 @@ func TestJashoreLocalSEOContentUpdateKeepsOwnerEdits(t *testing.T) {
 	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='page' AND slug='privacy-policy'`).Scan(&privacyHTML); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(privacyHTML, "on the blog and its buying guides") || !strings.Contains(privacyHTML, "Owner privacy note.") {
+	if !strings.Contains(privacyHTML, "on our blog and on selected product pages") || !strings.Contains(privacyHTML, "Owner privacy note.") {
 		t.Errorf("privacy note or advertising update missing: %q", privacyHTML)
 	}
 	if err := db.QueryRow(bg, `SELECT data->>'tagline',data->>'description',data->>'about',data->'hero'->>'title',data->'hero'->>'text' FROM settings WHERE key='site'`).Scan(&tagline, &desc, &about, &heroTitle, &heroText); err != nil {
