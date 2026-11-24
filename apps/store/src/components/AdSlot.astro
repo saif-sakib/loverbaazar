@@ -1,23 +1,36 @@
 ---
 import { resolveAdsenseClient, resolveAdSlot } from "../lib/adsense.mjs";
 
+const { placement = "content" } = Astro.props;
+const product = placement === "product";
 const isProduction = import.meta.env.BUILD_ENV === "production";
 const client = isProduction ? resolveAdsenseClient(import.meta.env.ADSENSE_CLIENT) : "";
-const slot = isProduction ? resolveAdSlot(import.meta.env.ADSENSE_SLOT_CONTENT) : "";
+const slot = client ? resolveAdSlot(product ? import.meta.env.ADSENSE_SLOT_PRODUCT : import.meta.env.ADSENSE_SLOT_CONTENT) : "";
+const loader = process.env.GITHUB_SHA ? `/ads.js?v=${encodeURIComponent(process.env.GITHUB_SHA)}` : "/ads.js";
 ---
 
 {client && slot && (
-  <aside class="ad-slot" aria-label="Advertisement" data-ad-slot-wrap>
-    <span class="ad-slot-label">Advertisement</span>
-    <div class="ad-slot-frame">
-      <ins
-        class="adsbygoogle"
-        style="display:block"
-        data-ad-client={client}
-        data-ad-slot={slot}
-        data-ad-format="horizontal"
-        data-full-width-responsive="true"
-      ></ins>
-    </div>
-  </aside>
+  <>
+    {product && <style is:inline>
+      .lb_product_ad { width: 320px; height: 50px; }
+      @media (max-width: 319px) { .ad-slot-product { display: none; } }
+      @media (min-width: 500px) { .lb_product_ad { width: 468px; height: 60px; } }
+      @media (min-width: 800px) { .lb_product_ad { width: 728px; height: 90px; } }
+    </style>}
+    <aside class:list={["ad-slot", { "ad-slot-product": product }]} aria-label="Advertisements" data-ad-slot-wrap
+      data-ad-defer-script={product ? "" : undefined}>
+      <span class="ad-slot-label">Advertisements</span>
+      <div class="ad-slot-frame">
+        <ins
+          class:list={["adsbygoogle", { lb_product_ad: product }]}
+          style="display:block"
+          data-ad-client={client}
+          data-ad-slot={slot}
+          data-ad-format={product ? undefined : "horizontal"}
+          data-full-width-responsive={product ? undefined : "true"}
+        ></ins>
+      </div>
+    </aside>
+    {product && <script is:inline src={loader} defer fetchpriority="low"></script>}
+  </>
 )}

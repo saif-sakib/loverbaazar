@@ -348,3 +348,13 @@ body.checkout-page { padding-bottom: var(--safe-bottom); }
   overflow: hidden;
 }
 .ad-slot ins.adsbygoogle { max-width: 100%; }
+.ad-slot.ad-slot-product {
+  width: fit-content;
+  margin: 32px auto 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  scroll-margin-block-end: calc(var(--product-dock-height) + var(--safe-bottom) + 16px);
+}
+.ad-slot-product .ad-slot-frame { min-height: 0; overflow: visible; }

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { chromium } from "playwright";
 import { sizedImage, responsiveImage } from "../src/lib/image-delivery.mjs";
 
 const assets = fileURLToPath(new URL("../", import.meta.url));
@@ -61,7 +62,7 @@ const server = createServer((request, response) => {
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const run = promisify(execFile);
-const build = async (environment, dir) => {
+const build = async (environment, dir, productSlot = "0987654321") => {
   const env = { ...process.env, BUILD_ENV: environment, BUILD_ID: "fixture", BUILD_KEY: buildKey,
     GITHUB_SHA: "f".repeat(40),
     SITE_ORIGIN: "https://loverbaazar.com", NO_COLOR: "1", PUBLIC_TURNSTILE_SITE: "test-site-key",
@@ -70,7 +71,8 @@ const build = async (environment, dir) => {
     BING_SITE_VERIFICATION: "0123456789ABCDEF0123456789ABCDEF",
     GOOGLE_SITE_VERIFICATION: "fixture_google_verify_token_12345",
     CLOUDFLARE_WEB_ANALYTICS_TOKEN: "0123456789abcdef0123456789abcdef",
-    ADSENSE_SLOT_CONTENT: "1234567890" };
+    ADSENSE_SLOT_CONTENT: "1234567890",
+    ADSENSE_SLOT_PRODUCT: productSlot };
   try {
     await run(process.execPath, ["node_modules/.bin/astro", "build", "--outDir", join(work, dir)], { cwd: assets, env, maxBuffer: 3_000_000 });
   } catch (error) {
@@ -80,6 +82,68 @@ const build = async (environment, dir) => {
 const read = (dir, path) => readFile(join(work, dir, path), "utf8");
 const entities = html => [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)]
   .map(match => JSON.parse(match[1]));
+
+async function verifyProductAd(html, csp) {
+  const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
+  try {
+    const path = `/product/${riceCookerFixture.slug}/`;
+    const page = await browser.newPage({ viewport: { width: 320, height: 812 } });
+    let requests = 0;
+    let blocked = false;
+    await page.route("**/*", async route => {
+      const url = new URL(route.request().url());
+      if (url.origin !== fixture.origin) return route.abort();
+      if (url.pathname === path) return route.fulfill({ contentType: "text/html", body: html, headers: { "Content-Security-Policy": csp } });
+      if (url.pathname.startsWith("/_astro/") || ["/ads.js", "/app.js", "/search-index.json"].includes(url.pathname)) {
+        return route.fulfill({ path: join(work, "production", url.pathname) });
+      }
+      if (url.pathname === "/api/stock") {
+        return route.fulfill({ json: { products: { [riceCookerFixture.id]: [1450, 1900, 1] }, settings: store.live } });
+      }
+      return route.abort();
+    });
+    await page.route("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=*", route => {
+      requests++;
+      if (blocked) return route.abort();
+      return route.fulfill({ contentType: "text/javascript", body: `document.querySelector("ins.adsbygoogle").dataset.adStatus = "filled";` });
+    });
+
+    await page.goto(new URL(path, fixture).href);
+    assert.equal(requests, 0, "AdSense loaded before the shopper reached the ad");
+    const slot = page.getByRole("complementary", { name: "Advertisements" });
+    const banner = slot.locator("ins.adsbygoogle");
+    await slot.evaluate(element => element.scrollIntoView({ block: "center" }));
+    await slot.locator('ins[data-ad-status="filled"]').waitFor({ state: "visible", timeout: 5000 });
+    for (const width of [320, 360, 375, 390, 414, 768, 1440]) {
+      await page.setViewportSize({ width, height: 812 });
+      await slot.evaluate(element => element.scrollIntoView({ block: "center" }));
+      const box = await banner.boundingBox();
+      const expected = width < 500 ? [320, 50] : width < 800 ? [468, 60] : [728, 90];
+      assert.deepEqual([box.width, box.height], expected, `Ad size at ${width}px`);
+      assert.ok(box.x >= 0 && box.x + box.width <= width, `Ad fits at ${width}px`);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `No horizontal overflow at ${width}px`);
+      if (width < 860) {
+        const buy = page.locator("[data-buybar] [data-buy]");
+        await buy.click({ trial: true, timeout: 5000 });
+        assert.ok(box.y + box.height < (await buy.boundingBox()).y, `Mobile Buy now stays clear at ${width}px`);
+      }
+    }
+    assert.equal(requests, 1, "Resizing initiated another ad request");
+    await banner.evaluate(element => { element.dataset.adStatus = "unfilled"; });
+    await slot.waitFor({ state: "hidden", timeout: 5000 });
+    assert.equal(await page.locator("[data-ad-slot-wrap]").getAttribute("hidden"), "");
+
+    blocked = true;
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto(new URL(path, fixture).href);
+    assert.equal(requests, 1, "AdSense loaded at the top of a fresh product view");
+    await slot.evaluate(element => element.scrollIntoView({ block: "center" }));
+    await slot.waitFor({ state: "hidden", timeout: 5000 });
+    assert.equal(requests, 2, "The blocked ad attempt should occur once");
+  } finally {
+    await browser.close();
+  }
+}
 
 try {
   await build("production", "production");
@@ -120,7 +184,7 @@ try {
     assert.match(adHTML, /<script src="\/ads\.js" defer fetchpriority="low"><\/script>/, `${adRoute} missing ads.js loader`);
     assert.match(adHTML, /<aside class="ad-slot"[^>]*data-ad-slot-wrap[^>]*>[\s\S]*Advertisement[\s\S]*data-ad-format="horizontal"/, `${adRoute} missing horizontal AdSlot`);
   }
-  for (const path of ["index.html", "shop/index.html", "offers/index.html", "online-shopping-jashore/index.html", "product-category/rice-cooker/index.html", "product/fixture-rice-cooker-18l/index.html"]) {
+  for (const path of ["index.html", "shop/index.html", "offers/index.html", "online-shopping-jashore/index.html", "product-category/rice-cooker/index.html"]) {
     const shoppingHTML = await read("production", path);
     assert.doesNotMatch(shoppingHTML, /googlesyndication\.com|google-adsense-account|data-ad-slot-wrap|src="\/ads\.js"/, `${path} loaded ads`);
   }
@@ -192,6 +256,11 @@ try {
   assert.match(riceCat, /Rice Cooker Price List in Bangladesh/);
   assert.match(riceCat, /<table class="price-table">[\s\S]*Fixture Kiam Rice Cooker 1\.8L/);
   const rcPage = await read("production", "product/fixture-rice-cooker-18l/index.html");
+  assert.equal(rcPage.match(/data-ad-slot-wrap(?=[\s=>])/g)?.length, 1);
+  assert.match(rcPage, /You may also like[\s\S]*<aside class="ad-slot ad-slot-product"[^>]*data-ad-defer-script/);
+  assert.match(rcPage, /<ins class="adsbygoogle lb_product_ad"[^>]*data-ad-slot="0987654321">/);
+  assert.match(rcPage, /<script src="\/ads\.js\?v=f{40}" defer fetchpriority="low"><\/script>/);
+  assert.doesNotMatch(rcPage, /googlesyndication\.com|google-adsense-account|data-full-width-responsive/);
   assert.match(rcPage, /src="https:\/\/static\.cloudflareinsights\.com\/beacon\.min\.js"[^>]*0123456789abcdef0123456789abcdef/);
   for (const privateRoute of ["checkout", "cart", "my-account", "track", "search", "wishlist", "contact-us", "privacy-policy", "terms-conditions", "about-us", "how-to-buy", "admin", "seo-hidden-fixture"]) {
     const restrictedHTML = await read("production", `${privateRoute}/index.html`);
@@ -263,6 +332,7 @@ try {
   assert.match(prodCSP, /font-src[^;]*https:\/\/fonts\.gstatic\.com/);
   assert.doesNotMatch(prodCSP, /script-src[^;]*'unsafe-inline'/);
   assert.match(prodCSP, /connect-src[^;]*https:\/\/cloudflareinsights\.com/);
+  await verifyProductAd(rcPage, prodCSP);
   for (const restrictedPrefix of ["/admin/\\*", "/checkout/\\*", "/cart/\\*", "/my-account/\\*", "/track/\\*"]) {
     const block = productionHeaders.match(new RegExp(`^${restrictedPrefix}\\n  Content-Security-Policy: (.+)$`, "m"))?.[1] || "";
     assert.ok(block, `Missing strict CSP override for ${restrictedPrefix}`);
@@ -280,6 +350,10 @@ try {
   }
   await run("python3", ["-c", "import sys,xml.etree.ElementTree as ET\nfor x in sys.argv[1:]: ET.parse(x)", ...["feed.xml", "blog/feed.xml", "sitemap-index.xml", "sitemap-0.xml"].map(f => join(work, "production", f))]);
 
+  await build("production", "product-ads-disabled", "");
+  const adFreeProduct = await read("product-ads-disabled", "product/fixture-rice-cooker-18l/index.html");
+  assert.doesNotMatch(adFreeProduct, /googlesyndication\.com|data-ad-slot-wrap|src="\/ads\.js/);
+
   product.price = 999;
   product.inStock = false;
   product.sku = "  LB-0125  ";
@@ -288,6 +362,7 @@ try {
   store.live.delivery = store.live.delivery.filter(zone => zone.id === "jashore");
   await build("preview", "preview");
   const next = await read("preview", `product/${product.slug}/index.html`);
+  assert.doesNotMatch(next, /googlesyndication\.com|data-ad-slot-wrap|src="\/ads\.js/);
   const nextProduct = entities(next).find(item => item["@type"] === "Product");
   assert.equal(nextProduct.sku, "LB-0125");
   assert.equal(nextProduct.aggregateRating.reviewCount, 1);
@@ -316,7 +391,7 @@ try {
   assert.equal(sizedImage(source, 640), "https://res.cloudinary.com/test/image/upload/c_limit,w_640/q_auto/f_auto/v100/loverbaazar/products/example.webp");
   assert.match(responsiveImage(source, "", [160, 320, 640]).srcset, /640w$/);
   assert.equal(sizedImage("https://loverbaazar.com/photo.jpg", 640), "https://loverbaazar.com/photo.jpg");
-  console.log("Homepage identity, production sitemap, canonical, Bangla SEO, structured offers, preview noindex, changed offer/feed and image widths passed.");
+  console.log("Homepage identity, production sitemap, canonical, Bangla SEO, structured offers, ad placement and loading, preview noindex, changed offer/feed and image widths passed.");
 } finally {
   server.close();
   await rm(work, { recursive: true, force: true });
