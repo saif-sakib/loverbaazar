@@ -39,6 +39,10 @@ const mainImage = p.images[0];
 const displayImage = (image: any) => responsiveImage(image?.src, image?.src || image?.thumb, [320, 640]);
 const imageSet = displayImage(mainImage);
 const thumbnail = (image: any) => responsiveImage(image.src, image.thumb || image.src, [160]).src;
+const photoArrows = mainImage?.src && p.images.length > 1
+  ? [{ step: -1, label: "Previous photo" }, { step: 1, label: "Next photo" }]
+  : [];
+const firstPhotoPosition = `Photo 1 of ${p.images.length}`;
 const ld = {
   "@context": "https://schema.org",
   "@type": "Product",
@@ -147,22 +151,41 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
           <a class="link" href="#purchase-info-title">{localDeliveryOnly ? "Delivery in Jashore only" : "Delivery & payment"}</a>
         </p>
       </div>
-      <div class="product-gallery">
-        {mainImage?.src ? <button class="stage photo-zoom" type="button" data-zoom-trigger aria-label={`Enlarge photo of ${p.name}`}>
-          <img class="main" data-main {...imageSet} sizes={imageSet.srcset ? gallerySizes : undefined}
-            data-zoom={sizedImage(mainImage?.src, 960)} alt={mainImage?.alt || p.name} width="600" height="600" decoding="sync" fetchpriority="high" />
-          <span aria-hidden="true">Enlarge photo</span>
-        </button> : <div class="stage"><img class="main" {...imageSet} alt="Product photo unavailable" width="600" height="600" /></div>}
-        {p.images.length > 1 && (
-          <div class="gal" role="group" aria-label="Product photos">
-            {p.images.map((i: any, n: number) => {
-              const photo = displayImage(i);
-              return <button type="button" class={n === 0 ? "on" : undefined} data-thumb={photo.src} data-srcset={photo.srcset} data-zoom={sizedImage(i.src, 960)}
-                data-alt={i.alt || p.name} aria-label={`View photo ${n + 1} of ${p.images.length}`} aria-pressed={n === 0}>
-                <img src={thumbnail(i)} alt="" loading="lazy" width="66" height="66" />
-              </button>;
-            })}
-          </div>
+      <div class="product-gallery" data-photo-gallery data-photo-sizes={gallerySizes} role="group" aria-label="Product photos">
+        <div class="photo-stage">
+          {mainImage?.src ? <button class="stage photo-zoom" type="button" data-zoom-trigger aria-haspopup="dialog" aria-label={`Enlarge photo of ${p.name}`}>
+            <img class="main" data-main {...imageSet} sizes={imageSet.srcset ? gallerySizes : undefined}
+              data-zoom={sizedImage(mainImage?.src, 960)} alt={mainImage?.alt || p.name} width="600" height="600" draggable="false" decoding="sync" fetchpriority="high" />
+          </button> : <div class="stage"><img class="main" {...imageSet} alt="Product photo unavailable" width="600" height="600" /></div>}
+          {photoArrows.map(({ step, label }) => (
+            <button class="photo-arrow" type="button" data-photo-step={step} aria-label={label}></button>
+          ))}
+        </div>
+        {photoArrows.length > 0 && (
+          <>
+            <div class="gal" role="group" aria-label="Choose a photo">
+              {p.images.map((i: any, n: number) => {
+                const photo = displayImage(i);
+                return <button type="button" class={n === 0 ? "on" : undefined} data-thumb={photo.src} data-srcset={photo.srcset} data-zoom={sizedImage(i.src, 960)}
+                  data-alt={i.alt || p.name} aria-label={`View photo ${n + 1} of ${p.images.length}`} aria-pressed={n === 0}>
+                  <img src={thumbnail(i)} alt="" loading="lazy" width="66" height="66" />
+                </button>;
+              })}
+            </div>
+            <span class="sr-only" role="status" data-photo-position>{firstPhotoPosition}</span>
+          </>
+        )}
+        {mainImage?.src && (
+          <template data-photo-dialog>
+            <dialog class="lightbox" aria-label="Enlarged product photos">
+              <button class="x" type="button" data-close-photo aria-label="Close enlarged photo" autofocus>×</button>
+              <img data-expanded-photo alt="" draggable="false" />
+              {photoArrows.map(({ step, label }) => (
+                <button class="photo-arrow" type="button" data-photo-step={step} aria-label={label}></button>
+              ))}
+              {photoArrows.length > 0 && <span class="sr-only" role="status" data-photo-position>{firstPhotoPosition}</span>}
+            </dialog>
+          </template>
         )}
       </div>
       <div class="product-details">

@@ -241,7 +241,7 @@
     $$("details.mega[open]").forEach((d) => {
       if (d !== open) d.open = false;
     });
-    const t = e.target.closest("[data-add],[data-wish],[data-del],[data-thumb],[data-again],[data-mine-order]");
+    const t = e.target.closest("[data-add],[data-wish],[data-del],[data-again],[data-mine-order]");
     if (!t) return;
     if (t.dataset.add) {
       const id = t.dataset.add;
@@ -283,16 +283,6 @@
       delete cart[t.dataset.del];
       saveCart();
       renderCart();
-    }
-    if (t.dataset.thumb) {
-      const image = $("[data-main]");
-      if (!image) return;
-      if (t.dataset.srcset) image.srcset = t.dataset.srcset;
-      else image.removeAttribute("srcset");
-      image.src = t.dataset.thumb;
-      image.alt = t.dataset.alt || image.alt;
-      image.dataset.zoom = t.dataset.zoom || t.dataset.thumb;
-      $$("[data-thumb]").forEach((b) => { b.classList.toggle("on", b === t); b.setAttribute("aria-pressed", String(b === t)); });
     }
   });
 
@@ -860,23 +850,110 @@
     resize();
   }
 
-  // Load the larger photo when the buyer opens the gallery.
-  function zoom() {
-    const trigger = $("[data-zoom-trigger]");
+  function photoSwipe(surface, move) {
+    let start;
+    let swiped = false;
+    surface.addEventListener("pointerdown", (event) => {
+      swiped = false;
+      start = event.pointerType === "touch" && event.isPrimary ? event : null;
+    });
+    surface.addEventListener("pointercancel", () => { start = null; });
+    surface.addEventListener("pointerup", (event) => {
+      if (!start || start.pointerId !== event.pointerId) return;
+      const dx = event.clientX - start.clientX;
+      const dy = event.clientY - start.clientY;
+      start = null;
+      if (Math.abs(dx) < 42 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
+      swiped = true;
+      move(dx < 0 ? 1 : -1);
+    });
+    surface.addEventListener("click", (event) => {
+      // Suppress the touch-generated click after a swipe. Keyboard activation still opens the photo.
+      if (!swiped || event.detail === 0) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+  }
+
+  function productGallery() {
+    const gallery = $("[data-photo-gallery]");
+    const trigger = gallery && $("[data-zoom-trigger]", gallery);
     if (!trigger) return;
     const pic = $("[data-main]", trigger);
+    const thumbs = $$("[data-thumb]", gallery);
+    const position = $("[data-photo-position]", gallery);
+    const template = $("[data-photo-dialog]", gallery);
+    let current = 0;
+    let box = null;
+
+    const photoPosition = () => `Photo ${current + 1} of ${thumbs.length}`;
+    const updateExpanded = () => {
+      const image = $("[data-expanded-photo]", box);
+      image.src = pic.dataset.zoom || pic.currentSrc || pic.src;
+      image.alt = pic.alt;
+      const status = $("[data-photo-position]", box);
+      if (status) status.textContent = photoPosition();
+    };
+    const selectPhoto = (index) => {
+      const previous = thumbs[current];
+      current = (index + thumbs.length) % thumbs.length;
+      const thumb = thumbs[current];
+      previous.classList.remove("on");
+      previous.setAttribute("aria-pressed", "false");
+      thumb.classList.add("on");
+      thumb.setAttribute("aria-pressed", "true");
+      if (thumb.dataset.srcset) {
+        pic.sizes = gallery.dataset.photoSizes;
+        pic.srcset = thumb.dataset.srcset;
+      } else {
+        pic.removeAttribute("srcset");
+        pic.removeAttribute("sizes");
+      }
+      pic.src = thumb.dataset.thumb;
+      pic.alt = thumb.dataset.alt;
+      pic.dataset.zoom = thumb.dataset.zoom || thumb.dataset.thumb;
+      position.textContent = photoPosition();
+      if (box) updateExpanded();
+
+      // Keep the selected thumbnail visible without scrolling the page away from the photo.
+      const rail = thumb.parentElement;
+      const row = rail.getBoundingClientRect();
+      const item = thumb.getBoundingClientRect();
+      if (item.left < row.left) rail.scrollLeft += item.left - row.left;
+      if (item.right > row.right) rail.scrollLeft += item.right - row.right;
+    };
+    const move = (step) => selectPhoto(current + step);
+    const connectNavigation = (area, surface) => {
+      area.addEventListener("click", (event) => {
+        const step = event.target.closest("[data-photo-step]");
+        if (step) move(Number(step.dataset.photoStep));
+      });
+      area.addEventListener("keydown", (event) => {
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        event.preventDefault();
+        move(event.key === "ArrowRight" ? 1 : -1);
+      });
+      photoSwipe(surface, move);
+    };
+    if (thumbs.length) {
+      connectNavigation(gallery, trigger);
+      thumbs.forEach((thumb, index) => thumb.addEventListener("click", () => selectPhoto(index)));
+    }
+
     trigger.addEventListener("click", () => {
-      const box = document.createElement("dialog");
-      box.className = "lightbox";
-      box.setAttribute("aria-label", "Product image");
-      box.innerHTML = '<img src="' + esc(pic.dataset.zoom || pic.currentSrc || pic.src) + '" alt="' + esc(pic.alt) + '"><button class="x" type="button" aria-label="Close">×</button>';
+      if (box) return;
+      box = template.content.firstElementChild.cloneNode(true);
+      updateExpanded();
+      if (thumbs.length) connectNavigation(box, $("[data-expanded-photo]", box));
       const close = () => {
         box.close();
         box.remove();
-        trigger.focus();
+        box = null;
+        trigger.focus({ preventScroll: true });
       };
       box.addEventListener("click", (event) => {
-        if (event.target === box || event.target.closest("button")) close();
+        if (event.target === box || event.target.closest("[data-close-photo]")) close();
       });
       box.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
       document.body.append(box);
@@ -1123,14 +1200,13 @@
     if (image instanceof HTMLImageElement && !image.src.endsWith("/placeholder.svg")) { image.closest("picture")?.querySelectorAll("source").forEach(source => source.remove()); image.removeAttribute("srcset"); image.removeAttribute("data-zoom"); image.src = "/placeholder.svg"; }
   }, true);
   $$("img").forEach(image => { if (image.complete && !image.naturalWidth && image.getAttribute("src")) image.dispatchEvent(new Event("error")); });
-  $$("[data-thumb]").forEach(b => b.setAttribute("aria-pressed", String(b.classList.contains("on"))));
   if (storageUnavailable) storageNotice();
   rememberProduct();
   badges();
   grids();
   suggestions();
   buyBar();
-  zoom();
+  productGallery();
   track();
   account();
   checkout();

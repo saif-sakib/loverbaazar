@@ -18,8 +18,8 @@ const settings = {
   delivery: [{ id: 'local', label: 'Local', fee: 60 }],
   payments: [{ id: 'cod', label: 'Cash on delivery', enabled: true, number: '' }, { id: 'mobile', label: 'Mobile payment', enabled: true, number: 'test-number' }],
 };
-async function shop(run, { cart = {}, wish = [], stock = { 1: [1000, 1200, 10], 2: [500, 500, 10] }, live = {} } = {}) {
-  const context = await browser.newContext({ baseURL, viewport: { width: 375, height: 812 } });
+async function shop(run, { cart = {}, wish = [], stock = { 1: [1000, 1200, 10], 2: [500, 500, 10] }, live = {}, hasTouch = false } = {}) {
+  const context = await browser.newContext({ baseURL, hasTouch, isMobile: hasTouch, viewport: { width: 375, height: 812 } });
   const errors = [];
   context.on('page', page => page.on('pageerror', e => errors.push(e.message)));
   await context.addInitScript(({ cart, wish }) => {
@@ -203,17 +203,103 @@ test('main pages fit small screens and desktop', { timeout: 180000 }, () => shop
   }
 }, { cart: { 1: 1 } }));
 
-test('product image opens and closes with the keyboard', () => shop(async page => {
+test('product photo hover respects reduced motion and the image still opens and closes with the keyboard', () => shop(async page => {
   await ready(page, '/shop/');
   const href = await page.locator('.card .thumb').first().getAttribute('href');
   await ready(page, href);
-  await page.locator('[data-zoom-trigger]').focus();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const trigger = page.locator('[data-zoom-trigger]');
+  assert.equal((await trigger.textContent()).trim(), '');
+  await trigger.hover();
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-main]')).transform !== 'none');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  assert.equal(await trigger.locator('[data-main]').evaluate(el => getComputedStyle(el).transform), 'none');
+  await trigger.focus();
   await page.keyboard.press('Enter');
   assert.equal(await page.locator('dialog.lightbox').isVisible(), true);
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('dialog.lightbox').count(), 0);
-  assert.equal(await page.locator('[data-zoom-trigger]').evaluate(e => e === document.activeElement), true);
+  assert.equal(await trigger.evaluate(e => e === document.activeElement), true);
 }));
+
+test('product photos share one selection across swipe, arrows, thumbnails and the enlarged view', () => shop(async (page, context) => {
+  await context.route('**/*', route => {
+    if (route.request().resourceType() !== 'image') return route.fallback();
+    return route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600"><rect width="600" height="600" fill="silver"/></svg>',
+    });
+  });
+  await ready(page, '/product/kiam-induction-cooker-h-77/');
+  const gallery = page.getByRole('group', { name: 'Product photos' });
+  const trigger = gallery.locator('[data-zoom-trigger]');
+  const main = trigger.locator('[data-main]');
+  const thumbs = gallery.locator('[data-thumb]');
+  const lightbox = page.getByRole('dialog', { name: 'Enlarged product photos' });
+  const count = await thumbs.count();
+  assert.ok(count >= 3);
+  const assertPhoto = async index => {
+    const selected = thumbs.nth(index);
+    assert.equal(await selected.getAttribute('aria-pressed'), 'true');
+    assert.equal(await gallery.locator('[data-thumb][aria-pressed="true"]').count(), 1);
+    assert.equal(await main.getAttribute('src'), await selected.getAttribute('data-thumb'));
+    assert.equal(await main.getAttribute('alt'), await selected.getAttribute('data-alt'));
+    assert.equal(await gallery.getByRole('status').textContent(), `Photo ${index + 1} of ${count}`);
+  };
+  const cdp = await context.newCDPSession(page);
+  const swipe = async (surface, dx, dy) => {
+    const frame = await surface.boundingBox();
+    const x = Math.round(frame.x + (frame.width - dx) / 2);
+    const y = Math.round(frame.y + (frame.height - dy) / 2);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    for (const part of [0.33, 0.67, 1]) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * part, y: y + dy * part }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+
+  await gallery.getByRole('button', { name: 'Next photo' }).tap();
+  await assertPhoto(1);
+  await gallery.getByRole('button', { name: 'Previous photo' }).tap();
+  await assertPhoto(0);
+  await trigger.focus();
+  await page.keyboard.press('ArrowLeft');
+  await assertPhoto(count - 1);
+  await thumbs.nth(1).tap();
+  await trigger.tap({ position: { x: 130, y: 90 } });
+  await lightbox.waitFor();
+  const enlarged = lightbox.locator('[data-expanded-photo]');
+  assert.equal(await enlarged.getAttribute('src'), await thumbs.nth(1).getAttribute('data-zoom'));
+  await lightbox.getByRole('button', { name: 'Next photo' }).tap();
+  assert.equal(await lightbox.getByRole('status').textContent(), `Photo 3 of ${count}`);
+  await page.waitForFunction(() => document.querySelector('[data-expanded-photo]')?.naturalWidth === 600);
+  await swipe(enlarged, 110, 0);
+  assert.equal(await lightbox.getByRole('status').textContent(), `Photo 2 of ${count}`);
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await enlarged.getAttribute('src'), await thumbs.nth(0).getAttribute('data-zoom'));
+  await lightbox.getByRole('button', { name: 'Close enlarged photo' }).click();
+  await assertPhoto(0);
+  assert.equal(await trigger.evaluate(el => el === document.activeElement), true);
+
+  for (const width of [320, 360, 375, 390, 414, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Gallery fits at ${width}px`);
+    for (const arrow of await gallery.locator('[data-photo-step]').all()) {
+      const box = await arrow.boundingBox();
+      assert.ok(box.width >= 44 && box.height >= 44 && box.x >= 0 && box.x + box.width <= width, `Arrow fits at ${width}px`);
+    }
+  }
+  await page.setViewportSize({ width: 375, height: 812 });
+  await trigger.evaluate(el => el.scrollIntoView({ block: 'center' }));
+  const startY = await page.evaluate(() => scrollY);
+  await swipe(trigger, -110, 0);
+  await assertPhoto(1);
+  assert.equal(await lightbox.count(), 0);
+  await swipe(trigger, 0, -120);
+  await page.waitForFunction(y => scrollY > y + 20, startY);
+  await assertPhoto(1);
+  assert.equal(await lightbox.count(), 0);
+}, { hasTouch: true }));
 
 test('admin remains usable when session storage is blocked', () => shop(async page => {
   await page.addInitScript(() => Object.defineProperty(window, 'sessionStorage', { get() { throw new DOMException('Storage blocked', 'SecurityError'); } }));
