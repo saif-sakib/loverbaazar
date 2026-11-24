@@ -80,7 +80,7 @@ Run the Playwright scans against one isolated fixture through `dev.sh`. The logi
 
 1. On each phone, open a product with Bangla and English text. Check pronunciation at the heading and navigation, font legibility, line wrapping, price, availability and photo alt text. Open and close the category drawer and the photo zoom. Confirm focus returns to the opener.
 2. With the software keyboard, order a fixture item with a Bangla-digit phone number and long Bangla address. Make one validation error, then correct it. Check that the error is announced and that receipt/tracking order numbers and taka amounts remain legible. Repeat with optional payment controls, cart edits and an out-of-stock item. Use a preview test order, not an order on the live shop.
-3. Check tab focus and form labels in the admin order list and product editor, including saving Search and social settings. Confirm you can complete the controls at 200% zoom. Record browser, OS, assistive technology and defects in [mobile verification](mobile-results.md). [WCAG 2.2 guidance](https://www.w3.org/WAI/WCAG22/quickref/)
+3. Check tab focus and form labels in the admin order list and product editor, including saving Search and social settings. Confirm you can complete the controls at 200% zoom. Record browser, OS, assistive technology and defects in [mobile verification](records/mobile-results.md). [WCAG 2.2 guidance](https://www.w3.org/WAI/WCAG22/quickref/)
 
 ## Verification commands
 

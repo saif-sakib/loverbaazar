@@ -36,6 +36,6 @@ The product's baseline cold image transfer was still incomplete in the test wind
 
 ## Actions required
 
-1. Follow the [WordPress backup and export instructions](wordpress-export.md), then provide the local folder path.
-2. Review actual URL outcomes and merchandising, policy, SEO and asset metadata with the [acceptance guide](seo-performance.md). Rerun the builds and mobile profile using the approved real catalog.
+1. Follow the [WordPress backup and export instructions](../wordpress-export.md), then provide the local folder path.
+2. Review actual URL outcomes and merchandising, policy, SEO and asset metadata with the [acceptance guide](../seo-performance.md). Rerun the builds and mobile profile using the approved real catalog.
 3. Complete the documented hosted refresh, Search Console and device checks before the relevant roadmap tasks are marked Done.

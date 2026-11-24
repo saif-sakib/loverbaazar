@@ -16,13 +16,13 @@ Start with [the WordPress export instructions](wordpress-export.md). Keep raw ex
 | 22 | Sanitized editorial imports, preserved SEO metadata, demo/shortcode/claim/link audit, required public policy-page checks, settings-bound commercial approval and dominant-script language metadata | Actual business/policy corrections and owner approval. No commercial promises are invented or silently overwritten |
 | 23 | Disposable end-to-end import/rerun/source-delta/admin-conflict/build-snapshot/archive/restore/deletion/post-sale closure rehearsal | Repeat using the real dataset, resolve/approve exceptions, capture a real restore point and authorize the eventual single-writer cutover |
 
-Test results and limits: [migration verification](migration-results.md).
+Test results and limits: [migration verification](records/migration-results.md).
 
 ## Export and inventory
 
 `scripts/export-wordpress.php` uses WooCommerce data APIs rather than assuming orders live in WordPress posts. It exports products and variations, terms, documents, attachments, orders and customer profiles in bounded pages, preserving Rank Math fields and redirects. Each file has SHA-256/count metadata. The source is not assumed frozen during the initial export; a final authorized freeze must precede the last export. Protected pages become private drafts; unaddressable drafts/trash are retained in the private source with an explicit disposition.
 
-The public-only [DNS capture](migration-public-dns.json) was collected on 18 November 2026, Asia/Dhaka. It is not proof of the full zone, mailbox ownership, correct delivery or paid-through dates. The existing website was inspected read-only; it is not treated as a complete product/stock/customer export.
+The public-only [DNS capture](records/migration-public-dns.json) was collected on 18 November 2026, Asia/Dhaka. It is not proof of the full zone, mailbox ownership, correct delivery or paid-through dates. The existing website was inspected read-only; it is not treated as a complete product/stock/customer export.
 
 Optional private backup evidence inventory:
 

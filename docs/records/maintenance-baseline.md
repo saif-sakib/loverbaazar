@@ -33,7 +33,7 @@ This is one availability observation. It establishes neither an uptime percentag
 | GitHub | Account artifact/storage allowance and usage, cache usage/configured cap; free/no-card status | Unknown; repository artifact bytes above are measured |
 | Commerce/recovery | Natural warm checkout p95/sample count, cold delays/confirmed losses, full operator recovery time, contribution/order, offline archive/key access | Owner record required; prior fixture p95 98–191 ms and fixture restore 1–2 seconds in task 41/36 are not production measurements or full operator recovery time |
 
-Use [the operating checklist](maintenance.md) and [empty private usage template](maintenance-usage.example.json). No provider API key, customer export or database query is required by the checker. Owner readings must include observation date and actual allowance; do not infer usage from catalog size.
+Use [the operating checklist](../maintenance.md) and [empty private usage template](../maintenance-usage.example.json). No provider API key, customer export or database query is required by the checker. Owner readings must include observation date and actual allowance; do not infer usage from catalog size.
 
 ## Branch cleanup
 
@@ -54,5 +54,5 @@ Also removed **three remote branches belonging to already closed Dependabot PRs*
 ## Actions required
 
 1. Record actual dashboard usage in the private template and run `python3 scripts/maintenance-check.py --usage /absolute/private/path/maintenance-usage.json`. Review warnings rather than treating a nonzero exit as a reason to buy capacity.
-2. Set the [maintenance cadence](maintenance.md#calendar-in-bangladesh-time-utc6), record the backup operator and independent recovery access, and download the verified encrypted backup before its expiry.
+2. Set the [maintenance cadence](../maintenance.md#calendar-in-bangladesh-time-utc6), record the backup operator and independent recovery access, and download the verified encrypted backup before its expiry.
 3. Finish the baseline and record review outcomes before changing task 49 to Done.

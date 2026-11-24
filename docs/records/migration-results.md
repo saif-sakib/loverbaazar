@@ -53,5 +53,5 @@ Cloudinary HTTP/account behavior is covered with controlled test responses, incl
 ## Actions required
 
 1. Merge the reviewed PR so the export script is available from `main`.
-2. Follow [the private WordPress backup/export instructions](wordpress-export.md) and provide the local source directory path.
+2. Follow [the private WordPress backup/export instructions](../wordpress-export.md) and provide the local source directory path.
 3. Review the actual catalog, outstanding old orders, asset failures and business policies produced from those files. Finish the isolated real-data rehearsal before marking tasks 17–23 Done or changing the domain/hosting.

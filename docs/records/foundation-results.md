@@ -22,12 +22,12 @@ Local fixtures used separate containers, ports and output directories. The ordin
 
 ## Remaining account and cloud acceptance
 
-Repository work cannot establish production account recovery, install unpushed workflows or demonstrate a real cloud deploy callback. Task 4 remains pending main-branch protection and the other service-account access/recovery checks. Task 8 remains pending configuring its scoped token/variables, deploying the API and workflow, then demonstrating real successful/failed/superseded publication and cross-device status. Follow [the foundation handover](foundation.md#actions-required) on an isolated preview before production.
+Repository work cannot establish production account recovery, install unpushed workflows or demonstrate a real cloud deploy callback. Task 4 remains pending main-branch protection and the other service-account access/recovery checks. Task 8 remains pending configuring its scoped token/variables, deploying the API and workflow, then demonstrating real successful/failed/superseded publication and cross-device status. Follow [the publication protocol](../foundation.md#publication-protocol) on an isolated preview before production.
 
 No DNS change, hosting cancellation, paid plan, new payment method, remote deployment or customer notification was performed. Changes remain in the workspace for review. Full functional pull-request CI is task 31; main-branch API checks and the new security workflow are not presented as a substitute.
 
 ## Actions required
 
-1. Follow [foundation setup and account steps](foundation.md#actions-required), keeping the deployment in preview until launch readiness.
+1. Follow the setup and account steps in the [foundation guide](../foundation.md), keeping the deployment in preview until launch readiness.
 2. Restart the ordinary local dev server when ready to use the implementation. Never erase `lbpg` to install the migrations.
 3. Complete and verify the account/cloud acceptance steps before marking tasks 4 and 8 Done.

@@ -2,7 +2,7 @@
 
 **Goal:** a fast, mobile-first Bangladesh store at $0 application running cost, serving `loverbaazar.com` on the free stack while retaining a tested rollback and deferring Stellar Plus retirement until owner confirmation.
 
-The complete implementation plan is [docs/roadmap.md](docs/roadmap.md). Its numbered tasks (core tasks 1–50 plus appended optional backlog and post-launch tasks 51–65; task numbers are preserved and never renumbered) are the source of truth for requests such as **"Do task 1"**. The [architecture audit](docs/architecture-audit.md) records the source findings, local test results and verified provider constraints behind that plan.
+The [numbered roadmap](docs/roadmap.md) is the source of truth for requests such as **"Do task 1"**. It keeps the original task numbers and appends new work. The [architecture audit](docs/architecture-audit.md) records the source findings, local test results and provider constraints behind the plan.
 
 ## Architecture decisions
 

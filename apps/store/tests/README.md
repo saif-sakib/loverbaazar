@@ -36,4 +36,4 @@ PYTHONPATH=scripts python3 -m unittest discover -s scripts/migration -p 'test_*.
 ./scripts/test-wordpress-export.sh
 ```
 
-Run these from the repository root. The last command downloads local WordPress/MariaDB Docker fixtures and WooCommerce; it does not use the real site or publish a port. See [migration results](../../../docs/migration-results.md). Real inventory comes only from an approved export/review; legacy `in_stock` flags do not prove a quantity. Disposable `LB_ISOLATED=1` demos use explicit synthetic fixture stock.
+Run these from the repository root. The last command downloads local WordPress/MariaDB Docker fixtures and WooCommerce; it does not use the real site or publish a port. See [migration results](../../../docs/records/migration-results.md). Real inventory comes only from an approved export/review; legacy `in_stock` flags do not prove a quantity. Disposable `LB_ISOLATED=1` demos use explicit synthetic fixture stock.

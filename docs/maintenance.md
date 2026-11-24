@@ -2,7 +2,7 @@
 
 The owner runs the shop checks and approves business decisions. The repository maintainer investigates failures, prepares tested fixes and records evidence. If the owner is also the maintainer, keep both responsibilities on the same checklist. Before delegating, record the named backup operator and verify their account/recovery access privately.
 
-Keep the application stack at $0: Free plans, no payment methods, no automatic reload, no paid add-ons or overage. A warning starts investigation; it never authorizes an upgrade. Domain renewal remains a separate Namecheap responsibility. [Current measured baseline and remaining owner readings](maintenance-baseline.md).
+Keep the application stack at $0: Free plans, no payment methods, no automatic reload, no paid add-ons or overage. A warning starts investigation; it never authorizes an upgrade. Domain renewal remains a separate Namecheap responsibility. [19 November baseline and remaining owner readings](records/maintenance-baseline.md).
 
 ## Calendar in Bangladesh time (UTC+6)
 

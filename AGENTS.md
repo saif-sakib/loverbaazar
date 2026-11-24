@@ -25,7 +25,7 @@ Bangladesh home-appliance shop. Replaces WordPress at loverbaazar.com.
 
 Mobile implementation and acceptance evidence: [docs/mobile-ui.md](docs/mobile-ui.md). Never claim Chromium emulation as real-phone acceptance.
 
-Foundation contracts, environment setup and release protocol: [docs/foundation.md](docs/foundation.md).
+The [documentation index](docs/README.md) links to operating guides and verification records. Use the [foundation guide](docs/foundation.md) for data contracts, environment setup and releases.
 
 ## SEO, performance and accessibility
 

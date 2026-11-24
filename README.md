@@ -1,46 +1,41 @@
 # LoverBaazar
 
-Run a disposable local demo (needs Docker, Go per `apps/api/go.mod`, Node per `.nvmrc`): `LB_ISOLATED=1 ./scripts/dev.sh`, then open http://127.0.0.1:8787/. Use `./scripts/dev.sh` for existing verified local inventory. Unknown legacy quantities are quarantined, never invented.
+Bangladesh home-appliance and furniture shop. The [architecture plan](PLAN.md) records the stack choices and the $0 running-cost rule.
 
-For setup/checks use `./scripts/check.sh --browsers`; isolated test commands and environment/release contracts are in [docs/foundation.md](docs/foundation.md).
+## Run locally
 
-## Admin token
+Install Docker, Python 3, the Go version in [go.mod](apps/api/go.mod), and the Node version in [.nvmrc](.nvmrc). From the repository root, start a shop with disposable fixture data.
 
-| Where | Token | Set in |
-|---|---|---|
-| This computer | `local-admin-token-for-this-computer-only` | `scripts/dev.sh`, automatically |
-| Live shop | One you generate with `openssl rand -hex 32` | Render, as `ADMIN_TOKEN`. Never in this repo |
+```sh
+LB_ISOLATED=1 ./scripts/dev.sh
+```
 
-Open `/admin/` and paste the token. The live API refuses to start with the local token.
+Open the shop at `http://127.0.0.1:8787/`. Open `/admin/` and use `local-admin-token-for-this-computer-only` for the local API. Use `./scripts/dev.sh` to work with existing local inventory. The [setup guide](docs/foundation.md#local-setup-and-isolation) describes alternate ports and isolated tests.
 
-## Settings and secrets
+```sh
+./scripts/check.sh --browsers
+./scripts/test-mobile.sh --ci
+```
 
-There is no `.env` file by default, on purpose. `dev.sh` sets up everything for local use, and real
-secrets live in the Render, GitHub and Cloudflare dashboards. [.env.example](.env.example) lists every
-setting and where it goes. Copy it to `.env` only to try an optional service, such as email, locally.
+## Configuration
 
-Shop details, delivery charges and payment numbers aren't environment settings. Change them in
-admin, under Settings. Their first values come from `apps/api/defaults.json`.
+- [.env.example](.env.example) lists settings and their destinations. `dev.sh` provides local defaults. Use an ignored `.env` for optional local integrations.
+- Store production credentials in the relevant hosting dashboards. Generate the live Render `ADMIN_TOKEN` with `openssl rand -hex 32`.
+- Edit shop details, delivery charges, and payment numbers under **Admin → Settings**. The initial values come from [API defaults](apps/api/defaults.json).
 
 ## Project layout
 
-    apps/api/        Go API: main.go core, shop.go customers, admin.go admin, notifications.go email, release.go frozen builds, product_photos.go uploads, operations.go ops, safety.go validation, catalog_migration.go importer, schema.sql & migrations*.sql
-    apps/store/      Astro storefront, admin panel (public/admin.js, public/invoice.js), legacy-urls.json, tests/
-    edge/worker.js   Cloudflare Worker: /api proxy, legacy redirects, caching, security headers
-    scripts/         Local dev (dev.sh), checks (check.sh, test-*.sh), release/backup/maintenance/security & WordPress migration
-    docs/            Operating runbooks, roadmap, and point-in-time verification records
-    .github/         CI, coordinated deploys, security scan, nightly backups and freshness watch
+| Path | Contents |
+| --- | --- |
+| [apps/api](apps/api/) | Go API, order and catalog logic, release snapshots, schema and migrations |
+| [apps/store](apps/store/) | Astro storefront and Admin, browser assets, SEO build, and [storefront tests](apps/store/tests/README.md) |
+| [edge](edge/) | Cloudflare Worker, API proxy, redirects, caching, and security headers |
+| [scripts](scripts/README.md) | Local development, tests, WordPress migration, release, backup, and maintenance commands |
+| [.github/workflows](.github/workflows/) and [render.yaml](render.yaml) | CI, coordinated releases, hosting, security scans, and backups |
+| [docs](docs/README.md) | Runbooks, roadmap, and verification records |
 
-Admin covers orders, products, categories, coupons, customers, reviews, messages, pages, blog and shop settings.
+## Start here
 
-- Verified WordPress migration: [docs/migration.md](docs/migration.md)
-- Export WordPress privately: [docs/wordpress-export.md](docs/wordpress-export.md)
-- Go live for $0: [docs/go-live.md](docs/go-live.md)
-- Storefront SEO, mobile performance and accessibility: [docs/seo-performance.md](docs/seo-performance.md)
-- A-to-Z owner operating guide: [docs/operations-index.md](docs/operations-index.md)
-- Old orders, accounts and backup retention: [docs/data-retention.md](docs/data-retention.md)
-- Numbered implementation and launch tasks: [docs/roadmap.md](docs/roadmap.md)
-- Routine maintenance and measured upgrade triggers: [docs/maintenance.md](docs/maintenance.md)
-- Architecture audit and verified baseline: [docs/architecture-audit.md](docs/architecture-audit.md)
-- Why this stack: [PLAN.md](PLAN.md)
-- Rules for changing the code: [AGENTS.md](AGENTS.md) and [CLAUDE.md](CLAUDE.md)
+- Read the [operating guide](docs/operations-index.md) for daily shop work.
+- Use the [numbered roadmap](docs/roadmap.md) to find task status, dependencies, and the latest verification.
+- Follow the [contributor rules](AGENTS.md) when editing the project. [CLAUDE.md](CLAUDE.md) imports the same rules.

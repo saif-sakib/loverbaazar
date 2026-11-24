@@ -16,9 +16,10 @@ apps/api/app
 *.dump
 *.dump.gpg
 
-# Local data
-data/raw
+# Local data and machine-specific settings
+/data/
 apps/store/public/uploads
+/.claude/settings.local.json
 
 # Editors and systems
 .DS_Store

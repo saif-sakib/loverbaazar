@@ -55,7 +55,7 @@ SHOP_URL=http://127.0.0.1:18787 CHROME_PATH=/path/to/chromium \
   node --test apps/store/tests/*.test.mjs
 ```
 
-Results are in [mobile verification results](mobile-results.md). UI tests emulate Chromium; the 720 CSS-pixel reflow check represents a 1440 px desktop viewport at 200% zoom. It does not prove device font scaling, VoiceOver/TalkBack, Safari rendering or a hardware keyboard.
+Results are in [mobile verification results](records/mobile-results.md). UI tests emulate Chromium; the 720 CSS-pixel reflow check represents a 1440 px desktop viewport at 200% zoom. It does not prove device font scaling, VoiceOver/TalkBack, Safari rendering or a hardware keyboard.
 
 ## Screenshots
 
@@ -63,16 +63,16 @@ Representative viewport captures, locally built from fixture/seed content:
 
 | Screen | Evidence |
 | --- | --- |
-| Phone home | [375 px](ui/home-375.png) |
-| Phone catalog | [375 px](ui/catalog-375.png) |
-| Phone purchase controls | [375 px](ui/product-375.png) |
-| Phone checkout | [375 px](ui/checkout-375.png) |
-| Phone admin product editor | [375 px](ui/admin-editor-375.png) |
-| Phone order fulfillment | [375 px](ui/admin-orders-375.png) |
-| Desktop home | [1440 px](ui/home-1440.png) |
+| Phone home | [375 px](records/ui/home-375.png) |
+| Phone catalog | [375 px](records/ui/catalog-375.png) |
+| Phone purchase controls | [375 px](records/ui/product-375.png) |
+| Phone checkout | [375 px](records/ui/checkout-375.png) |
+| Phone admin product editor | [375 px](records/ui/admin-editor-375.png) |
+| Phone order fulfillment | [375 px](records/ui/admin-orders-375.png) |
+| Desktop home | [1440 px](records/ui/home-1440.png) |
 
 ## Actions required
 
 1. Under tasks 30 and 39, run physical-device TalkBack (Android) and VoiceOver (iPhone) passes, actual 200% browser zoom checks, and real-phone order-tracking verification across key customer and admin journeys.
-2. Record device model, browser/version, scenario and result in [mobile-results.md](mobile-results.md) (and [roadmap.md](roadmap.md)) before marking tasks 30 and 39 Done.
+2. Record device model, browser/version, scenario and result in [mobile-results.md](records/mobile-results.md) (and [roadmap.md](roadmap.md)) before marking tasks 30 and 39 Done.
 3. Use `LB_ISOLATED=1 ./scripts/dev.sh` (or `./scripts/test-mobile.sh`) for any destructive fixture purchases, photo edits or stock tests; never place fake orders in the production customer database or transfer real money for checks.

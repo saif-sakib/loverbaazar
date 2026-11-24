@@ -15,7 +15,7 @@ Tasks 9–16 have repository implementations and local verification. Tasks 9, 11
 | Real isolated full-stack journey | Passed with `scripts/test-mobile.sh`: actual 375 px touch-emulated admin product creation → local Publish confirmation → real attribute filter → guest purchase → server-confirmed fee/total → receipt/privacy → confirm/ship → concurrent stock edit → repeated cancellation → CSV |
 | Manual API race on full-stack fixture | Twenty parallel requests for one unit returned one 200 and nineteen 409; deliberately supplied browser price `1` was ignored; cancellation twice restored only one unit |
 | Builds/publication | Repeated full Astro builds and local Publish confirmations succeeded using owned temporary output; no ordinary `dist` replacement or cloud deployment |
-| Other checks | Go vet/formatting, JavaScript and shell syntax, `git diff --check` passed; representative phone/desktop screenshots reviewed and recorded in `docs/ui/` |
+| Other checks | Go vet/formatting, JavaScript and shell syntax, `git diff --check` passed; representative phone/desktop screenshots reviewed and recorded in `docs/records/ui/` |
 
 The real journey exposed two admin problems that are fixed: saved courier details left an unsaved flag that prevented subsequent navigation, and cached product data displayed pre-sale stock when reopening an editor. The editor now refreshes on opening while continuing to submit only a relative stock delta. Slow-response navigation and abandoned-image checks cover additional mobile failure paths.
 
@@ -37,5 +37,5 @@ Chromium touch emulation, screenshots and 720 CSS-pixel reflow do not prove iOS 
 ## Actions required
 
 1. Merge the reviewed change and wait for the existing preview workflow to finish. Verify task 8's cloud Publish status if that acceptance is still open.
-2. Follow the [real-phone checklist](mobile-ui.md#actions-required), using disposable fixtures for orders/admin writes. Record device/browser and results in the table above.
+2. Follow the [real-phone checklist](../mobile-ui.md#actions-required), using disposable fixtures for orders/admin writes. Record device/browser and results in the table above.
 3. Mark tasks 10/12/14/16 Done after those checks pass. Continue the numbered data/SEO/CI/CD/launch work before switching the domain or cancelling hosting.

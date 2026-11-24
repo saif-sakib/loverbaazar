@@ -63,7 +63,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Give destructive API tests a clearly separate, loopback-only disposable database and guard against selecting `lbpg`, production URLs or an ordinary development database. Bound startup waits, check port conflicts and clean up only task-owned processes/containers.
 - Verify a fresh local setup, API/Worker/browser checks and cleanup. Document expected browser installation or `CHROME_PATH` use. Done when a new checkout can repeat the checks without secrets, production traffic or changes to business data.
 
-**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md).
+**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](records/foundation-results.md).
 
 ### Task 2 — Define and enforce application data contracts
 
@@ -73,7 +73,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Enforce bounded whole-taka integers, bounded integer stock deltas/quantities, valid slugs/URLs, category relationships and supported attributes. Reject overflow, fractions, malformed references and ambiguous product variants.
 - Verify boundary inputs with meaningful API/build checks. Done when invalid persisted content cannot silently break a build or produce incorrect money/stock behavior, and contracts explain which changes are live versus Publish-required.
 
-**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md).
+**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](records/foundation-results.md).
 
 ### Task 3 — Separate local, preview and production behavior
 
@@ -83,7 +83,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Keep repeatable integration environments local in Docker. Use a free Worker preview with fixtures or a deliberately isolated data source; never run destructive tests or real customer notifications against the production database. Avoid a second continuously running Render service.
 - Add preview `noindex` headers/meta and keep private/admin/customer data protected independently of indexing. Verify preview/prod builds, canonical origins, secret isolation and forbidden configuration combinations.
 
-**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md).
+**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](records/foundation-results.md).
 
 ### Task 4 — Secure repository, accounts and secrets
 
@@ -93,7 +93,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Prepare least-privilege GitHub/Cloudflare/Render access, 2FA/recovery ownership, restricted production secrets, minimal workflow permissions, pinned third-party action revisions and dependency update/security checks that remain free.
 - Define branch protection or the available free equivalent and a token-expiry recovery procedure. Verify untrusted pull requests cannot access deploy/backup secrets. Account changes requiring owner access remain explicit pending steps.
 
-**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md). GitHub 2FA and read-only workflow defaults were verified. Main protection enforces Store CI on current pull requests, including for administrators. Other provider account and recovery checks remain owner actions.
+**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](records/foundation-results.md). GitHub 2FA and read-only workflow defaults were verified. Main protection enforces Store CI on current pull requests, including for administrators. Other provider account and recovery checks remain owner actions.
 
 **Verification, 19 November 2026.** Main requires Store CI for administrators, rejects force pushes and defaults Actions to read-only. Confirm two-factor and recovery access in the provider accounts.
 
@@ -105,7 +105,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Ensure all private/error responses have correct cache behavior and logs do not leak addresses, credentials, payment references or tracking queries. Verify JSON-LD serialization and `esc()` use at customer-text boundaries.
 - Require a coherent production Turnstile configuration and test rejection/expiry/retry paths with test keys or stubs. Done with targeted negative tests for actual trust boundaries, not only happy-path login tests.
 
-**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md).
+**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](records/foundation-results.md).
 
 ### Task 6 — Prove checkout, money and inventory correctness
 
@@ -115,7 +115,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Strengthen idempotency behavior across lost responses, concurrent retries and changed payloads; scope keys so a reused key cannot reveal another customer's receipt. Verify coupon/payment-reference limits, logged-in pool contention, cancellation/return stock restoration and concurrent admin stock deltas.
 - Extend existing tests only for uncovered risks. Done when race/concurrency tests prove the last unit sells once, retries create one order and a failed transaction leaves no partial order, stock or coupon changes.
 
-**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md).
+**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](records/foundation-results.md).
 
 ### Task 7 — Make schema changes, startup and readiness reliable
 
@@ -125,7 +125,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Expose release/version and readiness information from memory after migration/snapshot initialization. Keep `/api/health` database-free; do not add database probes to public browsing or routine uptime checks.
 - Test clean schema creation, upgrade from an earlier schema, concurrent/repeated startup, migration failure and database wake/failure. Done when deploy checks distinguish a live process from a store ready to accept requests.
 
-**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md).
+**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](records/foundation-results.md).
 
 ### Task 8 — Make publishing and image cleanup safe
 
@@ -136,7 +136,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Retain images used by the active release and rollback releases. Delete only after confirmed replacement publication and a bounded retention policy, with quota accounting.
 - Verify failed/cancelled/superseded builds, another-device admin access, edits during a build, replaced photos before Publish and a rollback. Existing public pages must retain working assets throughout.
 
-**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](foundation-results.md). Real isolated local success/failure/retry and protocol regression checks pass. On 18 November, the [admin-triggered publication](https://github.com/saif-sakib/loverbaazar/actions/runs/44136254142) and [latest main release](https://github.com/saif-sakib/loverbaazar/actions/runs/44202649487) passed deployment confirmation. The Cloudflare preview returned the matching main commit as JSON. Cross-device confirmation, asset replacement and hosted rollback remain pending.
+**Implementation evidence (17 November 2026):** [Foundation report](foundation.md) and [verification results](records/foundation-results.md). Real isolated local success/failure/retry and protocol regression checks pass. On 18 November, the [admin-triggered publication](https://github.com/saif-sakib/loverbaazar/actions/runs/44136254142) and [latest main release](https://github.com/saif-sakib/loverbaazar/actions/runs/44202649487) passed deployment confirmation. The Cloudflare preview returned the matching main commit as JSON. Cross-device confirmation, asset replacement and hosted rollback remain pending.
 
 
 **Product photo follow-up.** Gallery and description selections stay in the browser until a product save. A checked save uploads only referenced files, preserves retries and tracks interrupted uploads for compensation. Rollback and shared images remain protected. A disposable trial on the Cloudinary Free account verified served upload, idempotent retry, replacement and confirmed removal of both fixture assets. Historical assets without verified ownership remain queued for review. Deployment and hosted admin smoke test are pending.
@@ -152,7 +152,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — implemented and locally verified · **Depends on:** 1
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](records/mobile-results.md).
 
 - Document and implement shared spacing, type, colors, controls, page widths, focus and loading/error/empty states. Start at 320–414 px, then enhance with tablet/desktop breakpoints.
 - Prefer `min-width` for new/substantially rewritten layout rules and consolidate competing overrides where the change requires it. Preserve existing brand assets and useful mobile controls.
@@ -162,7 +162,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — mobile navigation verified; owner confirmed phone use · **Depends on:** 9
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md). Follow-up verified the four bottom navigation links without header or footer duplicates at phone widths. The Account link stays in the header and the desktop navigation remains available.
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](records/mobile-results.md). Follow-up verified the four bottom navigation links without header or footer duplicates at phone widths. The Account link stays in the header and the desktop navigation remains available.
 
 - Make categories, product discovery, search, offers, cart and contact easy to reach with one hand. Reduce unnecessary first-screen hero height and competing sticky/floating controls while keeping the current visual identity.
 - Support touch/keyboard category navigation, clear active states, useful search suggestions and honest delivery/payment messages driven by settings.
@@ -174,7 +174,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — implemented and locally verified · **Depends on:** 9, 10
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](records/mobile-results.md).
 
 - Refine cards, stock/price clarity, sorting, price/stock filters and accessible mobile filter controls. Add brand/color filters only where task 2's real attributes support them; do not invent unavailable variants.
 - Preserve useful filter state on navigation, provide clear reset/no-result/error states and ensure live price updates preserve sorting. Keep every sellable product reachable with crawlable links; use static pagination when catalog size warrants it.
@@ -184,7 +184,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — product and purchase controls verified on phones and in the browser suite · **Depends on:** 9, 11
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](records/mobile-results.md).
 
 - Refine gallery/zoom, real specifications, model/SKU, brand, included items, warranty/returns, availability, quantity and delivery information. Identify seller and manufacturer accurately; show no fabricated ratings, warranty or stock promises.
 - Keep Add to cart/Buy now understandable and reachable on phones. Resolve buy-bar/navigation/chat overlap and include accessible image/option controls. Unsupported selectable product options block that product's launch until represented correctly.
@@ -196,7 +196,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — implemented and locally verified · **Depends on:** 9, 11
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](records/mobile-results.md).
 
 - Make quantity editing, removal, price changes, stock limits and the route to checkout clear on phones. Keep wishlist/recent products useful without making an account mandatory.
 - Preserve valid state across reloads/tabs and tolerate malformed or blocked browser storage. Explain removed products and price/availability changes without implying the browser's total is authoritative.
@@ -206,7 +206,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — owner confirmed Android and iPhone checkout · **Depends on:** 6, 12, 13
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](records/mobile-results.md).
 
 - Refine labels, Bangladeshi phone normalization, address/delivery selection, optional email, coupons, per-piece delivery charges, payment instructions and final server-confirmed totals. Keep guest ordering the default path.
 - Clearly label manual mobile payments as requiring verification. Handle Turnstile expiry, duplicate taps, total/stock changes, slow API wake-up and an uncertain response without encouraging a second payment or duplicate order.
@@ -218,7 +218,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — implemented and locally verified · **Depends on:** 5, 9, 14
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md).
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](records/mobile-results.md).
 
 - Refine optional registration/login/logout/password changes, phone-based order tracking and contact/review forms. Explain that historical WordPress passwords/sessions may not transfer; keep the agreed account recovery method safe and understandable.
 - Link actual delivery, returns, warranty, privacy and terms content at decision points. Keep public tracking responses limited to the matched customer and keep admin notes private.
@@ -228,7 +228,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — owner confirmed Admin on Android and iPhone · **Depends on:** 8, 9
 
-**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](mobile-results.md). Verified invoice previews at five phone widths and at 1440 px. Single-page and multipage fixture PDFs use A4 margins, repeat item headings across pages and include the saved amounts and the thank-you line.
+**Implementation evidence (18 November 2026):** [Mobile UI report](mobile-ui.md) and [verification results](records/mobile-results.md). Verified invoice previews at five phone widths and at 1440 px. Single-page and multipage fixture PDFs use A4 margins, repeat item headings across pages and include the saved amounts and the thank-you line.
 
 - Make products, images, stock deltas, prices, categories, pages, site/live settings, coupons, orders, tracking, messages and customer support usable from a phone. Use contained table scrolling or readable row layouts as appropriate.
 - Preserve unsaved edits, prevent duplicate saves, distinguish live effects from Publish-required effects and display task 8's real publication status. Provide clear order/payment verification and safe CSV export behavior.
@@ -242,7 +242,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** In progress — legacy export waived; cPanel inventory and expiry remain · **Depends on:** 3, 4
 
-**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](records/migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Obtain the selected private WooCommerce catalog/order records, Rank Math metadata/redirects and required media/URL sources. The owner waived a full WordPress filesystem and MySQL backup on 18 November 2026. Capture the current DNS zone, mailbox/other-site inventory and Stellar Plus renewal/end dates.
 - Record source time, file checksums, actual record counts, unresolved fields and business-critical legacy URLs. Keep raw exports/customer details outside Git and public CI artifacts; commit only sanitized tooling and aggregate evidence.
@@ -254,7 +254,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — importer verified in isolation; owner approved using the live catalog · **Depends on:** 2, 7, 17
 
-**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](records/migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Replace fixed-page/minor-unit assumptions with a complete paginated/export-based import that validates currency, source precision, IDs, slugs, categories, attributes, images and real quantities. Support dry run, change report, explicit create/update policy and safe reruns.
 - Map variable products to supported independent SKU/option inventory or block unresolved products. Respect sold-individually, unmanaged stock/backorders and inactive items; never translate an in-stock flag into 100 sellable units.
@@ -266,7 +266,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — owner declined legacy customer and order transfer · **Depends on:** 5, 17, 18
 
-**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](records/migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Deliver a tested historical migration or searchable private archive with explicit owner-approved coverage. Preserve original identifiers, statuses, timestamps, totals and outstanding fulfillment obligations; map legacy statuses to documented meanings.
 - Do not replay historical orders through checkout or decrement current stock again. Account mapping must verify identity; never claim WooCommerce password hashes work with the current password scheme or automatically attach a person's orders merely because someone registered a matching number.
@@ -278,7 +278,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — published references and sampled asset delivery verified · **Depends on:** 8, 17, 18
 
-**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](records/migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Extend/verify `images_to_cloudinary.py` for product, embedded description, category, page, blog and site assets. Keep deterministic `loverbaazar/products/<category>/<product>-N` naming and corresponding `pages/`, `blog/`, `site/` locations.
 - Create a resumable manifest with source/destination checks, useful alt text, dimensions and explicit failures. Preserve required downloads and old image URL mappings; implement appropriate legacy asset redirects before removing their old host.
@@ -290,7 +290,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — owner approved the current live inventory · **Depends on:** 16, 18, 20
 
-**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](records/migration-results.md) and [private export instructions](wordpress-export.md).
 
 **Live audit, 18 November 2026.** The isolated restore of the production archive contained 291 active catalog entries. Of those, 267 had exactly 100 units, the historical seed quantity. The owner confirmed the current inventory and asked to retain its quantities.
 
@@ -304,7 +304,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** In progress — editorial audit and approval prepared; business-content approval pending · **Depends on:** 10, 12, 15, 17
 
-**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](records/migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Review shop identity, phone/address/hours, delivery areas/charges/times, enabled payment accounts, warranty/returns/refunds, About/How to Buy/Terms/Privacy, category introductions and useful buying guides. Keep defaults only in `defaults.json`, with owner changes managed in admin.
 - Remove template/demo claims and stale WordPress shortcodes. Preserve valuable Bangla/English content and make language metadata reflect actual content. Do not publish invented testimonials or unverified brand guarantees.
@@ -314,7 +314,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 
 **Status:** Done — tested rehearsal and restore completed for the owner-approved data scope · **Depends on:** 18, 19, 20, 21, 22
 
-**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](migration-results.md) and [private export instructions](wordpress-export.md).
+**Implementation evidence (18 November 2026):** [Migration runbook](migration.md), [verification results](records/migration-results.md) and [private export instructions](wordpress-export.md).
 
 - Run the full migration against an isolated copy, then rerun it and simulate changes arriving on WordPress after the first export. Produce a dry-run delta for final prices, quantities, catalog edits and outstanding orders.
 - Reconcile source/target counts, identifiers, order totals/statuses, relationships, Asia/Dhaka display and image mappings. Document an explicit source-of-truth switch and single-writer freeze, including how old orders fulfilled after launch affect inventory.
@@ -332,7 +332,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Map changed URLs and legacy images/downloads to their closest relevant destinations; retain useful old query-link behavior. Review broad existing redirects for soft-404s. Genuine missing resources return an actual 404/410, without universal homepage redirects or redirect chains.
 - Define HTTPS, apex/www, canonical query/filter and staging URL policies. Verify the complete ledger, unusual encodings, redirects and status codes; protect commercially important URLs with regression checks.
 
-**Evidence, 18 November 2026.** Public sitemap ledger and exact path/query aliases implemented. Local comparison covered 348 URLs, with 336 direct, eight equivalent alias redirects, and four private decisions pending. The implemented aliases use public WordPress sitemap evidence. Complete private Search Console/backlink and catalog archive coverage. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** Public sitemap ledger and exact path/query aliases implemented. Local comparison covered 348 URLs, with 336 direct, eight equivalent alias redirects, and four private decisions pending. The implemented aliases use public WordPress sitemap evidence. Complete private Search Console/backlink and catalog archive coverage. [Results and remaining actions](records/seo-performance-results.md)
 
 **Verification, 19 November 2026.** The Pureit alias redirects to its corresponding product with the original query. Four old editorial URLs return actual 404s. Review their final disposition and any important old inbound links in Search Console before adding redirects.
 
@@ -346,7 +346,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Align sitemap inclusion with canonical/indexable active content, excluding admin/account/cart/checkout/search/tracking, drafts and intentional noindex pages. Make preview indexing protection environment-aware and preserve Search Console verification.
 - Verify unique meaningful titles/descriptions, one primary H1, canonical correctness, noindex/robots behavior and valid share images. Do not claim robots disallow makes private data secure or reliably removes an already indexed URL.
 
-**Evidence, 18 November 2026.** Editable product/category/page/post search properties, preview protection, canonical build checks and production sitemap generated from page heads. Local production-shaped build passed. The custom domain initially served a preview artifact with a sitemap 404. The [production release](https://github.com/saif-sakib/loverbaazar/actions/runs/44290572989) served a valid sitemap index, a child sitemap with 571 canonical URLs and the sitemap directive in robots.txt. Search Console submission and business metadata approval remain pending. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** Editable product/category/page/post search properties, preview protection, canonical build checks and production sitemap generated from page heads. Local production-shaped build passed. The custom domain initially served a preview artifact with a sitemap 404. The [production release](https://github.com/saif-sakib/loverbaazar/actions/runs/44290572989) served a valid sitemap index, a child sitemap with 571 canonical URLs and the sitemap directive in robots.txt. Search Console submission and business metadata approval remain pending. [Results and remaining actions](records/seo-performance-results.md)
 
 **Verification, 19 November 2026.** The owner confirmed Search Console Success for `sitemap-index.xml`. All 571 public pages passed the current canonical, noindex and heading crawl. Preview serves noindex/nofollow.
 
@@ -358,7 +358,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Implement a documented freshness policy for build-time prices/availability and feeds. Rebuild already-published content or serve appropriate memory-snapshot feeds without releasing pending editorial edits. Include the trigger, maximum lag and failure alert; a browser price patch alone does not update static HTML.
 - Verify rich-result validation, feed parsing and a price/stock change across HTML, visible UI and feeds. Confirm channel/country eligibility before treating Merchant Center as a required sales channel. Google indexing timing is outside the application's control.
 
-**Evidence, 18 November 2026.** BDT Product/Offer fields, verified GTIN handling, separate blog/product RSS and opt-in daily published-offer refresh implemented. Local frozen-release and artifact-change checks passed. Final rich-results test, real offer reconciliation and hosted workflow evidence are pending. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** BDT Product/Offer fields, verified GTIN handling, separate blog/product RSS and opt-in daily published-offer refresh implemented. Local frozen-release and artifact-change checks passed. Final rich-results test, real offer reconciliation and hosted workflow evidence are pending. [Results and remaining actions](records/seo-performance-results.md)
 
 **Verification, 19 November 2026.** All 291 catalog values agreed with live stock, visible offers, structured BDT offers and the feed. The published-artifact offer refresh was exercised in CI. Inspect the Google product rich-result report when available.
 
@@ -370,7 +370,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Reduce unused font weights/subsets while retaining Bangla/English glyph coverage and stable fallback layout. Verify broken-image handling, zoom quality and gallery sizing.
 - Measure mobile network/image transfers and layout shift on home, category and product pages. Done with recorded before/after evidence and acceptable Cloudinary credit use; do not trade an oversized original for uncontrolled per-device transformation costs.
 
-**Evidence, 18 November 2026.** Bounded responsive Cloudinary image URLs, priority/lazy loading, gallery zoom and self-hosted Latin/Bangla fonts implemented. Fixture measurements completed. The live catalog exposed 291 products with Cloudinary galleries. The Cloudinary Free account reported 6.64% of its credits in use during the audit. Confirm visual quality and complete archival coverage. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** Bounded responsive Cloudinary image URLs, priority/lazy loading, gallery zoom and self-hosted Latin/Bangla fonts implemented. Fixture measurements completed. The live catalog exposed 291 products with Cloudinary galleries. The Cloudinary Free account reported 6.64% of its credits in use during the audit. Confirm visual quality and complete archival coverage. [Results and remaining actions](records/seo-performance-results.md)
 
 **Verification, 19 November 2026.** The latest live mobile lab stayed within the image and font budgets. A public asset sample and the cross-browser published-image journey passed.
 
@@ -382,7 +382,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Initial targets: ordinary storefront first-load transfer ≤1 MB, compressed first-party JS ≤75 KB and CSS ≤40 KB, with separately recorded image/font budgets. Adjust targets only with documented measurements and a reason; do not hide regressions by changing thresholds silently.
 - Target LCP ≤2.5 s, INP ≤200 ms and CLS ≤0.1; lab measurements are prelaunch evidence, field 75th-percentile results come later. Verify cold/warm cache and meaningful input interactions. [Metric definitions](https://web.dev/articles/vitals)
 
-**Evidence, 18 November 2026.** Repeatable cold/warm phone-profile lab and documented byte thresholds. All representative fixture pages passed. The hosted homepage, shop, anodized category and induction product measured 166–386 kB cold transfer and 0.93–1.51 s lab LCP. Collect real-device and field results when eligible. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** Repeatable cold/warm phone-profile lab and documented byte thresholds. All representative fixture pages passed. The hosted homepage, shop, anodized category and induction product measured 166–386 kB cold transfer and 0.93–1.51 s lab LCP. Collect real-device and field results when eligible. [Results and remaining actions](records/seo-performance-results.md)
 
 **Verification, 19 November 2026.** The four live mobile profiles transferred 167–397 kB cold, with first-party JavaScript under 17 kB and CSS under 10 kB. Cold lab LCP ranged from 0.68 to 1.86 seconds, CLS stayed below 0.001 and the measured interaction peak was 80 ms. Field data will accumulate with actual traffic.
 
@@ -394,7 +394,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Make optional analytics respectful of applicable consent/privacy choices; a blocked analytics script must never break shopping. Use provider dashboards or lightweight aggregate tooling before adding a new service.
 - Verify duplicate purchase events/idempotent retries and exclusion of preview/test traffic. Done with a baseline/report guide for conversion, popular products, 404s and Web Vitals, stating where low traffic means field data is unavailable.
 
-**Evidence, 18 November 2026.** Documented Search Console/404/field baseline. Optional production-only request and unique committed-order counts tested with retries and no customer fields. Ownership, hosted reporting and baseline traffic remain pending. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** Documented Search Console/404/field baseline. Optional production-only request and unique committed-order counts tested with retries and no customer fields. Ownership, hosted reporting and baseline traffic remain pending. [Results and remaining actions](records/seo-performance-results.md)
 
 **Verification, 19 November 2026.** Owner confirmed Search Console accepted the sitemap. The reporting guide and privacy-preserving checkout counters are available. Collect the first traffic baseline during the observation period.
 
@@ -406,7 +406,7 @@ Render Free can sleep and has no production availability guarantee. Free quotas 
 - Check Bangla numerals/phone entry, mixed-language long names, address wrapping, font coverage and clear local currency/date presentation. Do not add a partially translated language switcher that promises unsupported content.
 - Verify with automated accessibility checks plus manual keyboard/screen-reader and 200% zoom checks. Done when critical journeys have no unresolved serious accessibility barriers and any remaining limitations are recorded.
 
-**Evidence, 18 November 2026.** Resolved automated contrast, accessible naming and link issues. Axe, keyboard/reflow and disposable Bangla guest checkout passed. The hosted public-page and admin sign-in scan also reported zero tested violations. Finish real 200% zoom, TalkBack/VoiceOver and final content checks. [Results and remaining actions](seo-performance-results.md)
+**Evidence, 18 November 2026.** Resolved automated contrast, accessible naming and link issues. Axe, keyboard/reflow and disposable Bangla guest checkout passed. The hosted public-page and admin sign-in scan also reported zero tested violations. Finish real 200% zoom, TalkBack/VoiceOver and final content checks. [Results and remaining actions](records/seo-performance-results.md)
 
 **Verification, 19 November 2026.** The current CI accessibility scan and responsive keyboard tests passed. The owner confirmed phone checkout/Admin. Record TalkBack, VoiceOver and actual 200% zoom results.
 
@@ -649,7 +649,7 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 - Maintain the numbered backlog for optional growth features such as a verified payment gateway, phone-order entry, promotion popups, automated courier integration or self-service recovery. Gateways/SMS/other paid integrations require separate commercial approval and are not assumed part of the free launch.
 - Done with executable runbooks, baseline usage and a review cadence; no service is upgraded automatically.
 
-**Implementation evidence, 19 November 2026.** [Maintenance runbook](maintenance.md) defines daily/weekly/monthly/quarterly reviews, responsible operators, free quota remedies at 70/85/95%, checkout/cold-start/resource/recovery/business decision thresholds and pause/resume, notification, backup, release/media and access recovery steps. [Measured baseline and branch cleanup](maintenance-baseline.md) records matching live API/store commits, active schedules, a fresh verified encrypted artifact and its expiry. `scripts/maintenance-check.py` performs only bounded public/GitHub GETs, reports unknown/stale dashboard usage and checks manually supplied actual allowances. Its 12 isolated safety checks pass and run in Store CI. Removed 13 obsolete local and 16 remote branches; preserved superseded handover history in a verified private Git bundle and included merged PR #22. The owner reports work through 48 complete and explicitly left provider readings as an owner action; no historical account verification is inferred.
+**Implementation evidence, 19 November 2026.** [Maintenance runbook](maintenance.md) defines daily/weekly/monthly/quarterly reviews, responsible operators, free quota remedies at 70/85/95%, checkout/cold-start/resource/recovery/business decision thresholds and pause/resume, notification, backup, release/media and access recovery steps. [Measured baseline and branch cleanup](records/maintenance-baseline.md) records matching live API/store commits, active schedules, a fresh verified encrypted artifact and its expiry. `scripts/maintenance-check.py` performs only bounded public/GitHub GETs, reports unknown/stale dashboard usage and checks manually supplied actual allowances. Its 12 isolated safety checks pass and run in Store CI. Removed 13 obsolete local and 16 remote branches; preserved superseded handover history in a verified private Git bundle and included merged PR #22. The owner reports work through 48 complete and explicitly left provider readings as an owner action; no historical account verification is inferred.
 
 **Actions required**
 
@@ -904,3 +904,13 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 - Keep the enlarge label available to assistive technology. Allow vertical swipes to scroll the product page. Use a small hover zoom for a fine pointer when reduced motion is off. Request the larger image when the enlarged view opens.
 - On 24 November 2026, local Chromium touch input confirmed that a horizontal swipe changed the selected photo and a vertical swipe scrolled the page. Chromium, Firefox and WebKit checks covered gallery controls, enlarged photos, focus return, single-photo products and eight viewport sizes. After release, check swiping, scrolling and closing the viewer on Android and iPhone.
 - All 62 UI tests, 19 accessibility scans, the API race suite and the disposable checkout and publication flow passed. The cold H-77 product page transferred 105 KB and reached largest contentful paint in 1.04 seconds in the throttled local fixture.
+
+### Task 73 — Organize project files and documentation
+
+**Status** Done.
+
+- Document the project layout and test entry points in the [README](../README.md) and [script index](../scripts/README.md). Use the [documentation index](README.md) for current guides and dated evidence. Keep shared contributor rules in [AGENTS.md](../AGENTS.md).
+- Move dated reports, the public DNS capture and UI screenshots into `docs/records/`. Update repository links and repair the two broken links in the foundation verification record.
+- Move old generated storefront builds, Astro output and Python bytecode to a private recovery folder. Keep local data and machine-specific settings ignored by Git.
+
+**Verification, 25 November 2026.** Local Markdown paths and section anchors resolve. Go formatting, vet and API race checks passed, along with Worker, release, migration and maintenance tests. The disposable store passed production and preview build checks, all 62 UI tests, 19 accessibility scans and checkout and publication.
