@@ -65,7 +65,6 @@ jobs:
           CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ vars.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
           ADSENSE_CLIENT: ${{ vars.ADSENSE_CLIENT }}
           ADSENSE_SLOT_CONTENT: ${{ vars.ADSENSE_SLOT_CONTENT }}
-          ADSENSE_SLOT_CATALOG: ${{ vars.ADSENSE_SLOT_CATALOG }}
       - name: Promote version and verify visible artifact
         id: promote
         run: node ../../scripts/release-provider.mjs store

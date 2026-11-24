@@ -6,12 +6,17 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
 
 <Base title="Checkout" noindex>
   {site && <script slot="head" is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
-  <div class="wrap">
+  <div class="wrap checkout-wrap">
     <div class="pagehead">
       <p class="crumbs"><a href="/cart/">Cart</a> <span aria-hidden="true">/</span> Checkout</p>
       <h1 class="title">Checkout</h1>
-      <p>Order without an account. Choose your delivery area to see your total.</p>
+      <p>Order without an account.</p>
     </div>
+    <div class="note" data-checkout-loading hidden>
+      <p data-checkout-status role="status"></p>
+      <button class="btn ghost" type="button" data-checkout-retry hidden>Try again</button>
+    </div>
+    <noscript><p class="note">Enable JavaScript to order online, or <a class="link" href="/contact-us/">contact the shop</a>.</p></noscript>
     <p data-empty hidden>
       Your cart is empty.{" "}
       <a class="link" href="/shop/">
@@ -23,6 +28,7 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
       class="two"
       method="post"
       data-checkout
+      hidden
       data-live={JSON.stringify({
         delivery: LIVE.delivery,
         payments: LIVE.payments.map(({ number, ...payment }: any) => ({ ...payment, manual: Boolean(number) })),
@@ -38,7 +44,7 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
         <label class="field">
           Delivery area<select name="area" required></select>
         </label>
-        <p class="checkout-estimate" data-checkout-total hidden></p>
+        <p class="checkout-estimate" data-checkout-total role="status" hidden></p>
         <p class="meta" data-eta hidden></p>
         <label class="field">
           Full name
@@ -50,11 +56,9 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
           <span class="field-help" id="checkout-phone-help">We’ll call this number to confirm your order.</span>
         </label>
         <label class="field">
-          Email (optional, for your order confirmation)
-          <input name="email" type="email" maxlength="100" placeholder="you@example.com" autocomplete="email" />
-        </label>
-        <label class="field">
-          Full address<textarea name="address" rows="3" required minlength="5" maxlength="500" autocomplete="street-address"></textarea>
+          Full delivery address<textarea name="address" rows="2" required minlength="5" maxlength="500" autocomplete="street-address"
+            aria-describedby="checkout-address-help"></textarea>
+          <span class="field-help" id="checkout-address-help">Include your house and road or village, area and district.</span>
         </label>
         <label class="field">
           Payment<select name="payment" aria-describedby="checkout-payment-help"></select>
@@ -64,28 +68,37 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
           Transaction ID
           <input name="txnid" maxlength="60" autocomplete="off" />
         </label>
-        <label class="field">
-          Order note (optional)<textarea name="note" rows="2" maxlength="500"></textarea>
-        </label>
+        <details class="checkout-extra">
+          <summary>Add email or delivery note</summary>
+          <label class="field">
+            Confirmation email (optional)
+            <input name="email" type="email" maxlength="100" autocomplete="email" />
+          </label>
+          <label class="field">
+            Delivery note (optional)<textarea name="note" rows="2" maxlength="500"></textarea>
+          </label>
+        </details>
       </fieldset>
       <aside class="panel">
         <h2 class="checkout-heading">Review your order</h2>
         <a class="link checkout-edit" href="/cart/">Edit items or quantities</a>
         <div data-sum></div>
-        <div class="coupon">
-          <input name="coupon" placeholder="Coupon code" aria-label="Coupon code" autocomplete="off" />
-          <button class="btn ghost" type="button" data-apply>
-            Apply
-          </button>
-        </div>
-        <p class="meta" data-coupon-msg role="status" aria-live="polite"></p>
-        {site && <div class="cf-turnstile" data-sitekey={site}></div>}
+        <details class="checkout-extra">
+          <summary>Have a coupon?</summary>
+          <div class="coupon">
+            <input name="coupon" placeholder="Coupon code" aria-label="Coupon code" autocomplete="off" />
+            <button class="btn ghost" type="button" data-apply>Apply</button>
+          </div>
+          <p class="meta" data-coupon-msg role="status"></p>
+        </details>
+        {site && <div class="cf-turnstile" data-sitekey={site} data-size="compact" data-appearance="interaction-only"></div>}
+        <button class="link checkout-security-retry" type="button" data-security-retry hidden>Restart security check</button>
         <p class="err" data-err role="alert" tabindex="-1"></p>
         <button class="btn small" type="submit" disabled>
           Place order
         </button>
         <p class="meta">By placing an order you accept the <a class="link" href="/terms-conditions/">terms</a>. See our <a class="link" href="/privacy-policy/">privacy policy</a> and <a class="link" href="/how-to-buy/">delivery and buying information</a>.</p>
-        <p class="meta">Trouble ordering? <a class="link" href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a>.</p>
+        {SITE.phone && <p class="meta">Trouble ordering? <a class="link" href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a>.</p>}
       </aside>
     </form>
   </div>

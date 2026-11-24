@@ -32,7 +32,11 @@ const article = p.date
       publisher: { "@type": "Organization", name: SITE.name, logo: { "@type": "ImageObject", url: siteUrl(SITE.logo || "/logo/primary-logo.jpg") } },
     }
   : null;
-const seo = recordSEO(p, summary);
+const pageDescriptions: Record<string, string> = {
+  "about-us": `Meet ${SITE.name}${SITE.address ? ` in ${SITE.address}` : ""}. Shop cookware, home appliances and furniture, and find out how to reach the shop.`,
+  "how-to-buy": `See how to order from ${SITE.name} without an account, check delivery charges, choose a payment method and track your order. Instructions in Bangla and English.`,
+};
+const seo = recordSEO(p, pageDescriptions[p.slug] || summary);
 ---
 
 <Base title={p.title} {...seo} image={seo.image || p.image} type={p.date ? "article" : "website"} allowAds={Boolean(p.date)}>
@@ -54,12 +58,12 @@ const seo = recordSEO(p, summary);
       {p.slug === "how-to-buy" && (
         <section id="delivery" aria-labelledby="delivery-guide-title">
           <h2 id="delivery-guide-title">Delivery charges and order tracking</h2>
-          <p>Choose your delivery area at checkout to see the charge and order total. Where there’s a delivery fee, it’s charged per item. Any free delivery is reflected in the total before you order.</p>
+          <p>Check the product page for delivery area limits. At checkout, choose your area to see the delivery charge and order total. Where there’s a delivery fee, it’s charged per item.</p>
           <p>Keep your order number and use it with the mobile number you ordered with to <a href="/track/">track your order</a>. {merchantReturnURL && <><a href={merchantReturnURL}>Read the returns and exchanges policy</a>.</>}</p>
         </section>
       )}
       {p.slug === "about-us" && <p><a href="/contact-us/">See the shop’s address and contact details</a>.</p>}
     </article>
-    {p.date && <AdSlot kind="content" />}
+    {p.date && <AdSlot />}
   </div>
 </Base>

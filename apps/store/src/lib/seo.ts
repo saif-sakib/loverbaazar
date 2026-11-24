@@ -219,10 +219,18 @@ export function postalAddress(address: unknown) {
   };
 }
 
+const nationwideZone = (zone: any) =>
+  /^(?:outside (?:of )?(?:jashore|jessore|যশোর)|nationwide(?: delivery)?|(?:(?:all of|across) )?bangladesh|সারা বাংলাদেশ|যশোরের বাইরে)$/i
+    .test(String(zone?.label || "").trim().replace(/\s+/g, " "));
+
+export function hasNationwideDelivery(live: any) {
+  return Array.isArray(live?.delivery) && live.delivery.some(nationwideZone);
+}
+
 /** Find a zero-fee local delivery zone from live store settings. */
 export function freeLocalArea(live: any) {
   const list = Array.isArray(live?.delivery) ? live.delivery : [];
-  const freeZone = list.find((zone: any) => Number(zone?.fee) === 0 && String(zone?.label || "").trim());
+  const freeZone = list.find((zone: any) => Number(zone?.fee) === 0 && String(zone?.label || "").trim() && !nationwideZone(zone));
   if (!freeZone) return null;
   const label = String(freeZone.label).trim();
   const area = label.replace(/^inside\s+/i, "").trim();
@@ -241,10 +249,12 @@ export function deliveryZonesText(live: any) {
   const free = freeLocalArea(live);
   const payments = Array.isArray(live?.payments) ? live.payments : [];
   const hasCod = payments.some((p: any) => p?.enabled && /cash on delivery|\bcod\b/i.test(`${p.id || ""} ${p.label || ""}`));
-  if (free && hasCod) return `Free delivery in ${free.area} and cash on delivery across Bangladesh`;
-  if (free) return `Free delivery in ${free.area} and delivery across Bangladesh`;
-  if (hasCod) return "Cash on delivery across Bangladesh";
-  return "Delivery across Bangladesh";
+  if (hasNationwideDelivery(live)) {
+    if (free) return `Free delivery in ${free.area} and ${hasCod ? "cash on delivery" : "delivery"} across Bangladesh`;
+    return hasCod ? "Cash on delivery across Bangladesh" : "Delivery across Bangladesh";
+  }
+  if (free) return `Free delivery in ${free.area}${hasCod ? " and cash on delivery" : ""}`;
+  return hasCod ? "Cash on delivery" : "Choose your delivery area at checkout";
 }
 
 /** Emit structured areaServed entities for Jashore and Bangladesh when configured. */
@@ -253,16 +263,15 @@ export function storeAreaServed(address: unknown, live: any) {
   const list = Array.isArray(live?.delivery) ? live.delivery : [];
   const matchesJashore = /\b(?:jashore|jessore)\b/i.test(rawAddress) ||
     list.some((zone: any) => /\b(?:jashore|jessore)\b/i.test(`${zone?.id || ""} ${zone?.label || ""}`));
+  const areas = [];
   if (matchesJashore) {
-    return [
-      {
-        "@type": "AdministrativeArea",
-        name: "Jashore",
-        alternateName: ["Jessore", "যশোর"],
-        containedInPlace: { "@type": "AdministrativeArea", name: "Khulna Division" },
-      },
-      { "@type": "Country", name: "Bangladesh" },
-    ];
+    areas.push({
+      "@type": "AdministrativeArea",
+      name: "Jashore",
+      alternateName: ["Jessore", "যশোর"],
+      containedInPlace: { "@type": "AdministrativeArea", name: "Khulna Division" },
+    });
   }
-  return { "@type": "Country", name: "Bangladesh" };
+  if (hasNationwideDelivery(live)) areas.push({ "@type": "Country", name: "Bangladesh" });
+  return areas.length ? areas : undefined;
 }

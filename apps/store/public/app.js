@@ -211,15 +211,26 @@
     }
     if (!live) return;
     const payments = (Array.isArray(live.payments) ? live.payments : []).filter(p => p.enabled);
+    const cash = payments.find(p => p.id === "cod");
     const labels = payments.map(p => p.label).join(" · ");
     $$("[data-payment-summary]").forEach(el => { el.textContent = labels || "Contact the shop for payment options"; });
     const feature = $("[data-payment-feature]");
-    if (feature) feature.textContent = (payments.find(p => p.id === "cod") || payments[0])?.label || "Payment options";
+    if (feature) feature.textContent = (cash || payments[0])?.label || "Payment options";
+    const cashLabel = $("[data-cod-label]");
+    if (cashLabel) {
+      cashLabel.textContent = cash?.label || "";
+      cashLabel.hidden = !cash;
+    }
+    const zones = Array.isArray(live.delivery) ? live.delivery : [];
+    const zoneLabel = zone => String(zone?.label || "").trim().replace(/\s+/g, " ");
+    const nationwideLabel = /^(?:outside (?:of )?(?:jashore|jessore|যশোর)|nationwide(?: delivery)?|(?:(?:all of|across) )?bangladesh|সারা বাংলাদেশ|যশোরের বাইরে)$/i;
+    const nationwide = zones.some(zone => nationwideLabel.test(zoneLabel(zone)));
+    $$("[data-delivery-coverage]").forEach(el => { el.textContent = nationwide ? "Delivery across Bangladesh" : "Delivery information"; });
     const deliveryFeature = $("[data-delivery-feature]");
     if (deliveryFeature) {
-      const zone = live.delivery?.find(z => z.fee === 0 && z.label?.trim());
-      const area = zone?.label.replace(/^inside\s+/i, "").trim();
-      deliveryFeature.textContent = area ? `Free delivery in ${area}` : "Delivery charges";
+      const zone = zones.find(z => z.fee === 0 && zoneLabel(z) && !nationwideLabel.test(zoneLabel(z)));
+      const area = zoneLabel(zone).replace(/^inside\s+/i, "");
+      deliveryFeature.textContent = area ? `Free delivery in ${area}` : "See the cost before ordering";
     }
     const pay = $("[data-payments]");
     if (pay) pay.textContent = labels;
@@ -275,6 +286,7 @@
     }
     if (t.dataset.thumb) {
       const image = $("[data-main]");
+      if (!image) return;
       if (t.dataset.srcset) image.srcset = t.dataset.srcset;
       else image.removeAttribute("srcset");
       image.src = t.dataset.thumb;
@@ -520,6 +532,10 @@
     const submit = $("button[type=submit]", f),
       err = $("[data-err]"),
       msg = $("[data-coupon-msg]");
+    const loading = $("[data-checkout-loading]");
+    const loadingStatus = $("[data-checkout-status]", loading);
+    const retryLoading = $("[data-checkout-retry]", loading);
+    const retrySecurity = $("[data-security-retry]", f);
     const settings = () => live || JSON.parse(f.dataset.live);
     let lines = [],
       total = 0,
@@ -529,6 +545,16 @@
     let placing = false, pendingRequest = null, applying = false;
     let failure = "";
     const details = $("[data-details-fields]", f);
+    const resetSecurity = () => {
+      if (!window.turnstile?.reset) return false;
+      try { window.turnstile.reset(); return true; } catch { return false; }
+    };
+    retrySecurity.addEventListener("click", () => {
+      failure = resetSecurity()
+        ? "Security check restarted. Complete the check, then place your order."
+        : "The security check could not load. Check your connection or contact the shop for help.";
+      showError(err, failure);
+    });
 
     const options = (select, list, hint) => {
       const keep = select.value;
@@ -542,10 +568,12 @@
 
     const paint = async () => {
       if (pendingRequest || placing) return; // Keep an uncertain order unchanged while checking it.
-      const s = settings();
       const data = await totals();
+      if (pendingRequest || placing) return;
+      const s = settings();
       lines = data.lines;
       const empty = !lines.length;
+      loading.hidden = true;
       $("[data-empty]").hidden = !empty;
       f.hidden = empty;
       if (empty) return;
@@ -616,11 +644,28 @@
           : failure;
     };
 
-    const repaint = () => paint().catch((x) => {
-      err.textContent = x.message || "Could not load your order. Please refresh and try again.";
+    const repaint = () => paint().catch(() => {
+      const message = "Could not load your cart. Please try again.";
+      if (f.hidden) {
+        $("[data-empty]").hidden = true;
+        loading.hidden = false;
+        loadingStatus.textContent = message;
+        retryLoading.hidden = false;
+      } else err.textContent = message;
       submit.disabled = true;
     });
+    const loadCart = () => {
+      retryLoading.hidden = true;
+      loadingStatus.textContent = "Loading your cart…";
+      loading.hidden = false;
+      repaint();
+    };
+    retryLoading.onclick = loadCart;
     repaintCheckout = repaint;
+    f.addEventListener("invalid", (event) => {
+      const extra = event.target.closest("details");
+      if (extra) extra.open = true;
+    }, true);
     f.onchange = (e) => {
       if (pendingRequest || placing || e.target.name === "coupon") return;
       failure = "";
@@ -671,9 +716,12 @@
       if (placing || submit.disabled || (!pendingRequest && !f.reportValidity())) return;
       // The bot check takes a moment. Pressing the button early shouldn't count as failing it.
       if ($(".cf-turnstile", f) && !new FormData(f).get("cf-turnstile-response")) {
-        showError(err, "The security check isn't finished. Wait a moment, tick the box if you see one, then try again.");
+        retrySecurity.hidden = false;
+        failure = "Finish the security check, then try again. Restart it if it gets stuck.";
+        showError(err, failure);
         return;
       }
+      retrySecurity.hidden = true;
       const label = "Place order";
       placing = true;
       submit.disabled = true;
@@ -726,11 +774,11 @@
         $("[data-apply]").disabled = !!pendingRequest;
         // The customer has now seen the new total, so pressing the button again accepts it.
         agreed = +(x.message.match(/total changed to ৳(\d+)/)?.[1] || 0);
-        window.turnstile?.reset();
+        resetSecurity();
         if (x.status === 409) loadStock(true);
       }
     };
-    repaint();
+    loadCart();
   }
 
   const orderHtml = (o) => {
@@ -789,69 +837,50 @@
     badges();
   }
 
-  // On a phone the Add to cart button scrolls away, so a bar keeps it in reach.
+  // Keep a checkout action available on phones whenever the main button is off-screen.
   function buyBar() {
     const bar = $("[data-buybar]"),
-      buy = $(".buy");
+      buy = $("[data-primary-buy]");
     if (!bar || !buy) return;
+    const phone = matchMedia("(max-width: 860px)");
+    const dockHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--product-dock-height"));
+    let covered;
     const update = () => {
-      const show = buy.getBoundingClientRect().bottom < 0;
+      const bounds = buy.getBoundingClientRect();
+      const show = phone.matches && (bounds.top < 0 || bounds.bottom > innerHeight - covered);
       bar.classList.toggle("on", show);
       document.body.classList.toggle("has-buybar", show);
     };
+    const resize = () => {
+      covered = dockHeight + parseFloat(getComputedStyle(bar).paddingBottom) - 8;
+      update();
+    };
     addEventListener("scroll", update, { passive: true });
-    update();
+    addEventListener("resize", resize, { passive: true });
+    resize();
   }
 
-  // Product photo: hovering shows a magnified view beside it on a computer; a tap or click opens it full screen.
+  // Load the larger photo when the buyer opens the gallery.
   function zoom() {
-    const pic = $("[data-main]");
-    if (!pic) return;
-    const stage = pic.closest(".stage");
-    const pane = document.createElement("div");
-    pane.className = "zoompane";
-    pane.hidden = true;
-    stage.append(pane);
-    const wide = matchMedia("(hover: hover) and (min-width: 900px)");
-    const url = () => `url("${(pic.dataset.zoom || pic.currentSrc || pic.src).replace(/["\\\n]/g, encodeURIComponent)}")`;
-    pic.addEventListener("mousemove", (e) => {
-      if (!wide.matches) return;
-      const r = pic.getBoundingClientRect();
-      pane.style.backgroundImage = url();
-      pane.style.backgroundPosition = `${((e.clientX - r.left) / r.width) * 100}% ${((e.clientY - r.top) / r.height) * 100}%`;
-      pane.hidden = false;
-    });
-    pic.addEventListener("mouseleave", () => {
-      pane.hidden = true;
-    });
-    pic.addEventListener("click", () => {
+    const trigger = $("[data-zoom-trigger]");
+    if (!trigger) return;
+    const pic = $("[data-main]", trigger);
+    trigger.addEventListener("click", () => {
       const box = document.createElement("dialog");
       box.className = "lightbox";
       box.setAttribute("aria-label", "Product image");
-      box.innerHTML = `<img src="${esc(pic.dataset.zoom || pic.currentSrc || pic.src)}" alt="${esc(pic.alt)}"><button class="x" aria-label="Close">×</button>`;
+      box.innerHTML = '<img src="' + esc(pic.dataset.zoom || pic.currentSrc || pic.src) + '" alt="' + esc(pic.alt) + '"><button class="x" type="button" aria-label="Close">×</button>';
       const close = () => {
         box.close();
         box.remove();
-        pic.focus();
-        removeEventListener("keydown", key);
+        trigger.focus();
       };
-      const key = (e) => e.key === "Escape" && close();
       box.addEventListener("click", (event) => {
         if (event.target === box || event.target.closest("button")) close();
       });
       box.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
-      addEventListener("keydown", key);
       document.body.append(box);
       box.showModal();
-    });
-    pic.tabIndex = 0;
-    pic.setAttribute("role", "button");
-    pic.setAttribute("aria-label", "Enlarge product image");
-    pic.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        pic.click();
-      }
     });
   }
 

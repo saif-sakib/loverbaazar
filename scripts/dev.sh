@@ -63,6 +63,9 @@ export APP_ENV=local DEV=1 PORT="$api_port"
 export DATABASE_URL="postgres://postgres:dev@127.0.0.1:$db_port/lb?sslmode=disable"
 export ADMIN_TOKEN=local-admin-token-for-this-computer-only
 unset ORIGIN_SECRET TURNSTILE_SECRET TURNSTILE_SITE PUBLIC_TURNSTILE_SITE BREVO_KEY GITHUB_TOKEN GITHUB_REPO PUBLISH_TOKEN
+if [[ ${LB_ISOLATED:-0} == 1 ]]; then
+ unset CLOUDFLARE_ANALYTICS_TOKEN CLOUDFLARE_ACCOUNT_ID
+fi
 export LOCAL_UPLOADS="$ROOT/apps/store/public/uploads" DEV_BUILD_DIR="$ROOT/apps/store"
 cd "$ROOT/apps/store"
 [[ -d node_modules ]] || npm ci --no-audit --no-fund

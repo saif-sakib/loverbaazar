@@ -337,6 +337,7 @@ func router() http.Handler {
 		a.Use(adminOnly, middleware.Compress(5))
 		a.Get("/dashboard", adminDashboard)
 		a.Get("/analytics", adminAnalytics)
+		a.Get("/analytics/today", adminAnalyticsToday)
 		a.With(limit(15, time.Minute)).Post("/analytics/sync", adminSyncAnalytics)
 		a.Get("/operations", adminOperations)
 		a.Get("/notifications", adminNotifications)

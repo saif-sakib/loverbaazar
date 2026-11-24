@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +36,7 @@ func TestAnalyticsUnconfiguredReturnsRealOrdersOnly(t *testing.T) {
 	t.Setenv("CLOUDFLARE_ACCOUNT_ID", "")
 
 	oldNow := analyticsNow
-	fixedNow := time.Date(2026, 11, 21, 10, 0, 0, 0, dhakaTZ)
+	fixedNow := time.Date(2026, 11, 21, 1, 0, 0, 0, dhakaTZ)
 	analyticsNow = func() time.Time { return fixedNow }
 	defer func() { analyticsNow = oldNow }()
 
@@ -162,6 +161,16 @@ func TestAnalyticsSyncDhakaBucketingCacheAndFallback(t *testing.T) {
 	defer func() { cloudflareGraphQLURL = oldURL }()
 
 	code, res := call(t, nil, "GET", "/api/admin/analytics", nil, true)
+	if code != 200 || cfCalls != 0 || res["refreshDue"] != true {
+		t.Fatalf("saved report status=%d provider calls=%d refreshDue=%v", code, cfCalls, res["refreshDue"])
+	}
+
+	code, current := call(t, nil, "GET", "/api/admin/analytics/today", nil, true)
+	if code != 200 || cfCalls != 1 || current["visitors"] != float64(14) || current["updatedAt"] == nil || current["stale"] != false {
+		t.Fatalf("overview count status=%d provider calls=%d today=%v", code, cfCalls, current)
+	}
+
+	code, res = call(t, nil, "POST", "/api/admin/analytics/sync?auto=1", "{}", true)
 	if code != 200 {
 		t.Fatalf("analytics = %d: %v", code, res)
 	}
@@ -221,13 +230,21 @@ func TestAnalyticsSyncDhakaBucketingCacheAndFallback(t *testing.T) {
 	if _, ok := dash["todayVisitors"]; !ok {
 		t.Fatalf("dashboard missing todayVisitors field: %v", dash)
 	}
-	_ = os.Getenv("TEST_DATABASE_URL") // keeps imports tidy if adjusted
-
-	// Second GET within 5-minute TTL hits cache and makes 0 Cloudflare calls.
-	code, _ = call(t, nil, "GET", "/api/admin/analytics", nil, true)
-	if code != 200 || cfCalls != prevCalls {
-		t.Fatalf("cached GET called Cloudflare: status=%d calls=%d->%d", code, prevCalls, cfCalls)
+	// Both views keep the saved count within the Cloudflare refresh interval.
+	code, cached := call(t, nil, "GET", "/api/admin/analytics", nil, true)
+	if code != 200 || cfCalls != prevCalls || cached["refreshDue"] != false {
+		t.Fatalf("saved report status=%d calls=%d->%d refreshDue=%v", code, prevCalls, cfCalls, cached["refreshDue"])
 	}
+	code, current = call(t, nil, "GET", "/api/admin/analytics/today", nil, true)
+	if code != 200 || cfCalls != prevCalls || current["visitors"] != float64(14) {
+		t.Fatalf("cached overview status=%d calls=%d->%d today=%v", code, prevCalls, cfCalls, current)
+	}
+	fixedNow = fixedNow.Add(analyticsCacheTTL)
+	code, _ = call(t, nil, "GET", "/api/admin/analytics/today", nil, true)
+	if code != 200 || cfCalls != prevCalls+1 {
+		t.Fatalf("fresh overview status=%d calls=%d->%d", code, prevCalls, cfCalls)
+	}
+	prevCalls = cfCalls
 
 	// Forced POST /sync when Cloudflare fails with 500 degrades gracefully to 200 stale without leaking secrets.
 	failCF = true
@@ -247,6 +264,10 @@ func TestAnalyticsSyncDhakaBucketingCacheAndFallback(t *testing.T) {
 	}
 	if staleRes["today"].(M)["visitors"].(float64) != 14 {
 		t.Fatalf("archived visitors lost after sync failure: %v", staleRes["today"])
+	}
+	code, current = call(t, nil, "GET", "/api/admin/analytics/today", nil, true)
+	if code != 200 || current["visitors"] != float64(14) || current["stale"] != true {
+		t.Fatalf("overview after provider failure status=%d today=%v", code, current)
 	}
 }
 

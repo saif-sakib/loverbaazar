@@ -59,6 +59,9 @@ func adminDashboard(w http.ResponseWriter, r *http.Request) {
 		'todayOrders',(SELECT count(*) FROM o,t WHERE day=d),
 		'todaySales',(SELECT coalesce(sum(total),0) FROM o,t WHERE day=d AND counts),
 		'todayVisitors',(SELECT visitors FROM analytics_daily,t WHERE day=d),
+		'todayVisitorsUpdatedAt',(SELECT updated_at FROM analytics_daily,t WHERE day=d),
+		'todayVisitorsSampled',(SELECT sample_rate>1 FROM analytics_daily,t WHERE day=d),
+		'visitorTrackingConfigured',$2::boolean,
 		'monthOrders',(SELECT count(*) FROM o,t WHERE day>d-30),
 		'monthSales',(SELECT coalesce(sum(total),0) FROM o,t WHERE day>d-30 AND counts),
 		'pending',(SELECT count(*) FROM orders WHERE status='pending'),
@@ -70,7 +73,7 @@ func adminDashboard(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN (SELECT day,sum(total) sales,count(*) n FROM o WHERE counts GROUP BY day) s ON s.day=g::date),
 		'top',(SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT i.name,sum(i.qty) qty,sum(i.qty*i.price) sales FROM order_items i JOIN o ON o.id=i.order_id, t
 			WHERE o.counts AND o.day>t.d-30 GROUP BY i.name ORDER BY 2 DESC LIMIT 5) x),
-		'low',(SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT id,data->>'name' AS name,stock FROM products WHERE active AND stock<=$1 ORDER BY stock,id LIMIT 20) x))`, live.LowStock)
+		'low',(SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT id,data->>'name' AS name,stock FROM products WHERE active AND stock<=$1 ORDER BY stock,id LIMIT 20) x))`, live.LowStock, loadAnalyticsConfig(r).configured)
 	if err != nil {
 		oops(w, err)
 		return

@@ -861,3 +861,28 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 - Keep guest checkout. Show a subtotal until the shopper chooses a delivery area. Show mobile payment instructions once a current stock snapshot confirms the payment details. Keep the order number visible if tracking is temporarily unavailable after a successful checkout.
 
 **Baseline, 23 November 2026.** Seventeen representative public routes returned HTTP 200 in mobile Chromium. The public catalog contained five products with approved reviews. Of 274 products, 48 short descriptions contained the Jashore-only delivery notice while the store offered a general outside-Jashore delivery option. The owner needs to confirm whether those restrictions still apply before checkout can enforce them per product.
+
+### Task 69 — Improve product discovery and guest checkout
+
+**Status:** In progress — release and phone checks pending · **Depends on:** 25, 28, 29, 39, 68
+
+- Give the homepage one featured product with its price and photo, a short category list and links to the full catalog. Put the product’s payment and delivery information next to its price. Keep Buy now accessible on phones and load full-size photos when requested.
+- Lead with delivery across Bangladesh when the delivery settings support it. Use a national homepage title and description. Show the shop address in Contact us and the footer and present any product-specific Jashore delivery limit in the product header.
+- Limit AdSense to the blog and its guides. Keep checkout focused on delivery, payment and the order total. Let shoppers open optional fields and retry cart loading or the security check without re-entering their details.
+- Verify guest and signed-in ordering, retry behavior, phone layouts, accessibility, transfer budgets and the frozen release’s sitemap, product markup and feed.
+
+**Live baseline, 24 November 2026.** The production homepage returned 200 with an indexable apex canonical. The sitemap listed 466 URLs, including 274 product pages, and the feed listed 274 offers with image links. Public results still showed some WordPress-era titles or copy. The homepage and representative product pages loaded AdSense. A phone-sized Chromium session reached guest checkout for the Kiam H-77 and saw ৳3,950 plus the configured ৳200 outside-Jashore fee. Production verification stopped at the order form. [Homepage](https://loverbaazar.com/) · [Sitemap](https://loverbaazar.com/sitemap-index.xml)
+
+**Local verification, 24 November 2026.** The frozen build confirmed the national search title and delivery label, the Jashore-only product notice, and the service-area markup for both configurations. All 59 UI checks, 19 accessibility scans and the Go race suite passed. Chromium, Firefox and WebKit completed the layout and purchase checks at eight viewport sizes. The disposable shop completed guest checkout and a signed-in coupon order with a retry after a lost response. Six pages met the transfer budgets in the throttled phone profile. Cold transfers were 104–153 KB and largest-content paint ranged from 0.39 to 1.57 seconds. Homepage largest-content paint was 0.51 seconds in the baseline fixture and 1.57 seconds with the larger featured image in the updated fixture. The fixture used fallback photos and omitted AdSense, so check the live page again after release.
+
+**Release and measurement.** After the code release, review the pending homepage and Privacy Policy copy in Admin before publishing it. Check the photo, cash-on-delivery path, security check and order receipt on a physical phone. Use the same date range in Search Console and Admin Analytics to compare impressions, search clicks, leading product pages and orders. Where checkout metrics are configured, check request status counts and unique committed orders. The 48 imported local-delivery notices identified in Task 68 still require shop confirmation. [Search reporting and checkout metrics](seo-performance.md#29-search-console-and-private-measurement)
+
+### Task 70 — Fix Admin charts and visitor count freshness
+
+**Status:** In progress — production verification pending · **Depends on:** 16, 29, 67
+
+- Show exact bar values and a numbered scale for daily visits, monthly visits and daily sales. Keep zero at the same baseline within each chart. Let phone users scroll the plot without scrolling the whole page.
+- Serve saved Analytics totals immediately and check Cloudflare after the report renders. Refresh today's count in Overview on open and while visible. Show the last successful update time in Bangladesh time and keep the saved count available during an outage.
+- Check the charts, delayed provider responses, retries and section changes in the disposable shop. After release, open both Admin sections and compare today's visits and timestamp with the Cloudflare dashboard. [Reporting workflow](seo-performance.md#29-search-console-and-private-measurement)
+
+**Local verification, 24 November 2026.** The provider fixture confirmed that opening the saved report made zero Cloudflare calls. Overview used the hourly traffic query and reused its result within the five-minute interval. A failed refresh preserved the saved count. Browser tests confirmed that the charts rendered while the refresh was pending, larger values produced proportionally taller bars, and the Overview timer stopped after leaving the page. Layout checks covered 320–1440 px. The API race suite, 61 UI checks, 19 accessibility scans and disposable checkout and publication passed.

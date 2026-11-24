@@ -1,15 +1,16 @@
 ---
 import "../styles/fonts.css";
 import "../styles/site.css";
-import { jsonLd, merchantReturnURL, organizationReturnPolicy, postalAddress, publicImage, storeAreaServed } from "../lib/seo";
+import { hasNationwideDelivery, jsonLd, merchantReturnURL, organizationReturnPolicy, postalAddress, publicImage, storeAreaServed } from "../lib/seo";
 import "../styles/mobile.css";
 import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf, spacedSiteName } from "../lib/shop";
 import { resolveAdsenseClient, resolveAdSlot } from "../lib/adsense.mjs";
-const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", preconnectCloudinary = false, allowAds = false, language = languageOf(`${title || ""} ${description}`) } = Astro.props;
+const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", preconnectCloudinary = false, allowAds = false, localDeliveryOnly = false, language = languageOf(`${title || ""} ${description}`) } = Astro.props;
 const full = seoTitle || (title ? `${title} | ${spacedSiteName}` : `${spacedSiteName} | ${SITE.tagline}`);
 const appScript = process.env.GITHUB_SHA ? `/app.js?v=${encodeURIComponent(process.env.GITHUB_SHA)}` : "/app.js";
 const canon = canonical || siteUrl(Astro.url.pathname);
 const isHome = Astro.url.pathname === "/";
+const isCheckout = Astro.url.pathname === "/checkout/";
 const preview = import.meta.env.BUILD_ENV !== "production";
 const bingVerification = String(import.meta.env.BING_SITE_VERIFICATION || "").trim();
 const googleVerification = String(import.meta.env.GOOGLE_SITE_VERIFICATION || "").trim();
@@ -27,10 +28,9 @@ const isPrivateAnalyticsPath = /^\/(admin|cart|checkout|my-account|track|search|
 const emitAnalytics = !preview && !noindex && !isPrivateAnalyticsPath && cfAnalyticsToken !== "";
 const adsenseClient = preview ? "" : resolveAdsenseClient(import.meta.env.ADSENSE_CLIENT);
 const adsenseSlotContent = resolveAdSlot(import.meta.env.ADSENSE_SLOT_CONTENT);
-const adsenseSlotCatalog = resolveAdSlot(import.meta.env.ADSENSE_SLOT_CATALOG);
 const isAdRestrictedPath = /^\/(admin|cart|checkout|my-account|track|search|wishlist|contact-us|privacy-policy|terms-conditions|about-us|how-to-buy|404)(\/|$)/.test(Astro.url.pathname);
 const emitAds = !preview && !noindex && allowAds && !isAdRestrictedPath && adsenseClient !== "";
-const emitManualAdLoader = emitAds && Boolean(adsenseSlotContent || adsenseSlotCatalog);
+const emitManualAdLoader = emitAds && Boolean(adsenseSlotContent);
 const parts = SITE.name.split(/(?=[A-Z])/);
 const logoEnd = parts.length > 1 ? parts.pop() : "";
 const logoStart = parts.join("");
@@ -146,14 +146,17 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
       ></script>
     )}
   </head>
-  <body>
+  <body class:list={{ "checkout-page": isCheckout }}>
     <a class="skip" href="#main" lang="en-BD">
       Skip to content
     </a>
     <div class="notice" data-notice hidden role="status"></div>
     <div class="ticker" lang="en-BD">
       <div>
-        <span>{SITE.address ? `Online shop based in ${SITE.address}` : "Order online without an account"}</span>
+        <span>{localDeliveryOnly
+          ? <a href="#purchase-info-title">Delivery in Jashore only</a>
+          : <a href="/how-to-buy/#delivery" data-delivery-coverage>{hasNationwideDelivery(LIVE) ? "Delivery across Bangladesh" : "Delivery information"}</a>}
+        </span>
         <span data-payment-summary>{payments.map((p: any) => p.label).join(" · ") || "Contact the shop for payment options"}</span>
         {SITE.phone && <span><a href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a></span>}
       </div>
@@ -167,6 +170,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
             <small class="logo-sub">Kitchen &amp; Home</small>
           </span>
         </a>
+        {isCheckout && SITE.phone && <a class="link checkout-help" href={`tel:${telOf(SITE.phone)}`}>Call for help</a>}
         <form action="/search/" class="find" role="search">
           <input
             name="q"

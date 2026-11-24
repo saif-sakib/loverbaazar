@@ -1,17 +1,14 @@
 ---
 import { resolveAdsenseClient, resolveAdSlot } from "../lib/adsense.mjs";
 
-const { kind = "content", label = "Advertisement" } = Astro.props;
 const isProduction = import.meta.env.BUILD_ENV === "production";
 const client = isProduction ? resolveAdsenseClient(import.meta.env.ADSENSE_CLIENT) : "";
-const slot = isProduction
-  ? resolveAdSlot(kind === "catalog" ? import.meta.env.ADSENSE_SLOT_CATALOG : import.meta.env.ADSENSE_SLOT_CONTENT)
-  : "";
+const slot = isProduction ? resolveAdSlot(import.meta.env.ADSENSE_SLOT_CONTENT) : "";
 ---
 
 {client && slot && (
-  <aside class="ad-slot" aria-label={label} data-ad-slot-wrap>
-    <span class="ad-slot-label">{label}</span>
+  <aside class="ad-slot" aria-label="Advertisement" data-ad-slot-wrap>
+    <span class="ad-slot-label">Advertisement</span>
     <div class="ad-slot-frame">
       <ins
         class="adsbygoogle"

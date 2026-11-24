@@ -70,8 +70,7 @@ const build = async (environment, dir) => {
     BING_SITE_VERIFICATION: "0123456789ABCDEF0123456789ABCDEF",
     GOOGLE_SITE_VERIFICATION: "fixture_google_verify_token_12345",
     CLOUDFLARE_WEB_ANALYTICS_TOKEN: "0123456789abcdef0123456789abcdef",
-    ADSENSE_SLOT_CONTENT: "1234567890",
-    ADSENSE_SLOT_CATALOG: "0987654321" };
+    ADSENSE_SLOT_CONTENT: "1234567890" };
   try {
     await run(process.execPath, ["node_modules/.bin/astro", "build", "--outDir", join(work, dir)], { cwd: assets, env, maxBuffer: 3_000_000 });
   } catch (error) {
@@ -85,13 +84,14 @@ const entities = html => [...html.matchAll(/<script type="application\/ld\+json"
 try {
   await build("production", "production");
   const home = await read("production", "index.html");
-  assert.match(home, /<title>Lover Baazar \| [^<]+<\/title>/);
-  assert.match(home, /<meta name="description" content="Lover Baazar in Vekutia, Jashore\. /);
+  assert.match(home, /<title>Lover Baazar \| Home Appliances &amp; Furniture in Bangladesh<\/title>/);
+  assert.match(home, /<meta name="description" content="Lover Baazar\. Shop rice cookers, [^"]*Delivery across Bangladesh\."/);
+  assert.match(home, /href="\/how-to-buy\/#delivery" data-delivery-coverage>Delivery across Bangladesh<\/a>/);
   assert.match(home, /<meta property="og:site_name" content="Lover Baazar">/);
   const headings = [...home.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)];
   assert.equal(headings.length, 1);
   assert.equal(headings[0][1].replace(/<[^>]+>/g, "").trim(), "Lover Baazar");
-  assert.match(home, /<strong lang="en-BD">Everything for your home, at wholesale prices\.<\/strong>/);
+  assert.match(home, /<p class="hero-title" lang="en-BD">Cookware, appliances &amp; furniture<\/p>/);
   assert.match(home, /<link rel="canonical" href="https:\/\/loverbaazar.com\/">/);
   assert.match(home, /<meta name="robots" content="index, follow/);
   assert.match(home, /<link rel="icon" href="\/favicon\.ico" sizes="16x16 32x32 48x48">/);
@@ -113,12 +113,16 @@ try {
   assert.ok(manifest.icons.some(icon => icon.sizes === "192x192") && manifest.icons.some(icon => icon.sizes === "512x512"));
   assert.equal(await read("production", "0123456789abcdef0123456789abcdef.txt"), "0123456789abcdef0123456789abcdef");
   assert.equal(await read("production", "ads.txt"), "google.com, pub-2212378495306002, DIRECT, f08c47fec0942fa0\n");
-  for (const adRoute of ["index.html", "shop/index.html", "online-shopping-jashore/index.html", "product-category/rice-cooker/index.html", "product/fixture-rice-cooker-18l/index.html"]) {
+  for (const adRoute of ["blog/index.html", `${store.posts[0].slug}/index.html`]) {
     const adHTML = await read("production", adRoute);
     assert.match(adHTML, /<meta name="google-adsense-account" content="ca-pub-2212378495306002">/, `${adRoute} missing AdSense meta`);
     assert.match(adHTML, /src="https:\/\/pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js\?client=ca-pub-2212378495306002"/, `${adRoute} missing AdSense script`);
     assert.match(adHTML, /<script src="\/ads\.js" defer fetchpriority="low"><\/script>/, `${adRoute} missing ads.js loader`);
     assert.match(adHTML, /<aside class="ad-slot"[^>]*data-ad-slot-wrap[^>]*>[\s\S]*Advertisement[\s\S]*data-ad-format="horizontal"/, `${adRoute} missing horizontal AdSlot`);
+  }
+  for (const path of ["index.html", "shop/index.html", "offers/index.html", "online-shopping-jashore/index.html", "product-category/rice-cooker/index.html", "product/fixture-rice-cooker-18l/index.html"]) {
+    const shoppingHTML = await read("production", path);
+    assert.doesNotMatch(shoppingHTML, /googlesyndication\.com|google-adsense-account|data-ad-slot-wrap|src="\/ads\.js"/, `${path} loaded ads`);
   }
   const homeEntities = entities(home);
   const websites = homeEntities.filter(item => item["@type"] === "WebSite");
@@ -196,10 +200,12 @@ try {
     }
     assert.doesNotMatch(restrictedHTML, /googlesyndication\.com|google-adsense-account|data-ad-slot-wrap/, `AdSense leaked on /${privateRoute}/`);
   }
+  assert.match(await read("production", "checkout/index.html"), /class="cf-turnstile"[^>]*data-size="compact"[^>]*data-appearance="interaction-only"/);
   assert.match(rcPage, /<title>Fixture Kiam Rice Cooker 1\.8L Price in Bangladesh \| Lover Baazar<\/title>/);
   assert.match(rcPage, /<meta name="description" content="Fixture Kiam Rice Cooker 1\.8L price in Bangladesh is ৳1,450 at Lover Baazar\./);
   assert.match(rcPage, /<meta name="description" content="[^"]*Delivery in Jashore only[^"]*">/);
   assert.match(rcPage, /Delivery available only in Jashore\./);
+  assert.match(rcPage, /<div class="ticker"[^>]*>\s*<div>\s*<span>\s*<a href="#purchase-info-title">Delivery in Jashore only<\/a>/);
   assert.match(rcPage, /Double pot rice cooker for 4 to 6 people\./);
   assert.doesNotMatch(rcPage, /Delivery time 4-7 days|<ul class="delivery" data-delivery>/);
   const rcLD = entities(rcPage);
@@ -279,6 +285,7 @@ try {
   product.sku = "  LB-0125  ";
   product.reviews = [{ name: "Fixture customer", rating: 5, body: "Review fixture" }];
   store.pages.find(page => page.slug === "terms-conditions").draft = true;
+  store.live.delivery = store.live.delivery.filter(zone => zone.id === "jashore");
   await build("preview", "preview");
   const next = await read("preview", `product/${product.slug}/index.html`);
   const nextProduct = entities(next).find(item => item["@type"] === "Product");
@@ -293,11 +300,14 @@ try {
   assert.match(await read("preview", "_headers"), /X-Robots-Tag: noindex, nofollow/);
   const previewHome = await read("preview", "index.html");
   assert.match(previewHome, /noindex, nofollow/);
+  assert.match(previewHome, /data-delivery-coverage>Delivery information<\/a>/);
   assert.doesNotMatch(previewHome, /name="(?:msvalidate\.01|google-site-verification|google-adsense-account)"/);
   assert.doesNotMatch(previewHome, /cloudflareinsights\.com|googlesyndication\.com|data-ad-slot-wrap/);
   await assert.rejects(read("preview", "ads.txt"), { code: "ENOENT" });
   await assert.rejects(read("preview", "0123456789abcdef0123456789abcdef.txt"), { code: "ENOENT" });
-  assert.ok(!entities(previewHome).find(item => item["@type"] === "Store").hasMerchantReturnPolicy);
+  const previewStore = entities(previewHome).find(item => item["@type"] === "Store");
+  assert.ok(!previewStore.hasMerchantReturnPolicy);
+  assert.deepEqual(previewStore.areaServed.map(area => area.name), ["Jashore"]);
   assert.ok(!nextProduct.offers.hasMerchantReturnPolicy);
   assert.doesNotMatch(await read("preview", "_redirects"), /page-sitemap\.xml/);
   assert.match(next, /noindex, nofollow/);

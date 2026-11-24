@@ -1,9 +1,8 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { categoryChain, deliveryZonesText, gtinOf, jsonLd, merchantReturnPolicy, merchantReturnURL, plainText, primaryCategoryOf, productSeoTitle, publicImage, recordSEO, skuOf } from "../../lib/seo";
+import { categoryChain, deliveryZonesText, gtinOf, isMerchandisingCategory, jsonLd, merchantReturnPolicy, merchantReturnURL, plainText, primaryCategoryOf, productSeoTitle, publicImage, recordSEO, skuOf } from "../../lib/seo";
 import { gallerySizes, responsiveImage, sizedImage } from "../../lib/image-delivery.mjs";
 import Card from "../../components/Card.astro";
-import AdSlot from "../../components/AdSlot.astro";
 import { products, cats, taka, off, catUrl, SITE, LIVE, telOf, waOf, rating, fileSlug, siteUrl, attributeValues, languageOf, spacedSiteName } from "../../lib/shop";
 export const getStaticPaths = () => products.map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
@@ -12,17 +11,14 @@ const url = siteUrl(`/product/${p.slug}/`);
 const myCats = p.cats.map((s: string) => cats.find((c: any) => c.slug === s)).filter(Boolean);
 const primaryCat = primaryCategoryOf(p.cats, cats);
 const catTrail = primaryCat ? categoryChain(primaryCat, cats) : [];
-const nonMerchSlugs = new Set(myCats.filter((c: any) => c.slug !== "latest-product" && c.slug !== "popular-item").map((c: any) => c.slug));
-const primaryPool = primaryCat ? products.filter((x) => x.id !== p.id && x.cats.includes(primaryCat.slug)) : [];
-const secondaryPool = products.filter(
-  (x) => x.id !== p.id && !primaryPool.some((y) => y.id === x.id) &&
-    (nonMerchSlugs.size ? x.cats.some((c: string) => nonMerchSlugs.has(c)) : x.cats.some((c: string) => p.cats.includes(c))),
-);
-const fallbackPool = products.filter(
-  (x) => x.id !== p.id && !primaryPool.some((y) => y.id === x.id) && !secondaryPool.some((y) => y.id === x.id) &&
-    x.cats.some((c: string) => p.cats.includes(c)),
-);
-const related = [...primaryPool, ...secondaryPool, ...fallbackPool].slice(0, 4);
+const nonMerchSlugs = new Set(p.cats.filter((slug: string) => !isMerchandisingCategory(slug)));
+const relatedRank = (x: any) => {
+  if (primaryCat && x.cats.includes(primaryCat.slug)) return 0;
+  return x.cats.some((slug: string) => nonMerchSlugs.has(slug)) ? 1 : 2;
+};
+const related = products.filter((x) => x.id !== p.id && x.cats.some((slug: string) => p.cats.includes(slug)))
+  .sort((a, b) => Number(b.inStock) - Number(a.inStock) || relatedRank(a) - relatedRank(b))
+  .slice(0, 4);
 const stars = rating(p);
 const localOnlyNote = "Delivery available only in Jashore.";
 // Suppress the imported shop-wide boilerplate while preserving product-specific notes.
@@ -31,6 +27,7 @@ const short = String(p.short ?? "")
   .replace(/Delivery time 4-7 days\. (?=Delivery available only in Jashore\.)/, "");
 const localDeliveryOnly = short.includes(localOnlyNote);
 const productSummary = short.replace(localOnlyNote, "").trim();
+const cashPayment = LIVE.payments.find((method: any) => method.enabled && method.id === "cod");
 const snippetText = plainText(productSummary || p.desc);
 const deliverySummary = localDeliveryOnly ? "Delivery in Jashore only" : deliveryZonesText(LIVE);
 const description = `${p.name} price in Bangladesh is ${taka(p.price)} at ${spacedSiteName}. ${p.inStock ? "In stock" : "Currently sold out"}. ${deliverySummary}.${snippetText ? ` ${snippetText}` : ""}`;
@@ -101,7 +98,7 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
   image={seo.image || publicImage(mainImage?.src)}
   type="product"
   preconnectCloudinary
-  allowAds
+  localDeliveryOnly={localDeliveryOnly}
 >
   <Fragment slot="head">
     {mainImage?.src && (
@@ -123,12 +120,7 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
   <div class="wrap">
     <p class="crumbs">
       <a href="/">Home</a> /{" "}
-      {catTrail.map((entry: any) => (
-        <>
-          <a href={catUrl(entry)}>{entry.name}</a> /{" "}
-        </>
-      ))}
-      {p.name}
+      {primaryCat ? <a href={catUrl(primaryCat)}>{primaryCat.name}</a> : <a href="/shop/">Shop</a>}
     </p>
     <section class="pd" data-product={p.id} data-price={p.price}>
       <div class="product-intro">
@@ -149,35 +141,39 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
           <p class={p.inStock ? "stock" : "stock no"} data-stock-for={p.id}>{p.inStock ? "In stock" : "Sold out"}</p>
           <p class="meta" data-save-for={p.id} hidden={d === 0}>You save {d}%</p>
         </div>
+        <p class="product-terms">
+          <span data-cod-label hidden={!cashPayment}>{cashPayment?.label}</span>
+          <a class="link" href="#purchase-info-title">{localDeliveryOnly ? "Delivery in Jashore only" : "Delivery & payment"}</a>
+        </p>
       </div>
       <div class="product-gallery">
-        <div class="stage">
+        {mainImage?.src ? <button class="stage photo-zoom" type="button" data-zoom-trigger aria-label={`Enlarge photo of ${p.name}`}>
           <img class="main" data-main {...imageSet} sizes={imageSet.srcset ? gallerySizes : undefined}
             data-zoom={sizedImage(mainImage?.src, 960)} alt={mainImage?.alt || p.name} width="600" height="600" decoding="sync" fetchpriority="high" />
-        </div>
+          <span aria-hidden="true">Enlarge photo</span>
+        </button> : <div class="stage"><img class="main" {...imageSet} alt="Product photo unavailable" width="600" height="600" /></div>}
         {p.images.length > 1 && (
-          <div class="gal">
-            {p.images.map((i: any, n: number) => (
-              <button class={n === 0 ? "on" : undefined} data-thumb={displayImage(i).src} data-srcset={displayImage(i).srcset} data-zoom={sizedImage(i.src, 960)}
-                data-alt={i.alt || p.name} aria-label={`View image ${n + 1}`} aria-pressed={n === 0}>
+          <div class="gal" role="group" aria-label="Product photos">
+            {p.images.map((i: any, n: number) => {
+              const photo = displayImage(i);
+              return <button type="button" class={n === 0 ? "on" : undefined} data-thumb={photo.src} data-srcset={photo.srcset} data-zoom={sizedImage(i.src, 960)}
+                data-alt={i.alt || p.name} aria-label={`View photo ${n + 1} of ${p.images.length}`} aria-pressed={n === 0}>
                 <img src={thumbnail(i)} alt="" loading="lazy" width="66" height="66" />
-              </button>
-            ))}
+              </button>;
+            })}
           </div>
         )}
       </div>
       <div class="product-details">
         <div class="buy">
-          <input class="qty" data-qty type="number" min="1" max="20" value="1" aria-label="Quantity" />
-          <button class="btn" data-add={p.id} data-label="Add to cart" disabled={!p.inStock}>
-            {p.inStock ? "Add to cart" : "Sold out"}
-          </button>
-          <button class="btn ghost" data-add={p.id} data-label="Buy now" data-buy="1" disabled={!p.inStock}>
+          <label class="product-qty">Quantity <input class="qty" data-qty type="number" min="1" max="20" value="1" /></label>
+          <button class="btn" type="button" data-primary-buy data-add={p.id} data-label="Buy now" data-buy="1" disabled={!p.inStock}>
             {p.inStock ? "Buy now" : "Sold out"}
           </button>
-          <button class="btn ghost" data-wish={p.id}>
-            ♥ Wishlist
+          <button class="btn ghost" type="button" data-add={p.id} data-label="Add to cart" disabled={!p.inStock}>
+            {p.inStock ? "Add to cart" : "Sold out"}
           </button>
+          <button class="btn ghost product-wish" type="button" data-wish={p.id} aria-pressed="false">Save to wishlist</button>
         </div>
         <section class="purchase-info" aria-labelledby="purchase-info-title">
           <h2 id="purchase-info-title">Delivery &amp; payment</h2>
@@ -217,27 +213,10 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
     </section>
     {p.desc ? (
       <section class="prose">
-        <h2>Description</h2>
+        <h2>Product details</h2>
         <Fragment set:html={p.desc} />
       </section>
-    ) : !productSummary && (
-      <section class="prose">
-        <h2>Product overview</h2>
-        <p>
-          <strong>{p.name}</strong> is priced at <strong>{taka(p.price)}</strong> in Bangladesh at {spacedSiteName}
-          {brandName ? ` (${brandName})` : ""} and is currently {p.inStock ? "in stock" : "out of stock"}.
-          {primaryCat && (
-            <>
-              {" "}Compare more options in <a href={catUrl(primaryCat)}>{primaryCat.name}</a>.
-            </>
-          )}
-        </p>
-        <p>
-          Available payments: {LIVE.payments.filter((m: any) => m.enabled).map((m: any) => m.label).join(", ") || "contact the shop"}. See{" "}
-          <a href="/how-to-buy/">delivery and buying details</a>.
-        </p>
-      </section>
-    )}
+    ) : null}
     <section class="prose" id="reviews">
       <h2>Customer reviews</h2>
       {p.reviews.length === 0 && <p>No reviews yet. Be the first to share your experience.</p>}
@@ -289,7 +268,6 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
         </section>
       </>
     )}
-    <AdSlot kind="catalog" />
     <section data-recent-wrap hidden>
       <div class="sec">
         <h2>Recently viewed</h2>
@@ -301,8 +279,9 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
     <div class="price" data-price-for={p.id}>
       <b>{taka(p.price)}</b>
     </div>
-    <button class="btn" data-add={p.id} data-label="Add to cart" disabled={!p.inStock}>
-      {p.inStock ? "Add to cart" : "Sold out"}
+    <button class="btn" type="button" data-add={p.id} data-label="Buy now" data-buy="1" disabled={!p.inStock}>
+      {p.inStock ? "Buy now" : "Sold out"}
     </button>
+    <a class="link buybar-cart" href="/cart/">Cart <span data-cart-count hidden></span></a>
   </div>
 </Base>

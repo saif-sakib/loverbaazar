@@ -11,7 +11,6 @@ import {
 } from "../../lib/seo";
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import AdSlot from "../../components/AdSlot.astro";
 import { attributeValues, catUrl, cats, fileSlug, inCat, languageOf, LIVE, MENU, SITE, siteUrl, spacedSiteName, taka } from "../../lib/shop";
 export const getStaticPaths = () => cats.map((c) => ({ params: { path: fileSlug(c.path) }, props: { c } }));
 const { c } = Astro.props;
@@ -84,7 +83,7 @@ const collection = items.length > 0
   : null;
 ---
 
-<Base title={heading} {...seo} noindex={seo.noindex || !items.length} preconnectCloudinary allowAds={items.length > 0}>
+<Base title={heading} {...seo} noindex={seo.noindex || !items.length} preconnectCloudinary>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />
     {collection && <script type="application/ld+json" set:html={jsonLd(collection)} />}
@@ -174,7 +173,6 @@ const collection = items.length > 0
         </p>
       </section>
     )}
-    {items.length > 0 && <AdSlot kind="catalog" />}
     {items.length > 0 && relatedCats.length > 0 && (
       <section class="prose" aria-labelledby="related-cats-title">
         <h2 id="related-cats-title">Related categories</h2>

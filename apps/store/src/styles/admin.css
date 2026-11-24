@@ -155,11 +155,6 @@
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0 40px; }
 .split .panel h3, .adminmain .panel > h3 { font-size: 14px; font-weight: 700; margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f2; color: var(--ink); }
 .split .tbl td:last-child, .split .tbl th:last-child { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.bars { display: flex; align-items: stretch; gap: 2px; height: 180px; }
-.barcol { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
-.barcol i { display: block; width: min(100%, 26px); min-height: 2px; background: var(--brand); border-radius: 4px 4px 0 0; }
-.barcol small { color: var(--mute); font-size: 11px; }
-.barcol .val { font-size: 11px; color: var(--mute); white-space: nowrap; }
 
 /* Filter pills, toolbars, summary bars & data tables */
 
@@ -612,8 +607,61 @@ figcaption { display: flex; justify-content: space-between; margin-top: 6px; }
 }
 .tile.primary .tile-sub { color: #d4d4d8; }
 .analytics-panel { margin-bottom: 16px; }
-.analytics-panel .bars { margin-bottom: 16px; }
-.bars-months .barcol small { font-size: 10px; }
+.analytics-chart {
+  --chart-height: 160px;
+  --chart-headroom: 26px;
+  --chart-column-min: 38px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.analytics-chart-wide { --chart-column-min: 68px; }
+.analytics-chart-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: end;
+  height: calc(var(--chart-height) + 16px);
+  margin-top: calc(var(--chart-headroom) - 8px);
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 16px;
+}
+.analytics-chart-scroll { overflow-x: auto; overscroll-behavior-inline: contain; }
+.analytics-chart-scroll:focus-visible { outline-offset: 2px; }
+.analytics-chart-columns {
+  display: grid;
+  grid-template-columns: repeat(var(--chart-columns), minmax(var(--chart-column-min), 1fr));
+}
+.analytics-chart-column { text-align: center; }
+.analytics-chart-column small { display: block; margin: 6px 2px; color: var(--mute); font-size: 11px; line-height: 1.3; }
+.analytics-chart-area {
+  position: relative;
+  height: var(--chart-height);
+  margin-top: var(--chart-headroom);
+  background: linear-gradient(to top, var(--line) 1px, transparent 1px) 0 0 / 100% var(--chart-grid-step);
+  box-shadow: inset 0 1px var(--line);
+}
+.analytics-chart-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: min(58%, 34px);
+  height: var(--chart-fill);
+  transform: translateX(-50%);
+  border-radius: 4px 4px 0 0;
+  background: var(--brand);
+}
+.analytics-chart-value {
+  position: absolute;
+  inset-inline: 0;
+  bottom: calc(var(--chart-fill) + 4px);
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 16px;
+}
 .delta-pill {
   display: inline-block;
   padding: 2px 7px;
@@ -719,4 +767,3 @@ figcaption { display: flex; justify-content: space-between; margin-top: 6px; }
 }
 .panel-head-row h3 { margin: 0; padding: 0; border: 0; }
 .analytics-toggle { min-height: 44px; }
-.analytics-panel .barcol small { line-height: 1.15; text-align: center; }

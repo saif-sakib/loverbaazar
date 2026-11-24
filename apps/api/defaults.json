@@ -21,9 +21,9 @@
   },
   "site": {
     "name": "LoverBaazar",
-    "tagline": "Online Shopping in Jashore — Home Appliances & Furniture",
-    "description": "Online shopping in Jashore (Jessore) for Kiam cookware, rice cookers, RFL chairs & wardrobes at wholesale prices, with cash on delivery.",
-    "about": "Your trusted online shop in Vekutia, Jashore for home appliances, cookware and furniture at wholesale prices.",
+    "tagline": "Home Appliances & Furniture in Bangladesh",
+    "description": "Shop rice cookers, pressure cookers, cookware, chairs and wardrobes from Kiam, RFL and Akij.",
+    "about": "Cookware, home appliances and furniture from Kiam, RFL and Akij.",
     "phone": "01710-076076",
     "email": "loverbaazar@gmail.com",
     "whatsapp": "01710-076076",
@@ -34,8 +34,8 @@
     "youtube": "https://www.youtube.com/channel/UCZu0It_vU51HDCGxWnGjIQA",
     "logo": "",
     "hero": {
-      "title": "Everything for your home, at wholesale prices.",
-      "text": "Shop online in Jashore (Jessore) for rice cookers, cookware, wardrobes, chairs and more from Kiam, RFL and Akij. Free delivery inside Jashore and cash on delivery across Bangladesh.",
+      "title": "Cookware, appliances & furniture",
+      "text": "Shop rice cookers, cookware, chairs and wardrobes from Kiam, RFL and Akij.",
       "button": "Shop all products",
       "link": "/shop/"
     },

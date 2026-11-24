@@ -1,7 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
-import AdSlot from "../../components/AdSlot.astro";
 import { deliveryZonesText, isMerchandisingCategory, jsonLd, priceBounds } from "../../lib/seo";
 import { cats, catUrl, inCat, languageOf, LIVE, products, siteUrl, spacedSiteName, taka } from "../../lib/shop";
 
@@ -12,8 +11,8 @@ const activeCats = cats
   .map((c: any) => ({ ...c, count: inCat(c.slug).length }))
   .filter((c: any) => c.count > 0)
   .sort((a: any, b: any) => b.count - a.count || a.name.localeCompare(b.name));
-const shopTitle = "Home Appliances & Furniture Price in Jashore & Bangladesh";
-const shopDesc = `Browse all ${products.length} kitchen and home appliances, cookware, chairs, tables, and wardrobes${bounds.min > 0 ? ` from ${taka(bounds.min)} to ${taka(bounds.max)}` : ""} in Jashore (Jessore) and Bangladesh at ${spacedSiteName}. ${deliverySummary}.`;
+const shopTitle = "Home Appliances & Furniture Prices in Bangladesh";
+const shopDesc = `Browse ${products.length} home appliances, cookware, chairs, tables, and wardrobes${bounds.min > 0 ? ` from ${taka(bounds.min)} to ${taka(bounds.max)}` : ""} at ${spacedSiteName}. ${deliverySummary}.`;
 const crumbs = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
@@ -43,7 +42,7 @@ const collection = products.length > 0
   : null;
 ---
 
-<Base title={shopTitle} description={shopDesc} preconnectCloudinary allowAds>
+<Base title={shopTitle} description={shopDesc} preconnectCloudinary>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />
     {collection && <script type="application/ld+json" set:html={jsonLd(collection)} />}
@@ -68,6 +67,5 @@ const collection = products.length > 0
       )}
     </div>
     <Grid items={products} />
-    <AdSlot kind="catalog" />
   </div>
 </Base>

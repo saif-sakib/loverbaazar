@@ -37,13 +37,17 @@ try {
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => document.activeElement?.matches("[data-categories]"));
   await page.goto(product);
-  const image = page.locator("[data-main]");
+  const image = page.locator("[data-zoom-trigger]");
   await image.focus();
   await page.keyboard.press("Enter");
   await scan("open product image");
   await page.keyboard.press("Escape");
   assert.equal(await page.locator("dialog[open]").count(), 0);
   assert.equal(await image.evaluate(el => el === document.activeElement), true);
+  await page.locator("[data-primary-buy]").click();
+  await page.waitForURL("**/checkout/");
+  await page.locator("[data-checkout]").waitFor();
+  await scan("guest checkout with an item");
 
   if (process.env.LB_ISOLATED === "1") {
     assert.equal(new URL(baseURL).hostname, "127.0.0.1");

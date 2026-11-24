@@ -54,6 +54,21 @@ test('an empty live catalogue disables every static add button', () => shop(asyn
   assert.equal(await page.locator('[data-add]:enabled').count(), 0);
 }, { stock: {} }));
 
+test('mobile storefront leads with the current delivery coverage', () => shop(async (page, context) => {
+  const local = { id: 'jashore', label: 'Inside Jashore', fee: 0 };
+  let delivery = [local, { id: 'outside', label: 'Outside Jashore', fee: 200 }];
+  await context.route('**/api/stock', r => r.fulfill({ json: { products: {}, settings: { ...settings, delivery } } }));
+  await ready(page, '/');
+  const ticker = page.locator('.ticker [data-delivery-coverage]');
+  assert.equal(await ticker.textContent(), 'Delivery across Bangladesh');
+  assert.equal(await ticker.getAttribute('href'), '/how-to-buy/#delivery');
+  assert.equal(await page.locator('[data-delivery-feature]').textContent(), 'Free delivery in Jashore');
+  delivery = [local];
+  await page.reload();
+  await page.waitForFunction(() => document.querySelector('.ticker [data-delivery-coverage]').textContent === 'Delivery information');
+  assert.equal(await page.locator('.shop-guide [data-delivery-coverage]').textContent(), 'Delivery information');
+}));
+
 test('cart updates across tabs, including quantities and totals', () => shop(async (page, context) => {
   await ready(page, '/cart/');
   const other = await context.newPage();
@@ -147,9 +162,17 @@ test('checkout explains when no payment method is available', () => shop(async p
 }, { cart: { 1: 1 }, live: { payments: [] } }));
 
 test('product loading failures show recovery text', () => shop(async (page, context) => {
-  await context.route('**/search-index.json', r => r.fulfill({ status: 503, body: '' }));
+  let restored = false;
+  await context.route('**/search-index.json', r => restored ? r.fulfill({json: products}) : r.fulfill({ status: 503, body: '' }));
   await ready(page, '/cart/');
   assert.match(await page.locator('[data-cart]').textContent(), /refresh/);
+  await ready(page, '/checkout/');
+  const retryCheckout = page.locator('[data-checkout-retry]');
+  await retryCheckout.waitFor();
+  restored = true;
+  await retryCheckout.click();
+  await page.locator('[data-checkout]').waitFor();
+  assert.match(await page.locator('[data-sum]').textContent(), /Test cooker/);
 }, { cart: { 1: 1 } }));
 
 test('live prices retain the selected catalogue sorting', () => shop(async (page, context) => {
@@ -184,12 +207,12 @@ test('product image opens and closes with the keyboard', () => shop(async page =
   await ready(page, '/shop/');
   const href = await page.locator('.card .thumb').first().getAttribute('href');
   await ready(page, href);
-  await page.locator('[data-main]').focus();
+  await page.locator('[data-zoom-trigger]').focus();
   await page.keyboard.press('Enter');
   assert.equal(await page.locator('dialog.lightbox').isVisible(), true);
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('dialog.lightbox').count(), 0);
-  assert.equal(await page.locator('[data-main]').evaluate(e => e === document.activeElement), true);
+  assert.equal(await page.locator('[data-zoom-trigger]').evaluate(e => e === document.activeElement), true);
 }));
 
 test('admin remains usable when session storage is blocked', () => shop(async page => {
@@ -306,6 +329,43 @@ test('admin overview loads dashboard once and defers product data until needed',
   assert.equal(requests.filter(p => p === '/api/admin/products').length, 1);
 }));
 
+test('overview shows saved visitors immediately and refreshes only while open', () => shop(async (page, context) => {
+  await page.addInitScript(() => sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'));
+  await page.clock.install();
+  await context.route('**/api/admin/dashboard', r => r.fulfill({ json: {
+    series: [], top: [], low: [], todaySales: 0, monthSales: 0, pending: 0, toShip: 0, unread: 0, reviews: 0,
+    todayVisitors: 138, todayVisitorsUpdatedAt: '2026-11-24T12:00:00Z', visitorTrackingConfigured: true,
+  } }));
+  let allowFirst;
+  const first = new Promise(resolve => { allowFirst = resolve; });
+  let calls = 0;
+  await context.route('**/api/admin/analytics/today', async r => {
+    calls++;
+    if (calls === 1) await first;
+    if (calls === 3) return r.fulfill({ status: 503, json: { error: "Temporarily unavailable" } });
+    return r.fulfill({ json: {
+      visitors: calls === 1 ? 163 : 172,
+      updatedAt: '2026-11-24T14:00:00Z', sampled: false, stale: false,
+    } });
+  });
+  await page.goto('/admin/', { waitUntil: 'domcontentloaded' });
+  const value = page.locator('[data-overview-visitor-value]');
+  await value.getByText('138', { exact: true }).waitFor();
+  assert.match(await page.locator('[data-overview-visitor-status]').textContent(), /Updated/);
+  allowFirst();
+  await value.getByText('163', { exact: true }).waitFor();
+  assert.equal(calls, 1);
+  await page.clock.fastForward(5 * 60 * 1000 + 100);
+  await value.getByText('172', { exact: true }).waitFor();
+  assert.equal(calls, 2);
+  await page.clock.fastForward(5 * 60 * 1000 + 100);
+  await page.locator('[data-overview-visitor-status]').getByText(/refresh unavailable/).waitFor();
+  assert.equal(await value.textContent(), '172');
+  await page.locator('#admin-section').selectOption('orders');
+  await page.getByRole('heading', { name: 'Orders', exact: true }).waitFor();
+  await page.clock.fastForward(10 * 60 * 1000);
+  assert.equal(calls, 3);
+}));
 
 test('saved stock is retried once so a newly published product becomes available', () => shop(async (page, context) => {
   let requests = 0;
@@ -586,6 +646,9 @@ test('expired bot challenges show a focused error and allow a fresh challenge', 
   await page.locator('button[type="submit"]').click();
   assert.equal(sent, 0);
   assert.match(await page.locator('[data-err]').textContent(), /security check/);
+  await page.getByRole('button', { name: 'Restart security check' }).click();
+  assert.match(await page.locator('[data-err]').textContent(), /Security check restarted/);
+  assert.equal(await page.locator('[name="name"]').inputValue(), 'Test buyer');
   await page.locator('[name="cf-turnstile-response"]').evaluate(el => { el.value = 'expired-test'; });
   await page.locator('button[type="submit"]').click();
   await page.waitForFunction(() => document.querySelector('[data-err]').textContent.includes('again'));
@@ -653,15 +716,24 @@ test('account loading failures have a retry and expired sessions offer optional 
   assert.equal(await page.locator('[data-form="login"]').isVisible(), true);
 }));
 
-test('phone forms yield fixed navigation while editing and controls meet touch sizes', () => shop(async page => {
+test('phone checkout has unobstructed controls and reopens invalid optional details', () => shop(async page => {
   await ready(page, '/checkout/');
-  await page.locator('[name="name"]').focus();
+  await page.locator('[name="name"]').fill('Test buyer');
+  await page.locator('[name="phone"]').fill('01710000000');
+  await page.locator('[name="address"]').fill('Test address, Bangladesh');
   assert.equal(await page.locator('.mobile-nav').isVisible(), false);
-  const box = await page.locator('button[type="submit"]').boundingBox();
+  const submit = page.getByRole('button', { name: 'Place order' });
+  const box = await submit.boundingBox();
   assert.ok(box.height >= 44);
-  await page.locator('h1').click();
-  await page.waitForFunction(() => !document.body.classList.contains('is-editing'));
-  assert.equal(await page.locator('.mobile-nav').isVisible(), true);
+  const extra = page.getByText('Add email or delivery note', { exact: true });
+  const email = page.locator('[name="email"]');
+  assert.equal(await email.isVisible(), false);
+  await extra.click();
+  await email.fill('invalid-email');
+  await extra.click();
+  await submit.click();
+  assert.equal(await email.isVisible(), true);
+  assert.equal(await email.evaluate(el => document.activeElement === el), true);
 }, { cart: { 1: 1 } }));
 
 test('reduced motion and 200 percent layout reflow remain usable', () => shop(async page => {
@@ -906,8 +978,19 @@ test('admin analytics renders business insights, enriched products, countries, e
   assert.equal(await page.locator('#view img').count(), 0);
   assert.equal(await page.locator('#view script').count(), 0);
 
+  const dailyChart = page.getByRole('region', { name: 'Daily visitors chart' });
+  assert.deepEqual(await dailyChart.locator('.analytics-chart-value').allTextContents(), ['10', '15', '20', '25', '30', '35', '40']);
+  assert.deepEqual(await page.locator('.analytics-chart-axis').first().locator('span').allTextContents(), ['40', '30', '20', '10', '0']);
+  const bars = await dailyChart.locator('.analytics-chart-bar').evaluateAll(nodes =>
+    nodes.map(node => ({ height: node.getBoundingClientRect().height, bottom: node.getBoundingClientRect().bottom })));
+  assert.ok(bars.every((bar, i) => i === 0 || bar.height > bars[i - 1].height), 'greater counts have taller bars');
+  assert.ok(bars.every(bar => bar.bottom === bars[0].bottom), 'all bars have the same baseline');
+
+  const monthlyChart = page.getByRole('region', { name: 'Monthly visitors chart' });
+  assert.equal(await monthlyChart.locator('.analytics-chart-column').count(), 3);
   await page.locator('#toggle-months').click();
   assert.match(await page.locator('#view').textContent(), /Dec 2025/);
+  assert.equal(await monthlyChart.locator('.analytics-chart-column').count(), 12);
 
   await page.locator('#refresh-analytics').click();
   await page.waitForFunction(() => document.querySelector('.analytics-tiles')?.textContent?.includes('55'));
@@ -915,6 +998,28 @@ test('admin analytics renders business insights, enriched products, countries, e
 
   await page.setViewportSize({ width: 1440, height: 900 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Analytics 1440px overflow');
+}));
+
+test('analytics renders saved numbers during a slow refresh and updates in place', () => shop(async (page, context) => {
+  await page.addInitScript(() => sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'));
+  const today = { day: '2026-11-24', hasVisitors: true, visitors: 138, pageviews: 182, orders: 0, sales: 0 };
+  const report = { configured: true, refreshDue: true, today, last7Days: { visitors: 138, daysRecorded: 1, days: [today] } };
+  await context.route('**/api/admin/analytics', r => r.fulfill({ json: report }));
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  const automaticSync = /\/api\/admin\/analytics\/sync\?auto=1$/;
+  await context.route(automaticSync, async r => {
+    await pending;
+    return r.fulfill({ json: { ...report, refreshDue: false, today: { ...today, visitors: 163 } } });
+  });
+  const requestStarted = page.waitForRequest(automaticSync);
+  await page.goto('/admin/#analytics', { waitUntil: 'domcontentloaded' });
+  await requestStarted;
+  assert.equal(await page.locator('.analytics-tiles b').first().textContent(), '138');
+  assert.equal(await page.locator('#refresh-analytics').isDisabled(), true);
+  release();
+  await page.locator('.analytics-tiles b').getByText('163', { exact: true }).waitFor();
+  assert.equal(await page.locator('#refresh-analytics').isEnabled(), true);
 }));
 
 test('front page silently recovers when /api/stock returns 503 during cold start', () => shop(async (page, context) => {

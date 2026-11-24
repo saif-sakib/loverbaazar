@@ -148,6 +148,7 @@
   let lowStock = 5;
 
   let navigationGeneration = 0;
+  let overviewVisitorTimer;
   const pendingReads = new Map();
   function api(path, opts = {}) {
     if (opts.body || opts.raw || (opts.method && opts.method !== "GET")) return apiRequest(path, opts);
@@ -185,6 +186,7 @@
     if (dismissAfter) noticeTimer = setTimeout(() => say(""), dismissAfter);
   };
   const logout = (msg) => {
+    clearTimeout(overviewVisitorTimer);
     $("#order-invoice")?.close();
     publicationGeneration++;
     clearTimeout(publicationTimer);
@@ -735,15 +737,51 @@
 
   // ---- Dashboard ----
 
+  const visitorValue = (count, sampled) => count == null ? "—" : `${sampled ? "≈ " : ""}${fmtNum(count)}`;
+  const visitorUpdatedText = (updatedAt, stale = false) => {
+    if (!updatedAt) return stale ? "Visitor refresh unavailable" : "Waiting for visitor count";
+    const updated = `Updated ${when(updatedAt)} Dhaka time`;
+    return stale ? `${updated} · refresh unavailable` : updated;
+  };
+
+  async function refreshOverviewVisitors(tile) {
+    const isOpen = () => tile?.isConnected && token && !$("#app").hidden && !document.hidden;
+    if (!isOpen() || tile.hasAttribute("aria-busy")) return;
+    clearTimeout(overviewVisitorTimer);
+    tile.setAttribute("aria-busy", "true");
+    const status = $("[data-overview-visitor-status]", tile);
+    try {
+      const data = await api("/analytics/today");
+      if (isOpen()) {
+        $("[data-overview-visitor-value]", tile).textContent = visitorValue(data.visitors, data.sampled);
+        status.dataset.updatedAt = data.updatedAt || "";
+        status.textContent = visitorUpdatedText(data.updatedAt, data.stale);
+      }
+    } catch (error) {
+      if (isOpen() && !error.stale) {
+        if (error.auth) logout(error.message);
+        else status.textContent = visitorUpdatedText(status.dataset.updatedAt, true);
+      }
+    } finally {
+      tile.removeAttribute("aria-busy");
+      if (isOpen()) overviewVisitorTimer = setTimeout(() => refreshOverviewVisitors(tile), 5 * 60 * 1000);
+    }
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    clearTimeout(overviewVisitorTimer);
+    if (!document.hidden) void refreshOverviewVisitors($("[data-overview-visitor-refresh]"));
+  });
+
   const dashboard = run(async () => {
     const d = await api("/dashboard");
-    const top = Math.max(...d.series.map((x) => x.sales), 1);
     const hasSeries = d.series.some((x) => x.sales > 0);
     const tile = (label, value, link, tone = "") =>
       `<a class="tile${tone ? " " + tone : ""}" href="${link || "#orders"}"><b>${esc(value)}</b><span>${esc(label)}</span></a>`;
-    const visitorTile = d.todayVisitors !== null && d.todayVisitors !== undefined
-      ? tile("Visitors today", Number(d.todayVisitors).toLocaleString("en-IN"), "#analytics")
-      : "";
+    const visitorTile = `<a class="tile" href="#analytics"${d.visitorTrackingConfigured ? " data-overview-visitor-refresh" : ""}>
+      <b data-overview-visitor-value>${visitorValue(d.todayVisitors, d.todayVisitorsSampled)}</b><span>Visitors today</span>
+      <small class="tile-sub" data-overview-visitor-status data-updated-at="${esc(d.todayVisitorsUpdatedAt)}" aria-live="polite">${esc(d.todayVisitorsUpdatedAt || d.visitorTrackingConfigured ? visitorUpdatedText(d.todayVisitorsUpdatedAt) : "Visitor tracking setup")}</small>
+    </a>`;
     view().innerHTML = `<div class="tiles">
       ${tile("Sales today", money(d.todaySales), "#orders/all", "primary")}${visitorTile}${tile("Waiting for confirmation", d.pending, "#orders/pending", d.pending > 0 ? "warn" : "")}${tile("Ready to ship", d.toShip, "#orders/confirmed", d.toShip > 0 ? "warn" : "")}${tile("New messages", d.unread, "#messages", d.unread > 0 ? "warn" : "")}${tile("Pending reviews", d.reviews, "#reviews", d.reviews > 0 ? "warn" : "")}${tile("Sales, last 30 days", money(d.monthSales), "#orders/all")}
     </div>
@@ -753,15 +791,14 @@
       .join("")}</div>
     <div class="panel"><h3>Daily sales, last 14 days</h3>${
       hasSeries
-        ? `<div class="bars" role="img" aria-label="Daily sales for the last 14 days. Best day ${money(top)}.">
-      ${d.series.map((x) => `<div class="barcol" title="${esc(x.day)}: ${money(x.sales)}, ${x.orders} orders"><span class="val">${x.sales === top && x.sales ? money(x.sales) : ""}</span><i style="height:${Math.round((x.sales / top) * 100)}%"></i><small>${esc(x.day.slice(8))}</small></div>`).join("")}
-    </div>`
+        ? renderBarChart(d.series.map(x => ({ label: shortDay(x.day), value: x.sales })), "Daily sales", money, true)
         : `<p class="empty-state">No sales recorded in the last 14 days.</p>`
     }</div>
     <div class="split">
       <div class="panel"><h3>Best sellers, last 30 days</h3>${d.top.length ? `<table class="tbl">${d.top.map((t) => `<tr><td>${esc(t.name)}</td><td>${t.qty} sold</td><td>${money(t.sales)}</td></tr>`).join("")}</table>` : `<p class="empty-state">No product sales yet.</p>`}</div>
       <div class="panel"><h3>Low stock (≤ ${lowStock} left)</h3>${d.low.length ? `<table class="tbl">${d.low.map((p) => `<tr><td><a class="link" href="#product/${p.id}">${esc(p.name)}</a></td><td><b>${p.stock}</b> left</td></tr>`).join("")}</table>` : `<p class="empty-state">All products are well stocked.</p>`}</div>
     </div>`;
+    void refreshOverviewVisitors($("[data-overview-visitor-refresh]"));
   });
 
   const fmtNum = (n) => Number(n || 0).toLocaleString("en-IN");
@@ -769,6 +806,31 @@
     new Date(`${d}T00:00:00+06:00`).toLocaleDateString("en-GB", { timeZone: "Asia/Dhaka", weekday: "short", day: "numeric", month: "short" });
   const shortWeekday = (d) =>
     new Date(`${d}T00:00:00+06:00`).toLocaleDateString("en-US", { timeZone: "Asia/Dhaka", weekday: "short" });
+
+  function renderBarChart(points, label, format = fmtNum, wide = false) {
+    const maximum = Math.max(1, ...points.map(point => point.value ?? 0));
+    const targetStep = maximum / 4;
+    const magnitude = 10 ** Math.floor(Math.log10(targetStep));
+    const step = Math.max(1, [1, 2, 5, 10].map(n => n * magnitude).find(n => n >= targetStep));
+    const intervals = Math.ceil(maximum / step);
+    const ceiling = step * intervals;
+    const scale = Array.from({ length: intervals + 1 }, (_, i) => `<span>${esc(format((intervals - i) * step))}</span>`).join("");
+    const values = points.map(point => `${point.label}, ${point.value === null ? "no data" : format(point.value)}`).join(". ");
+    return `<div class="analytics-chart${wide ? " analytics-chart-wide" : ""}">
+      <div class="analytics-chart-axis" aria-hidden="true">${scale}</div>
+      <div class="analytics-chart-scroll" tabindex="0" role="region" aria-label="${esc(label)} chart">
+        <div class="analytics-chart-columns" role="img" aria-label="${esc(values)}" style="--chart-columns:${points.length};--chart-grid-step:${100 / intervals}%">
+          ${points.map(({ label: period, value }) => `<div class="analytics-chart-column" aria-hidden="true">
+            <div class="analytics-chart-area" style="--chart-fill:${(value ?? 0) / ceiling * 100}%">
+              <i class="analytics-chart-bar"></i>
+              <b class="analytics-chart-value">${value === null ? "—" : esc(format(value))}</b>
+            </div>
+            <small>${esc(period)}</small>
+          </div>`).join("")}
+        </div>
+      </div>
+    </div>`;
+  }
   const convText = (orders, visitors, hasVisitors) =>
     hasVisitors && visitors > 0 ? `${((orders / visitors) * 100).toFixed(1)}%` : "—";
   const pctDelta = (cur, prev) => (prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : null);
@@ -878,7 +940,7 @@
     return `<div class="meter-list">${items.map((x) => {
       const visits = x.visits || 0;
       const pct = total > 0 ? ((visits / total) * 100).toFixed(1) : "0.0";
-      const width = Math.max(Math.round((visits / peak) * 100), visits > 0 ? 4 : 0);
+      const width = (visits / peak) * 100;
       return `<div class="meter-row">
         <div class="meter-head"><span>${esc(labelFn(x))}</span><b>${fmtNum(visits)} <small>(${pct}%)</small></b></div>
         <div class="meter-track" aria-hidden="true"><span class="meter-fill" style="width:${width}%"></span></div>
@@ -886,7 +948,7 @@
     }).join("")}</div>`;
   }
 
-  function renderAnalytics(data) {
+  function renderAnalytics(data, refreshing = false) {
     const today = data.today || {};
     const yesterday = data.yesterday || {};
     const l7 = data.last7Days || { days: [] };
@@ -904,9 +966,7 @@
         : "";
     const todaySub = today.hasVisitors
       ? `${fmtNum(today.pageviews)} page views${todayTrendText ? ` · ${todayTrendText}` : ""}`
-      : data.configured
-        ? "Click Update numbers to fetch today's visits"
-        : "Connect visitor tracking below";
+      : refreshing ? "Checking today's visits…" : data.configured ? "Today's count is pending" : "Visitor tracking setup";
 
     const l7Delta = l7.daysRecorded > 0 && l7.prevDaysRecorded >= 7 ? pctDelta(l7.visitors, l7.prevVisitors) : null;
     const pace7 = l7.daysRecorded > 0 ? Math.round(l7.visitors / l7.daysRecorded) : 0;
@@ -938,14 +998,10 @@
       if (restVisits > 0) shownCountries.push({ label: `Other countries (${rawCountries.length - 5})`, visits: restVisits, pageviews: restViews });
     }
 
-    const max7 = Math.max(...days.map((x) => (x.hasVisitors ? x.visitors : 0)), 1);
-    const has7Bars = days.some((x) => x.hasVisitors && x.visitors > 0);
-    const maxM = Math.max(...months.map((m) => (m.daysRecorded > 0 ? m.visitors : 0)), 1);
-    const hasMBars = months.some((m) => m.daysRecorded > 0 && m.visitors > 0);
-
     const activeMonths = months.filter((m, idx) => m.daysRecorded > 0 || m.orders > 0 || idx >= months.length - 3);
     const visibleMonths = showAllAnalyticsMonths ? months : activeMonths;
     const hasHiddenMonths = months.length > activeMonths.length;
+    const loadingBreakdowns = refreshing ? "Checking Cloudflare for traffic details…" : "";
 
     const stockBadge = (p) => {
       if (p.kind !== "product" || p.stock === null || p.stock === undefined) return "—";
@@ -957,10 +1013,11 @@
     view().innerHTML = `
       <div class="panel analytics-status">
         <div class="analytics-status-meta">
-          <span class="analytics-badge${data.configured ? " live" : ""}">${data.configured ? '<i class="analytics-dot" aria-hidden="true"></i>Live store traffic · Real human visitors' : "Live visitor tracking not turned on yet — showing orders & sales"}</span>
+          <span class="analytics-badge${data.configured ? " live" : ""}">${data.configured ? '<i class="analytics-dot" aria-hidden="true"></i>Traffic from Cloudflare' : "Showing saved traffic and shop orders"}</span>
           ${data.syncedAt ? `<small>Updated: ${esc(when(data.syncedAt))} (Bangladesh time)</small>` : ""}
+          ${refreshing ? '<small role="status">Checking for new visitor data…</small>' : ""}
         </div>
-        ${data.configured ? `<button type="button" id="refresh-analytics" class="btn ghost">Update numbers</button>` : ""}
+        ${data.configured ? `<button type="button" id="refresh-analytics" class="btn ghost" ${refreshing ? "disabled" : ""}>${refreshing ? "Updating…" : "Update numbers"}</button>` : ""}
       </div>
       ${data.syncError ? `<p class="hint-box warn" role="status">${esc(data.syncError)} Showing saved daily history.</p>` : ""}
       ${!data.configured ? `<div class="hint-box"><strong>Setup needed for visitor counts:</strong> Set <code>${esc((data.missingConfig || []).join(", "))}</code> on Render and <code>CLOUDFLARE_WEB_ANALYTICS_TOKEN</code> in GitHub Actions variables, then publish once. Orders and sales below already come from your live shop.</div>` : ""}
@@ -970,6 +1027,43 @@
         ${statTile("Sales, last 7 days", money(l7.sales), sales7Sub)}
         ${statTile(`This month (${curMonth.label || ""})`, curMonth.daysRecorded > 0 ? fmtNum(curMonth.visitors) : "—", curMonthSub)}
       </div>
+      <div class="panel analytics-panel">
+        <h3>Last 7 days — day by day (Bangladesh time)</h3>
+        ${days.some(day => day.hasVisitors)
+          ? renderBarChart(days.map(day => ({ label: `${shortWeekday(day.day)} ${day.day.slice(8)}`, value: day.hasVisitors ? day.visitors : null })), "Daily visitors")
+          : `<p class="empty-state">No visitor counts recorded in the last 7 days yet.</p>`}
+        <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Date</th><th scope="col">Visitors</th><th scope="col">Page views</th><th scope="col">Orders</th><th scope="col">Sales</th><th scope="col">Buyer rate</th></tr></thead><tbody>
+          ${[...days].reverse().map((x) => `<tr>
+            <td>${esc(shortDay(x.day))}${x.day === today.day ? ' <span class="tag">Today</span>' : ""}</td>
+            <td>${x.hasVisitors ? fmtNum(x.visitors) + (x.sampleRate > 1 ? " <small>(est.)</small>" : "") : "—"}</td>
+            <td>${x.hasVisitors ? fmtNum(x.pageviews) : "—"}</td>
+            <td>${fmtNum(x.orders)}</td>
+            <td>${money(x.sales)}</td>
+            <td>${convText(x.orders, x.visitors, x.hasVisitors)}</td>
+          </tr>`).join("")}
+        </tbody></table></div>
+      </div>
+      <div class="panel analytics-panel">
+        <div class="panel-head-row">
+          <h3>Month-by-month growth</h3>
+          ${hasHiddenMonths ? `<button type="button" id="toggle-months" class="btn ghost small analytics-toggle">${showAllAnalyticsMonths ? "Show active months only" : "Show all 12 months"}</button>` : ""}
+        </div>
+        ${visibleMonths.some(month => month.daysRecorded > 0)
+          ? renderBarChart(visibleMonths.map(month => ({ label: month.label, value: month.daysRecorded > 0 ? month.visitors : null })), "Monthly visitors", fmtNum, true)
+          : `<p class="empty-state">Monthly visitor chart will fill automatically as daily logs build up.</p>`}
+        <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Month</th><th scope="col">Visitors</th><th scope="col">vs last month</th><th scope="col">Avg / day</th><th scope="col">Orders</th><th scope="col">Sales</th><th scope="col">Avg order</th><th scope="col">Days tracked</th></tr></thead><tbody>
+          ${[...visibleMonths].reverse().map((m) => `<tr>
+            <td>${esc(m.label)}${m.current ? ' <span class="tag">This month</span>' : ""}</td>
+            <td>${m.daysRecorded > 0 ? fmtNum(m.visitors) : "—"}</td>
+            <td>${deltaPill(m.changePct)}</td>
+            <td>${m.avgPerDay !== null && m.avgPerDay !== undefined ? fmtNum(m.avgPerDay) : "—"}</td>
+            <td>${fmtNum(m.orders)}</td>
+            <td>${money(m.sales)}</td>
+            <td>${m.orders > 0 ? money(Math.round(m.sales / m.orders)) : "—"}</td>
+            <td><small>${m.daysRecorded} of ${m.daysInPeriod} days${m.sampledDays > 0 ? ` · ${m.sampledDays} est.` : ""}</small></td>
+          </tr>`).join("")}
+        </tbody></table></div>
+      </div>
       ${insights.length ? `<div class="panel insights-panel">
         <h3>Key business takeaways</h3>
         <ul class="insight-list">${insights.map((it) => `<li class="insight-item${it.alert ? " alert" : ""}">${it.html}</li>`).join("")}</ul>
@@ -977,15 +1071,15 @@
       <div class="split">
         <div class="panel">
           <h3>Where shoppers come from (last 7 days)</h3>
-          ${renderMeters(bd.referrers || [], (r) => r.source, data.configured ? "No traffic source data yet." : "Connect visitor tracking to see where shoppers come from.")}
+          ${renderMeters(bd.referrers || [], (r) => r.source, loadingBreakdowns || (data.configured ? "No traffic source data yet." : "Connect visitor tracking to see where shoppers come from."))}
           ${(bd.referrers || []).length ? `<p class="fhelp">“Direct / shared link” includes people typing your web address or tapping a link shared on WhatsApp or Messenger.</p>` : ""}
         </div>
         <div class="panel">
           <h3>Phone vs. computer &amp; locations</h3>
           <h4 class="subchart-head">Devices</h4>
-          ${renderMeters(bd.devices || [], (x) => x.device, data.configured ? "No device data yet." : "Available after connecting visitor tracking.")}
+          ${renderMeters(bd.devices || [], (x) => x.device, loadingBreakdowns || (data.configured ? "No device data yet." : "Available after connecting visitor tracking."))}
           <h4 class="subchart-head">Shopper countries</h4>
-          ${renderMeters(shownCountries, (c) => c.label, data.configured ? "No location data yet." : "Available after connecting visitor tracking.")}
+          ${renderMeters(shownCountries, (c) => c.label, loadingBreakdowns || (data.configured ? "No location data yet." : "Available after connecting visitor tracking."))}
         </div>
       </div>
       <div class="panel analytics-panel">
@@ -1008,53 +1102,12 @@
                 <td>${action}</td>
               </tr>`;
             }).join("")}</tbody></table></div>`
-          : `<p class="empty-state">${data.configured ? "No page visits recorded in the last 7 days yet." : "Available after connecting visitor tracking."}</p>`}
-      </div>
-      <div class="panel analytics-panel">
-        <h3>Last 7 days — day by day (Bangladesh time)</h3>
-        ${has7Bars
-          ? `<div class="bars" role="img" aria-label="Daily visitors for the last 7 days. Peak ${fmtNum(max7)} visitors.">
-              ${days.map((x) => `<div class="barcol" title="${esc(shortDay(x.day))}: ${x.hasVisitors ? fmtNum(x.visitors) : "not tracked"} visitors, ${x.orders} orders"><span class="val">${x.hasVisitors && x.visitors === max7 && x.visitors > 0 ? fmtNum(x.visitors) : ""}</span><i style="height:${x.hasVisitors ? Math.round((x.visitors / max7) * 100) : 0}%"></i><small>${esc(shortWeekday(x.day))}<br>${esc(x.day.slice(8))}</small></div>`).join("")}
-            </div>`
-          : `<p class="empty-state">No visitor counts recorded in the last 7 days yet.</p>`}
-        <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Date</th><th scope="col">Visitors</th><th scope="col">Page views</th><th scope="col">Orders</th><th scope="col">Sales</th><th scope="col">Buyer rate</th></tr></thead><tbody>
-          ${[...days].reverse().map((x) => `<tr>
-            <td>${esc(shortDay(x.day))}${x.day === today.day ? ' <span class="tag">Today</span>' : ""}</td>
-            <td>${x.hasVisitors ? fmtNum(x.visitors) + (x.sampleRate > 1 ? " <small>(est.)</small>" : "") : "—"}</td>
-            <td>${x.hasVisitors ? fmtNum(x.pageviews) : "—"}</td>
-            <td>${fmtNum(x.orders)}</td>
-            <td>${money(x.sales)}</td>
-            <td>${convText(x.orders, x.visitors, x.hasVisitors)}</td>
-          </tr>`).join("")}
-        </tbody></table></div>
-      </div>
-      <div class="panel analytics-panel">
-        <div class="panel-head-row">
-          <h3>Month-by-month growth</h3>
-          ${hasHiddenMonths ? `<button type="button" id="toggle-months" class="btn ghost small analytics-toggle">${showAllAnalyticsMonths ? "Show active months only" : "Show all 12 months"}</button>` : ""}
-        </div>
-        ${hasMBars
-          ? `<div class="bars bars-months" role="img" aria-label="Monthly visitors over the last 12 months. Best month ${fmtNum(maxM)} visitors.">
-              ${months.map((m) => `<div class="barcol" title="${esc(m.label)}: ${m.daysRecorded > 0 ? fmtNum(m.visitors) : "no data"} visitors, ${m.orders} orders"><span class="val">${m.daysRecorded > 0 && m.visitors === maxM ? fmtNum(m.visitors) : ""}</span><i style="height:${m.daysRecorded > 0 ? Math.round((m.visitors / maxM) * 100) : 0}%"></i><small>${esc((m.label || "").slice(0, 3))}</small></div>`).join("")}
-            </div>`
-          : `<p class="empty-state">Monthly visitor chart will fill automatically as daily logs build up.</p>`}
-        <div class="scroll"><table class="tbl"><thead><tr><th scope="col">Month</th><th scope="col">Visitors</th><th scope="col">vs last month</th><th scope="col">Avg / day</th><th scope="col">Orders</th><th scope="col">Sales</th><th scope="col">Avg order</th><th scope="col">Days tracked</th></tr></thead><tbody>
-          ${[...visibleMonths].reverse().map((m) => `<tr>
-            <td>${esc(m.label)}${m.current ? ' <span class="tag">This month</span>' : ""}</td>
-            <td>${m.daysRecorded > 0 ? fmtNum(m.visitors) : "—"}</td>
-            <td>${deltaPill(m.changePct)}</td>
-            <td>${m.avgPerDay !== null && m.avgPerDay !== undefined ? fmtNum(m.avgPerDay) : "—"}</td>
-            <td>${fmtNum(m.orders)}</td>
-            <td>${money(m.sales)}</td>
-            <td>${m.orders > 0 ? money(Math.round(m.sales / m.orders)) : "—"}</td>
-            <td><small>${m.daysRecorded} of ${m.daysInPeriod} days${m.sampledDays > 0 ? ` · ${m.sampledDays} est.` : ""}</small></td>
-          </tr>`).join("")}
-        </tbody></table></div>
+          : `<p class="empty-state">${loadingBreakdowns || (data.configured ? "No page visits recorded in the last 7 days yet." : "Available after connecting visitor tracking.")}</p>`}
       </div>
       <details class="optional-fields">
         <summary>How to understand these numbers &amp; Google Search keywords<small>Simple guide to visitors, buyer rate, and seeing what people searched on Google</small></summary>
-        <p class="fhelp"><strong>Visitors vs. Page views:</strong> If one customer opens your home page and then views 3 rice cookers, that counts as <strong>1 visitor</strong> and <strong>4 page views</strong>. Automated bots and your own admin/checkout pages are left out so counts reflect real shoppers.</p>
-        <p class="fhelp"><strong>Why exact order counts matter most:</strong> A small share of phones use ad blockers (~5–15%) that hide visitor counters, while your <strong>Orders and Sales</strong> always come 100% from confirmed orders in your database (excluding cancelled and returned orders). Daily visitor counts are saved permanently every day so monthly comparisons never disappear.</p>
+        <p class="fhelp">Cloudflare reports visits and page views from tracked storefront pages. A visit can include multiple page views. The totals may miss visits when a browser blocks tracking.</p>
+        <p class="fhelp">Orders and sales come from the shop database. The totals exclude cancelled and returned orders. The daily archive supplies the monthly charts.</p>
         <p class="fhelp"><strong>Want to see which Google keywords bring customers?</strong> Open Google Search Console and check <em>Performance → Search results</em>.</p>
         <p><a class="btn ghost small" href="https://search.google.com/search-console" target="_blank" rel="noopener">Open Google Search Console ↗</a></p>
       </details>`;
@@ -1063,33 +1116,41 @@
     if (toggleBtn) {
       toggleBtn.onclick = () => {
         showAllAnalyticsMonths = !showAllAnalyticsMonths;
-        renderAnalytics(data);
+        renderAnalytics(data, refreshing);
+        $("#toggle-months")?.focus({ preventScroll: true });
       };
     }
 
     const refreshBtn = $("#refresh-analytics");
-    if (refreshBtn) {
-      refreshBtn.onclick = run(async () => {
-        refreshBtn.disabled = true;
-        refreshBtn.textContent = "Updating…";
-        try {
-          const fresh = await api("/analytics/sync", { method: "POST", body: {} });
-          renderAnalytics(fresh);
-          say(fresh.stale ? "Showing saved history; could not reach Cloudflare right now." : "Store numbers updated.");
-        } finally {
-          const btn = $("#refresh-analytics");
-          if (btn) {
-            btn.disabled = false;
-            btn.textContent = "Update numbers";
-          }
-        }
-      });
+    if (refreshBtn && !refreshing) refreshBtn.onclick = () => refreshAnalytics(data, false);
+  }
+
+  async function refreshAnalytics(data, automatic) {
+    const generation = navigationGeneration;
+    const currentToken = token;
+    const isOpen = () => generation === navigationGeneration && token === currentToken && !$("#app").hidden;
+    const restoreRefreshFocus = document.activeElement?.id === "refresh-analytics";
+    renderAnalytics(data, true);
+    try {
+      const fresh = await api(automatic ? "/analytics/sync?auto=1" : "/analytics/sync", { method: "POST", body: {} });
+      if (!isOpen()) return;
+      renderAnalytics(fresh);
+      if (!automatic && !fresh.stale) say("Store numbers updated.", 4000);
+    } catch (error) {
+      if (!isOpen()) return;
+      if (error.auth) logout(error.message);
+      else renderAnalytics({ ...data, syncError: "Could not refresh visitor data." });
+    } finally {
+      if (isOpen() && restoreRefreshFocus && document.activeElement === document.body) {
+        $("#refresh-analytics")?.focus({ preventScroll: true });
+      }
     }
   }
 
   const analytics = run(async () => {
     const data = await api("/analytics");
-    renderAnalytics(data);
+    if (data.configured && data.refreshDue) void refreshAnalytics(data, true);
+    else renderAnalytics(data);
   });
 
   const operations = run(async () => {
@@ -2566,6 +2627,7 @@
     }
     unsaved = false;
     navigationGeneration++;
+    clearTimeout(overviewVisitorTimer);
     catalogPromise = null;
     catsPromise = null;
     clearProductPhotoPreviews();

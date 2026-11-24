@@ -36,17 +36,20 @@ var (
 	cloudflareGraphQLURL = "https://api.cloudflare.com/client/v4/graphql"
 	analyticsNow         = time.Now
 
-	analyticsSyncMu  sync.Mutex
-	analyticsCacheMu sync.RWMutex
-	analyticsCache   = newEmptyAnalyticsCache()
+	analyticsSyncMu      sync.Mutex
+	analyticsBreakdownMu sync.Mutex
+	analyticsCacheMu     sync.RWMutex
+	analyticsCache       = newEmptyAnalyticsCache()
 )
 
 type analyticsCacheState struct {
-	cfgKey        string
-	syncedAt      time.Time
-	lastAttemptAt time.Time
-	breakdowns    analyticsBreakdowns
-	syncError     string
+	cfgKey             string
+	syncedAt           time.Time
+	lastAttemptAt      time.Time
+	breakdownAttemptAt time.Time
+	breakdowns         analyticsBreakdowns
+	syncError          string
+	breakdownError     string
 }
 
 func newEmptyAnalyticsCache() analyticsCacheState {
@@ -57,6 +60,34 @@ func resetAnalyticsCache() {
 	analyticsCacheMu.Lock()
 	analyticsCache = newEmptyAnalyticsCache()
 	analyticsCacheMu.Unlock()
+}
+
+func cachedAnalytics(cfgKey string) analyticsCacheState {
+	analyticsCacheMu.RLock()
+	defer analyticsCacheMu.RUnlock()
+	if analyticsCache.cfgKey != cfgKey {
+		return newEmptyAnalyticsCache()
+	}
+	return analyticsCache
+}
+
+func updateAnalyticsCache(cfgKey string, update func(*analyticsCacheState)) {
+	analyticsCacheMu.Lock()
+	defer analyticsCacheMu.Unlock()
+	if analyticsCache.cfgKey != cfgKey {
+		analyticsCache = newEmptyAnalyticsCache()
+		analyticsCache.cfgKey = cfgKey
+	}
+	update(&analyticsCache)
+}
+
+func analyticsDayStart(at time.Time) time.Time {
+	day := at.In(dhakaTZ)
+	return time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, dhakaTZ)
+}
+
+func analyticsRefreshDue(now, lastAttempt time.Time) bool {
+	return now.Sub(lastAttempt) >= analyticsCacheTTL || analyticsDayStart(now).After(analyticsDayStart(lastAttempt))
 }
 
 type analyticsConfig struct {
@@ -245,6 +276,7 @@ type analyticsReport struct {
 	SourceLabel   string                  `json:"sourceLabel"`
 	Timezone      string                  `json:"timezone"`
 	SyncedAt      string                  `json:"syncedAt"`
+	RefreshDue    bool                    `json:"refreshDue"`
 	Stale         bool                    `json:"stale"`
 	SyncError     string                  `json:"syncError"`
 	LowStock      int                     `json:"lowStock"`
@@ -1020,266 +1052,204 @@ func backfillCloudflare30Days(ctx context.Context, cfg analyticsConfig, todaySta
 	})
 }
 
-func syncCloudflareAnalytics(ctx context.Context, cfg analyticsConfig, force bool) {
+// Traffic refreshes are shared by the full report and the Overview tile.
+func syncCloudflareTraffic(ctx context.Context, cfg analyticsConfig, force bool) bool {
 	if !cfg.configured {
-		return
+		return false
 	}
-	analyticsSyncMu.Lock()
-	defer analyticsSyncMu.Unlock()
-
-	now := analyticsNow()
-	cfgKey := cfg.key()
-	analyticsCacheMu.RLock()
-	cached := analyticsCache
-	analyticsCacheMu.RUnlock()
-	if !force && cached.cfgKey == cfgKey && !cached.lastAttemptAt.IsZero() && now.Sub(cached.lastAttemptAt) < analyticsCacheTTL {
-		return
-	}
-
 	syncCtx, cancel := context.WithTimeout(ctx, analyticsSyncTimeout)
 	defer cancel()
 
-	nowDhaka := now.In(dhakaTZ)
-	todayStart := time.Date(nowDhaka.Year(), nowDhaka.Month(), nowDhaka.Day(), 0, 0, 0, 0, dhakaTZ)
-	todayStr := todayStart.Format("2006-01-02")
-	recentCutoffStr := todayStart.AddDate(0, 0, -2).Format("2006-01-02")
-	end := now.UTC().Add(time.Minute)
+	analyticsSyncMu.Lock()
+	defer analyticsSyncMu.Unlock()
+	if syncCtx.Err() != nil {
+		return false
+	}
 
-	hourly, orderedDays, err := fetchCloudflareHourlyRUM(syncCtx, cfg, todayStart, end)
+	now := analyticsNow()
+	cfgKey := cfg.key()
+	cached := cachedAnalytics(cfgKey)
+	if !force && !analyticsRefreshDue(now, cached.lastAttemptAt) {
+		return cached.syncError == ""
+	}
+
+	todayStart := analyticsDayStart(now)
+	hourly, days, err := fetchCloudflareHourlyRUM(syncCtx, cfg, todayStart, now.UTC().Add(time.Minute))
 	if err != nil {
 		log.Printf("analytics_sync event=cloudflare_hourly_failed reason=%s", err)
-		analyticsCacheMu.Lock()
-		if analyticsCache.cfgKey != cfgKey {
-			analyticsCache = newEmptyAnalyticsCache()
-			analyticsCache.cfgKey = cfgKey
-		}
-		analyticsCache.lastAttemptAt = now
-		analyticsCache.syncError = analyticsErrorFallback
-		analyticsCacheMu.Unlock()
-		return
+		updateAnalyticsCache(cfgKey, func(state *analyticsCacheState) {
+			state.lastAttemptAt = now
+			state.syncError = analyticsErrorFallback
+		})
+		return false
 	}
 
-	if err := pgx.BeginFunc(syncCtx, db, func(tx pgx.Tx) error {
-		for _, dayStr := range orderedDays {
-			agg := hourly[dayStr]
-			finalized := dayStr < todayStr
-			if _, err := tx.Exec(syncCtx, `
-				INSERT INTO analytics_daily(day, visitors, pageviews, sample_rate, source, finalized, updated_at)
-				VALUES($1::date, $2, $3, $4, 'cloudflare_rum', $5, now())
-				ON CONFLICT(day) DO UPDATE SET
-				  visitors = EXCLUDED.visitors,
-				  pageviews = EXCLUDED.pageviews,
-				  sample_rate = EXCLUDED.sample_rate,
-				  source = EXCLUDED.source,
-				  finalized = EXCLUDED.finalized,
-				  updated_at = now()
-				WHERE NOT analytics_daily.finalized
-				   OR EXCLUDED.sample_rate < analytics_daily.sample_rate
-				   OR (analytics_daily.day >= $6::date AND EXCLUDED.sample_rate <= analytics_daily.sample_rate)`,
-				dayStr, agg.visitors, agg.pageviews, agg.sampleRate, finalized, recentCutoffStr); err != nil {
-				return err
-			}
-		}
-		return nil
-	}); err != nil {
+	visitors := make([]int64, 0, len(days))
+	views := make([]int64, 0, len(days))
+	sampleRates := make([]float64, 0, len(days))
+	for _, day := range days {
+		visitors = append(visitors, hourly[day].visitors)
+		views = append(views, hourly[day].pageviews)
+		sampleRates = append(sampleRates, hourly[day].sampleRate)
+	}
+	_, err = db.Exec(syncCtx, `
+		INSERT INTO analytics_daily(day, visitors, pageviews, sample_rate, source, finalized, updated_at)
+		SELECT day::date, visitors, pageviews, sample_rate, 'cloudflare_rum', day::date < $5::date, now()
+		FROM unnest($1::text[], $2::bigint[], $3::bigint[], $4::float8[]) AS traffic(day, visitors, pageviews, sample_rate)
+		ON CONFLICT(day) DO UPDATE SET
+		  visitors = EXCLUDED.visitors,
+		  pageviews = EXCLUDED.pageviews,
+		  sample_rate = EXCLUDED.sample_rate,
+		  source = EXCLUDED.source,
+		  finalized = EXCLUDED.finalized,
+		  updated_at = now()
+		WHERE NOT analytics_daily.finalized
+		   OR EXCLUDED.sample_rate < analytics_daily.sample_rate
+		   OR (analytics_daily.day >= $6::date AND EXCLUDED.sample_rate <= analytics_daily.sample_rate)`,
+		days, visitors, views, sampleRates, todayStart.Format("2006-01-02"), todayStart.AddDate(0, 0, -2).Format("2006-01-02"))
+	if err != nil {
 		log.Printf("analytics_sync event=db_upsert_failed type=%T", err)
-		analyticsCacheMu.Lock()
-		if analyticsCache.cfgKey != cfgKey {
-			analyticsCache = newEmptyAnalyticsCache()
-			analyticsCache.cfgKey = cfgKey
-		}
-		analyticsCache.lastAttemptAt = now
-		analyticsCache.syncError = "Visitor history could not be saved right now. Showing previously archived totals."
-		analyticsCacheMu.Unlock()
+		updateAnalyticsCache(cfgKey, func(state *analyticsCacheState) {
+			state.lastAttemptAt = now
+			state.syncError = "Visitor history could not be saved right now. Showing previously archived totals."
+		})
+		return false
+	}
+
+	updateAnalyticsCache(cfgKey, func(state *analyticsCacheState) {
+		state.syncedAt = now.UTC()
+		state.lastAttemptAt = now
+		state.syncError = ""
+	})
+	return true
+}
+
+func syncCloudflareAnalytics(ctx context.Context, cfg analyticsConfig, force bool) {
+	syncCtx, cancel := context.WithTimeout(ctx, analyticsSyncTimeout)
+	defer cancel()
+	if !syncCloudflareTraffic(syncCtx, cfg, force) {
 		return
 	}
 
-	bd, bdErr := fetchCloudflareBreakdowns(syncCtx, cfg, todayStart, end)
-	if bdErr != nil {
+	analyticsBreakdownMu.Lock()
+	defer analyticsBreakdownMu.Unlock()
+	if syncCtx.Err() != nil {
+		return
+	}
+	now := analyticsNow()
+	cfgKey := cfg.key()
+	if !force && !analyticsRefreshDue(now, cachedAnalytics(cfgKey).breakdownAttemptAt) {
+		return
+	}
+
+	todayStart := analyticsDayStart(now)
+	breakdowns, err := fetchCloudflareBreakdowns(syncCtx, cfg, todayStart, now.UTC().Add(time.Minute))
+	if err != nil {
 		log.Printf("analytics_sync event=cloudflare_breakdowns_failed")
 	}
-
+	updateAnalyticsCache(cfgKey, func(state *analyticsCacheState) {
+		state.breakdownAttemptAt = now
+		state.breakdownError = ""
+		if err != nil {
+			state.breakdownError = "Cloudflare could not update the traffic breakdowns."
+			return
+		}
+		state.breakdowns = breakdowns
+	})
 	backfillCloudflare30Days(syncCtx, cfg, todayStart)
-
-	analyticsCacheMu.Lock()
-	if analyticsCache.cfgKey != cfgKey {
-		analyticsCache = newEmptyAnalyticsCache()
-		analyticsCache.cfgKey = cfgKey
-	}
-	analyticsCache.syncedAt = now.UTC()
-	analyticsCache.lastAttemptAt = now
-	analyticsCache.syncError = ""
-	if bdErr == nil {
-		analyticsCache.breakdowns = cloneBreakdowns(bd)
-	}
-	analyticsCacheMu.Unlock()
 }
 
 func buildAnalyticsReport(ctx context.Context, now time.Time, cfg analyticsConfig) (analyticsReport, error) {
-	nowDhaka := now.In(dhakaTZ)
-	today := time.Date(nowDhaka.Year(), nowDhaka.Month(), nowDhaka.Day(), 0, 0, 0, 0, dhakaTZ)
+	today := analyticsDayStart(now)
 	todayStr := today.Format("2006-01-02")
 	yesterdayStr := today.AddDate(0, 0, -1).Format("2006-01-02")
-	start14 := today.AddDate(0, 0, -13)
-	start14Str := start14.Format("2006-01-02")
-	start7Str := today.AddDate(0, 0, -6).Format("2006-01-02")
-	prev7EndStr := today.AddDate(0, 0, -7).Format("2006-01-02")
-
-	curMonthStart := time.Date(nowDhaka.Year(), nowDhaka.Month(), 1, 0, 0, 0, 0, dhakaTZ)
+	start14Str := today.AddDate(0, 0, -13).Format("2006-01-02")
+	curMonthStart := today.AddDate(0, 0, 1-today.Day())
 	monthStart12 := curMonthStart.AddDate(0, -11, 0)
-	monthStart12Str := monthStart12.Format("2006-01-02")
 
-	type visitorDayRow struct {
+	type monthTotals struct {
 		visitors, pageviews int64
-		sampleRate          float64
-		finalized           bool
-	}
-	visitorDays := map[string]visitorDayRow{}
-	rows, err := db.Query(ctx, `SELECT to_char(day, 'YYYY-MM-DD'), visitors, pageviews, sample_rate, finalized FROM analytics_daily WHERE day BETWEEN $1::date AND $2::date ORDER BY day`, start14Str, todayStr)
-	if err != nil {
-		return analyticsReport{}, err
-	}
-	for rows.Next() {
-		var d string
-		var r visitorDayRow
-		if err := rows.Scan(&d, &r.visitors, &r.pageviews, &r.sampleRate, &r.finalized); err != nil {
-			rows.Close()
-			return analyticsReport{}, err
-		}
-		visitorDays[d] = r
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return analyticsReport{}, err
-	}
-	rows.Close()
-
-	type orderTotals struct {
-		orders, sales int64
-	}
-	orderDays := map[string]orderTotals{}
-	rows, err = db.Query(ctx, `
-		SELECT to_char((created_at AT TIME ZONE 'Asia/Dhaka')::date, 'YYYY-MM-DD') AS d,
-		       count(*) FILTER (WHERE status NOT IN `+outStatuses+`),
-		       coalesce(sum(total) FILTER (WHERE status NOT IN `+outStatuses+`), 0)
-		FROM orders
-		WHERE (created_at AT TIME ZONE 'Asia/Dhaka')::date BETWEEN $1::date AND $2::date
-		GROUP BY d`, start14Str, todayStr)
-	if err != nil {
-		return analyticsReport{}, err
-	}
-	for rows.Next() {
-		var d string
-		var o orderTotals
-		if err := rows.Scan(&d, &o.orders, &o.sales); err != nil {
-			rows.Close()
-			return analyticsReport{}, err
-		}
-		orderDays[d] = o
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return analyticsReport{}, err
-	}
-	rows.Close()
-
-	dayAt := func(d string) analyticsDaySummary {
-		out := analyticsDaySummary{Day: d, SampleRate: 1}
-		if v, ok := visitorDays[d]; ok {
-			out.Visitors = v.visitors
-			out.Pageviews = v.pageviews
-			out.HasVisitors = true
-			out.SampleRate = v.sampleRate
-			out.Finalized = v.finalized
-		}
-		if o, ok := orderDays[d]; ok {
-			out.Orders = o.orders
-			out.Sales = o.sales
-		}
-		return out
-	}
-
-	last7 := analytics7DaySummary{Days: make([]analyticsDaySummary, 0, 7)}
-	for offset := -13; offset <= 0; offset++ {
-		d := today.AddDate(0, 0, offset).Format("2006-01-02")
-		s := dayAt(d)
-		if d <= prev7EndStr {
-			last7.PrevOrders += s.Orders
-			last7.PrevSales += s.Sales
-			if s.HasVisitors {
-				last7.PrevVisitors += s.Visitors
-				last7.PrevPageviews += s.Pageviews
-				last7.PrevDaysRecorded++
-			}
-		} else if d >= start7Str {
-			last7.Orders += s.Orders
-			last7.Sales += s.Sales
-			if s.HasVisitors {
-				last7.Visitors += s.Visitors
-				last7.Pageviews += s.Pageviews
-				last7.DaysRecorded++
-			}
-			last7.Days = append(last7.Days, s)
-		}
-	}
-
-	type visitorMonthAgg struct {
-		visitors, pageviews int64
+		orders, sales       int64
 		days, sampledDays   int
 	}
-	visitorMonths := map[string]visitorMonthAgg{}
-	rows, err = db.Query(ctx, `
-		SELECT to_char(date_trunc('month', day), 'YYYY-MM') AS m,
-		       coalesce(sum(visitors), 0),
-		       coalesce(sum(pageviews), 0),
-		       count(*),
-		       count(*) FILTER (WHERE sample_rate > 1)
-		FROM analytics_daily
-		WHERE day BETWEEN $1::date AND $2::date
-		GROUP BY m`, monthStart12Str, todayStr)
-	if err != nil {
-		return analyticsReport{}, err
-	}
-	for rows.Next() {
-		var m string
-		var a visitorMonthAgg
-		if err := rows.Scan(&m, &a.visitors, &a.pageviews, &a.days, &a.sampledDays); err != nil {
-			rows.Close()
-			return analyticsReport{}, err
-		}
-		visitorMonths[m] = a
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return analyticsReport{}, err
-	}
-	rows.Close()
+	monthsByDate := map[string]monthTotals{}
+	recentDays := map[string]analyticsDaySummary{}
+	var lastSaved time.Time
 
-	orderMonths := map[string]orderTotals{}
-	rows, err = db.Query(ctx, `
-		SELECT to_char(date_trunc('month', (created_at AT TIME ZONE 'Asia/Dhaka')::date), 'YYYY-MM') AS m,
-		       count(*) FILTER (WHERE status NOT IN `+outStatuses+`),
-		       coalesce(sum(total) FILTER (WHERE status NOT IN `+outStatuses+`), 0)
-		FROM orders
-		WHERE (created_at AT TIME ZONE 'Asia/Dhaka')::date BETWEEN $1::date AND $2::date
-		GROUP BY m`, monthStart12Str, todayStr)
+	// Read the archive once for both charts, with one indexed pass over the order date range.
+	rows, err := db.Query(ctx, `
+		WITH order_days AS (
+		  SELECT (created_at AT TIME ZONE 'Asia/Dhaka')::date AS day, count(*) AS orders, sum(total) AS sales
+		  FROM orders
+		  WHERE created_at >= ($1::date::timestamp AT TIME ZONE 'Asia/Dhaka')
+		    AND created_at < (($2::date + 1)::timestamp AT TIME ZONE 'Asia/Dhaka')
+		    AND status NOT IN `+outStatuses+`
+		  GROUP BY day
+		)
+		SELECT to_char(day, 'YYYY-MM-DD'), coalesce(a.visitors,0), coalesce(a.pageviews,0),
+		       a.day IS NOT NULL, coalesce(a.sample_rate,1), coalesce(a.finalized,false), a.updated_at,
+		       coalesce(o.orders,0), coalesce(o.sales,0)
+		FROM (SELECT * FROM analytics_daily WHERE day BETWEEN $1::date AND $2::date) a
+		FULL JOIN order_days o USING(day)`, monthStart12.Format("2006-01-02"), todayStr)
 	if err != nil {
 		return analyticsReport{}, err
 	}
-	for rows.Next() {
-		var m string
-		var o orderTotals
-		if err := rows.Scan(&m, &o.orders, &o.sales); err != nil {
-			rows.Close()
-			return analyticsReport{}, err
+	var d analyticsDaySummary
+	var updatedAt *time.Time
+	_, err = pgx.ForEachRow(rows, []any{&d.Day, &d.Visitors, &d.Pageviews, &d.HasVisitors, &d.SampleRate, &d.Finalized, &updatedAt, &d.Orders, &d.Sales}, func() error {
+		if d.Day >= start14Str {
+			recentDays[d.Day] = d
 		}
-		orderMonths[m] = o
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
+		key := d.Day[:7]
+		month := monthsByDate[key]
+		month.orders += d.Orders
+		month.sales += d.Sales
+		if d.HasVisitors {
+			month.visitors += d.Visitors
+			month.pageviews += d.Pageviews
+			month.days++
+			if d.SampleRate > 1 {
+				month.sampledDays++
+			}
+			if updatedAt != nil && updatedAt.After(lastSaved) {
+				lastSaved = *updatedAt
+			}
+		}
+		monthsByDate[key] = month
+		return nil
+	})
+	if err != nil {
 		return analyticsReport{}, err
 	}
-	rows.Close()
+
+	dayAt := func(day string) analyticsDaySummary {
+		if row, ok := recentDays[day]; ok {
+			return row
+		}
+		return analyticsDaySummary{Day: day, SampleRate: 1}
+	}
+	last7 := analytics7DaySummary{Days: make([]analyticsDaySummary, 0, 7)}
+	for offset := -13; offset <= 0; offset++ {
+		day := dayAt(today.AddDate(0, 0, offset).Format("2006-01-02"))
+		if offset < -6 {
+			last7.PrevOrders += day.Orders
+			last7.PrevSales += day.Sales
+			if day.HasVisitors {
+				last7.PrevVisitors += day.Visitors
+				last7.PrevPageviews += day.Pageviews
+				last7.PrevDaysRecorded++
+			}
+		} else {
+			last7.Orders += day.Orders
+			last7.Sales += day.Sales
+			if day.HasVisitors {
+				last7.Visitors += day.Visitors
+				last7.Pageviews += day.Pageviews
+				last7.DaysRecorded++
+			}
+			last7.Days = append(last7.Days, day)
+		}
+	}
 
 	months := make([]analyticsMonthSummary, 0, 12)
 	for i := 0; i < 12; i++ {
@@ -1288,20 +1258,19 @@ func buildAnalyticsReport(ctx context.Context, now time.Time, cfg analyticsConfi
 		current := i == 11
 		daysInPeriod := mStart.AddDate(0, 1, -1).Day()
 		if current {
-			daysInPeriod = nowDhaka.Day()
+			daysInPeriod = today.Day()
 		}
-		vm := visitorMonths[mStr]
-		om := orderMonths[mStr]
+		month := monthsByDate[mStr]
 		var avgPerDay *float64
-		if vm.days > 0 {
-			avg := math.Round((float64(vm.visitors)/float64(vm.days))*10) / 10
+		if month.days > 0 {
+			avg := math.Round((float64(month.visitors)/float64(month.days))*10) / 10
 			avgPerDay = &avg
 		}
 		var changePct *float64
-		if i > 0 && vm.days > 0 {
+		if i > 0 && month.days > 0 {
 			prev := months[i-1]
 			if prev.DaysRecorded > 0 && prev.Visitors > 0 {
-				pct := math.Round(((float64(vm.visitors)-float64(prev.Visitors))/float64(prev.Visitors))*1000) / 10
+				pct := math.Round(((float64(month.visitors)-float64(prev.Visitors))/float64(prev.Visitors))*1000) / 10
 				changePct = &pct
 			}
 		}
@@ -1309,33 +1278,37 @@ func buildAnalyticsReport(ctx context.Context, now time.Time, cfg analyticsConfi
 			Month:        mStr,
 			Label:        mStart.Format("Jan 2006"),
 			Current:      current,
-			Visitors:     vm.visitors,
-			Pageviews:    vm.pageviews,
-			Orders:       om.orders,
-			Sales:        om.sales,
-			DaysRecorded: vm.days,
+			Visitors:     month.visitors,
+			Pageviews:    month.pageviews,
+			Orders:       month.orders,
+			Sales:        month.sales,
+			DaysRecorded: month.days,
 			DaysInPeriod: daysInPeriod,
-			SampledDays:  vm.sampledDays,
+			SampledDays:  month.sampledDays,
 			AvgPerDay:    avgPerDay,
 			ChangePct:    changePct,
 		})
 	}
 
-	analyticsCacheMu.RLock()
-	cached := analyticsCache
-	analyticsCacheMu.RUnlock()
-
-	syncedAt := ""
 	breakdowns := emptyBreakdowns()
 	syncError := ""
-	stale := false
-	if cfg.configured && cached.cfgKey == cfg.key() {
+	refreshDue := false
+	if cfg.configured {
+		cached := cachedAnalytics(cfg.key())
 		if !cached.syncedAt.IsZero() {
-			syncedAt = cached.syncedAt.Format(time.RFC3339)
+			lastSaved = cached.syncedAt
 		}
 		breakdowns = cloneBreakdowns(cached.breakdowns)
 		syncError = cached.syncError
-		stale = syncError != ""
+		if syncError == "" {
+			syncError = cached.breakdownError
+		}
+		refreshDue = analyticsRefreshDue(now, cached.lastAttemptAt) ||
+			(cached.syncError == "" && analyticsRefreshDue(now, cached.breakdownAttemptAt))
+	}
+	syncedAt := ""
+	if !lastSaved.IsZero() {
+		syncedAt = lastSaved.UTC().Format(time.RFC3339)
 	}
 	enrichTopPages(ctx, breakdowns.TopPages)
 	lowStock := 5
@@ -1350,7 +1323,8 @@ func buildAnalyticsReport(ctx context.Context, now time.Time, cfg analyticsConfi
 		SourceLabel:   "Cloudflare Web Analytics (human visits, bot-filtered)",
 		Timezone:      "Asia/Dhaka",
 		SyncedAt:      syncedAt,
-		Stale:         stale,
+		RefreshDue:    refreshDue,
+		Stale:         syncError != "",
 		SyncError:     syncError,
 		LowStock:      lowStock,
 		Today:         dayAt(todayStr),
@@ -1363,9 +1337,6 @@ func buildAnalyticsReport(ctx context.Context, now time.Time, cfg analyticsConfi
 
 func adminAnalytics(w http.ResponseWriter, r *http.Request) {
 	cfg := loadAnalyticsConfig(r)
-	if cfg.configured {
-		syncCloudflareAnalytics(r.Context(), cfg, false)
-	}
 	report, err := buildAnalyticsReport(r.Context(), analyticsNow(), cfg)
 	if err != nil {
 		oops(w, err)
@@ -1375,14 +1346,29 @@ func adminAnalytics(w http.ResponseWriter, r *http.Request) {
 }
 
 func adminSyncAnalytics(w http.ResponseWriter, r *http.Request) {
+	force := r.URL.Query().Get("auto") != "1"
+	syncCloudflareAnalytics(r.Context(), loadAnalyticsConfig(r), force)
+	adminAnalytics(w, r)
+}
+
+func adminAnalyticsToday(w http.ResponseWriter, r *http.Request) {
 	cfg := loadAnalyticsConfig(r)
-	if cfg.configured {
-		syncCloudflareAnalytics(r.Context(), cfg, true)
+	var result struct {
+		Visitors  *int64     `json:"visitors"`
+		UpdatedAt *time.Time `json:"updatedAt"`
+		Sampled   bool       `json:"sampled"`
+		Stale     bool       `json:"stale"`
 	}
-	report, err := buildAnalyticsReport(r.Context(), analyticsNow(), cfg)
-	if err != nil {
+	if cfg.configured {
+		result.Stale = !syncCloudflareTraffic(r.Context(), cfg, false)
+	}
+	day := analyticsDayStart(analyticsNow()).Format("2006-01-02")
+	err := db.QueryRow(r.Context(), `
+		SELECT visitors, updated_at, sample_rate > 1 FROM analytics_daily WHERE day=$1::date`, day).
+		Scan(&result.Visitors, &result.UpdatedAt, &result.Sampled)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		oops(w, err)
 		return
 	}
-	ok(w, report)
+	ok(w, result)
 }

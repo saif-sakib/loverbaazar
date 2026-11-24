@@ -898,7 +898,8 @@ func TestJashoreLocalSEOContentUpdateKeepsOwnerEdits(t *testing.T) {
 	reset(t)
 	if _, err := db.Exec(bg, `INSERT INTO content(kind,slug,data) VALUES
 		('page','about-us','{"slug":"about-us","title":"About Us","html":"<p>{name} is a home appliance store. Custom note.</p>"}'),
-		('page','how-to-buy','{"slug":"how-to-buy","title":"How To Buy","html":"<p>ডেলিভারি এলাকা: সারা বাংলাদেশ।</p>"}')`); err != nil {
+		('page','how-to-buy','{"slug":"how-to-buy","title":"How To Buy","html":"<p>ডেলিভারি এলাকা: সারা বাংলাদেশ।</p>"}'),
+		('page','privacy-policy','{"slug":"privacy-policy","title":"Privacy Policy","html":"<p>We display Google AdSense advertisements on selected public storefront and guide pages (never on checkout, cart, account, or order-tracking pages).</p><p>Owner privacy note.</p>"}')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(bg, `INSERT INTO settings VALUES('site','{"tagline":"Home appliances and furniture in Bangladesh","description":"Rice cookers, pressure cookers, nonstick cookware, chairs, tables and wardrobes at wholesale prices in Bangladesh, with cash on delivery.","about":"Your trusted place for home appliances and furniture, at wholesale prices.","hero":{"title":"Everything for your home, at wholesale prices.","text":"Rice cookers, cookware, wardrobes, chairs and more from Kiam, RFL and Akij. Delivered across Bangladesh, and you pay on delivery."}}')`); err != nil {
@@ -907,7 +908,7 @@ func TestJashoreLocalSEOContentUpdateKeepsOwnerEdits(t *testing.T) {
 	if err := applyContentUpdates(bg); err != nil {
 		t.Fatal(err)
 	}
-	var aboutHTML, howHTML, tagline, desc, about, heroText string
+	var aboutHTML, howHTML, privacyHTML, tagline, desc, about, heroTitle, heroText string
 	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='page' AND slug='about-us'`).Scan(&aboutHTML); err != nil {
 		t.Fatal(err)
 	}
@@ -920,15 +921,24 @@ func TestJashoreLocalSEOContentUpdateKeepsOwnerEdits(t *testing.T) {
 	if !strings.Contains(howHTML, "/online-shopping-jashore/") || !strings.Contains(howHTML, "যশোর") {
 		t.Errorf("how-to-buy not enriched for Jashore: %q", howHTML)
 	}
-	if err := db.QueryRow(bg, `SELECT data->>'tagline',data->>'description',data->>'about',data->'hero'->>'text' FROM settings WHERE key='site'`).Scan(&tagline, &desc, &about, &heroText); err != nil {
+	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='page' AND slug='privacy-policy'`).Scan(&privacyHTML); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(tagline, "Online Shopping in Jashore") || !strings.Contains(desc, "Online shopping in Jashore") || !strings.Contains(about, "Vekutia, Jashore") || !strings.Contains(heroText, "Free delivery inside Jashore") {
+	if !strings.Contains(privacyHTML, "on the blog and its buying guides") || !strings.Contains(privacyHTML, "Owner privacy note.") {
+		t.Errorf("privacy note or advertising update missing: %q", privacyHTML)
+	}
+	if err := db.QueryRow(bg, `SELECT data->>'tagline',data->>'description',data->>'about',data->'hero'->>'title',data->'hero'->>'text' FROM settings WHERE key='site'`).Scan(&tagline, &desc, &about, &heroTitle, &heroText); err != nil {
+		t.Fatal(err)
+	}
+	if tagline != "Home Appliances & Furniture in Bangladesh" || !strings.Contains(desc, "Shop rice cookers, pressure cookers") || !strings.Contains(about, "Cookware, home appliances and furniture") {
 		t.Errorf("site settings defaults not updated: tagline=%q desc=%q about=%q hero=%q", tagline, desc, about, heroText)
+	}
+	if heroTitle != "Cookware, appliances & furniture" || heroText != "Shop rice cookers, cookware, chairs and wardrobes from Kiam, RFL and Akij." {
+		t.Errorf("hero copy not updated: title=%q text=%q", heroTitle, heroText)
 	}
 
 	// Owner-customized values must be preserved and the update must never re-run once applied.
-	if _, err := db.Exec(bg, `DELETE FROM applied WHERE name='2026-11-jashore-local-seo'`); err != nil {
+	if _, err := db.Exec(bg, `DELETE FROM applied WHERE name IN ('2026-11-jashore-local-seo','2026-11-purchase-copy')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(bg, `UPDATE content SET data=jsonb_set(data,'{html}','"Owner custom about page"') WHERE kind='page' AND slug='about-us'`); err != nil {

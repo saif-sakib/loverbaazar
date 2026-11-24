@@ -490,5 +490,16 @@
     "remove": [],
     "text": [],
     "sql": []
+  },
+  {
+    "id": "2026-11-purchase-copy",
+    "sql": [
+      "UPDATE settings SET data=jsonb_set(data,'{tagline}',to_jsonb('Home Appliances & Furniture in Bangladesh'::text)) WHERE key='site' AND data->>'tagline'='Online Shopping in Jashore — Home Appliances & Furniture'",
+      "UPDATE settings SET data=jsonb_set(data,'{description}',to_jsonb('Shop rice cookers, pressure cookers, cookware, chairs and wardrobes from Kiam, RFL and Akij.'::text)) WHERE key='site' AND data->>'description'='Online shopping in Jashore (Jessore) for Kiam cookware, rice cookers, RFL chairs & wardrobes at wholesale prices, with cash on delivery.'",
+      "UPDATE settings SET data=jsonb_set(data,'{about}',to_jsonb('Cookware, home appliances and furniture from Kiam, RFL and Akij.'::text)) WHERE key='site' AND data->>'about'='Your trusted online shop in Vekutia, Jashore for home appliances, cookware and furniture at wholesale prices.'",
+      "UPDATE settings SET data=jsonb_set(data,'{hero,title}',to_jsonb('Cookware, appliances & furniture'::text)) WHERE key='site' AND data->'hero'->>'title'='Everything for your home, at wholesale prices.'",
+      "UPDATE settings SET data=jsonb_set(data,'{hero,text}',to_jsonb('Shop rice cookers, cookware, chairs and wardrobes from Kiam, RFL and Akij.'::text)) WHERE key='site' AND data->'hero'->>'text'='Shop online in Jashore (Jessore) for rice cookers, cookware, wardrobes, chairs and more from Kiam, RFL and Akij. Free delivery inside Jashore and cash on delivery across Bangladesh.'",
+      "UPDATE content SET data=jsonb_set(data,'{html}',to_jsonb(replace(data->>'html','We display Google AdSense advertisements on selected public storefront and guide pages (never on checkout, cart, account, or order-tracking pages).','We display Google AdSense advertisements on the blog and its buying guides.'))) WHERE kind='page' AND slug='privacy-policy' AND position('We display Google AdSense advertisements on selected public storefront and guide pages (never on checkout, cart, account, or order-tracking pages).' in data->>'html')>0"
+    ]
   }
 ]
