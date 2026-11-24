@@ -150,11 +150,8 @@ func connect(ctx context.Context) error {
 	return err
 }
 
-// seed loads the imported catalogue. It is safe to re-run: existing products are left alone, and
+// seedCatalog loads the imported catalogue. It is safe to re-run: existing products are left alone, and
 // content of a kind the shop already has is skipped, so anything the admin deleted stays deleted.
-func seed(ctx context.Context, productsFile, contentFile string) error {
-	return seedCatalog(ctx, productsFile, contentFile, false)
-}
 func seedCatalog(ctx context.Context, productsFile, contentFile string, fixture bool) error {
 	if err := migrate(ctx); err != nil {
 		return err

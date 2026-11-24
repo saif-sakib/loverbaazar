@@ -16,18 +16,6 @@ import (
 const maxMoney int64 = 1_000_000_000 // whole taka; 1,000 maximum pieces still fit safely in BIGINT
 const maxStock int64 = 1_000_000
 
-func safeTestDatabase(raw string) bool {
-	u, e := url.Parse(raw)
-	if e != nil {
-		return false
-	}
-	for k := range u.Query() {
-		if k != "sslmode" {
-			return false
-		}
-	}
-	return (u.Scheme == "postgres" || u.Scheme == "postgresql") && (u.Hostname() == "127.0.0.1" || u.Hostname() == "localhost" || u.Hostname() == "::1") && u.Path == "/lb_test" && u.Query().Get("host") == "" && u.Query().Get("service") == ""
-}
 func safeSlug(s string, path bool) bool {
 	d, e := url.PathUnescape(s)
 	if e != nil || d == "" || len(d) > 240 {

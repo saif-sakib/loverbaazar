@@ -458,15 +458,15 @@
         f.inert = false;
       }
     });
-    const submitAs = (andPub) => {
-      if (!f.noValidate && f.reportValidity && !f.reportValidity()) return;
-      publishAfter = andPub;
-      if (f.requestSubmit) f.requestSubmit();
-      else f.onsubmit({ preventDefault: () => {} });
-    };
-    $$("#savepub, [data-savepub]", f).forEach((b) => {
-      b.onclick = () => submitAs(true);
-    });
+    const publishButton = $("#savepub", f);
+    if (publishButton) {
+      publishButton.onclick = () => {
+        if (!f.noValidate && f.reportValidity && !f.reportValidity()) return;
+        publishAfter = true;
+        if (f.requestSubmit) f.requestSubmit();
+        else f.onsubmit({ preventDefault: () => {} });
+      };
+    }
   };
 
   async function loadCategories(force = false) {

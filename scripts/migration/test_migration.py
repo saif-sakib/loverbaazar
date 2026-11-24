@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from migration.core import CLASSES, Invalid, POLICIES, approve, archive_note, canonical, digest, editorial_audit, file_hash, legacy_archive, load_bundle, lookup, make_plan, normalize, private, review_csv, slug, write
+from migration.core import CLASSES, Invalid, POLICIES, approve, archive_note, canonical, editorial_audit, file_hash, legacy_archive, load_bundle, lookup, make_plan, normalize, private, review_csv, slug, write
 from migration import assets
 
 

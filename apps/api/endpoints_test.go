@@ -471,17 +471,15 @@ func TestPublicID(t *testing.T) {
 
 func TestPhotosStillInUseAreKept(t *testing.T) {
 	reset(t)
+	t.Setenv("CLOUDINARY_CLOUD", "x")
 	const shared = "https://res.cloudinary.com/x/image/upload/loverbaazar/products/p/shared-1.jpg"
 	const single = "https://res.cloudinary.com/x/image/upload/loverbaazar/products/p/single-1.jpg"
 	if _, err := db.Exec(bg, `UPDATE products SET data=data||jsonb_build_object('images',jsonb_build_array(jsonb_build_object('src',$1::text))) WHERE id=2`, shared); err != nil {
 		t.Fatal(err)
 	}
-	got := unusedImages(bg, []any{M{"src": shared}, M{"src": single}, M{"src": "/placeholder.svg"}}, []any{})
-	if len(got) != 1 || got[0] != "loverbaazar/products/p/single-1" {
-		t.Errorf("unused: %v", got)
-	}
-	if got := unusedImages(bg, []any{M{"src": single}}, []any{M{"src": single}}); len(got) != 0 {
-		t.Errorf("a photo still on the product was marked unused: %v", got)
+	cloudIDs, localFiles := unusedURLs(bg, []string{shared, single, "/placeholder.svg"})
+	if len(cloudIDs) != 1 || cloudIDs[0] != "loverbaazar/products/p/single-1" || len(localFiles) != 0 {
+		t.Errorf("unused Cloudinary images: %v, unused local files: %v", cloudIDs, localFiles)
 	}
 }
 

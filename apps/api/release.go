@@ -229,16 +229,6 @@ func publicationDirtyFrom(ctx context.Context, tx pgx.Tx) (bool, error) {
 	return e == nil && live != current, e
 }
 
-func publicationDirty(ctx context.Context) (bool, error) {
-	var dirty bool
-	e := pgx.BeginTxFunc(ctx, db, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly}, func(tx pgx.Tx) error {
-		var err error
-		dirty, err = publicationDirtyFrom(ctx, tx)
-		return err
-	})
-	return dirty, e
-}
-
 const staleReleaseFailure = "GitHub did not confirm this publication within 45 minutes. Check the Publish store workflow in GitHub Actions."
 
 func expireStaleReleases(ctx context.Context) {

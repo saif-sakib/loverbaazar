@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -126,6 +127,19 @@ var (
 
 const adminKey = "test-admin-token-test-admin-token-1234"
 
+func safeTestDatabase(raw string) bool {
+	u, e := url.Parse(raw)
+	if e != nil {
+		return false
+	}
+	for k := range u.Query() {
+		if k != "sslmode" {
+			return false
+		}
+	}
+	return (u.Scheme == "postgres" || u.Scheme == "postgresql") && (u.Hostname() == "127.0.0.1" || u.Hostname() == "localhost" || u.Hostname() == "::1") && u.Path == "/lb_test" && u.Query().Get("host") == "" && u.Query().Get("service") == ""
+}
+
 func TestMain(m *testing.M) {
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url != "" {
@@ -155,7 +169,9 @@ func reset(t *testing.T) {
 	if _, err := db.Exec(bg, `TRUNCATE analytics_daily,product_photo_uploads,product_photo_saves,notification_daily_budget,order_notifications,releases,retired_images,applied,products,users,sessions,orders,order_items,order_events,messages,settings,content,coupons,reviews RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatal(err)
 	}
-	resetAnalyticsCache()
+	analyticsCacheMu.Lock()
+	analyticsCache = newEmptyAnalyticsCache()
+	analyticsCacheMu.Unlock()
 	// Fixed charges here, so the tests don't depend on what the shop happens to charge today.
 	if _, err := db.Exec(bg, `INSERT INTO settings VALUES('live','{"delivery":[{"id":"jashore","label":"Inside Jashore","fee":60},{"id":"outside","label":"Outside Jashore","fee":100}]}')`); err != nil {
 		t.Fatal(err)
@@ -757,13 +773,13 @@ func TestSeedKeepsDeletedContentDeleted(t *testing.T) {
 	content := dir + "/content.json"
 	os.WriteFile(products, []byte(`[]`), 0o644)
 	os.WriteFile(content, []byte(`{"posts":[{"slug":"a","title":"A","html":""},{"slug":"b","title":"B","html":""}]}`), 0o644)
-	if err := seed(bg, products, content); err != nil {
+	if err := seedCatalog(bg, products, content, false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(bg, `DELETE FROM content WHERE slug='a'`); err != nil {
 		t.Fatal(err)
 	}
-	if err := seed(bg, products, content); err != nil {
+	if err := seedCatalog(bg, products, content, false); err != nil {
 		t.Fatal(err)
 	}
 	var n int

@@ -56,12 +56,6 @@ func newEmptyAnalyticsCache() analyticsCacheState {
 	return analyticsCacheState{breakdowns: emptyBreakdowns()}
 }
 
-func resetAnalyticsCache() {
-	analyticsCacheMu.Lock()
-	analyticsCache = newEmptyAnalyticsCache()
-	analyticsCacheMu.Unlock()
-}
-
 func cachedAnalytics(cfgKey string) analyticsCacheState {
 	analyticsCacheMu.RLock()
 	defer analyticsCacheMu.RUnlock()

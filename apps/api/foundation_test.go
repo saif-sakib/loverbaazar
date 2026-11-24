@@ -257,9 +257,7 @@ func TestCodeReleaseDoesNotSupersedeNewerEditorialPublish(t *testing.T) {
 
 func TestPublishSkipsUnchangedContentAndRecordsFailures(t *testing.T) {
 	reset(t)
-	if dirty, err := publicationDirty(bg); err != nil || !dirty {
-		t.Fatal("never-published shop must need Publish", dirty, err)
-	}
+	expect(t, "first publication needed", "GET", "/api/admin/publish", nil, true, 200, `"dirty":true`)
 	id, key, err := freezeRelease(bg, true, true)
 	if err != nil {
 		t.Fatal(err)
@@ -278,9 +276,7 @@ func TestPublishSkipsUnchangedContentAndRecordsFailures(t *testing.T) {
 	if _, err := db.Exec(bg, `UPDATE settings SET data=data||'{"lowStock":3}' WHERE key='live'`); err != nil {
 		t.Fatal(err)
 	}
-	if dirty, err := publicationDirty(bg); err != nil || dirty {
-		t.Fatal("live-only edit marked dirty", dirty, err)
-	}
+	expect(t, "live-only edit needs no publication", "GET", "/api/admin/publish", nil, true, 200, `"dirty":false`)
 	if _, _, err := freezeRelease(bg, true, true); !errors.As(err, &existing) || existing.state != "published" {
 		t.Fatal("unchanged content queued a build", err)
 	}
@@ -288,15 +284,11 @@ func TestPublishSkipsUnchangedContentAndRecordsFailures(t *testing.T) {
 	if _, err := db.Exec(bg, `UPDATE products SET data=data||'{"name":"Renamed"}' WHERE id=1`); err != nil {
 		t.Fatal(err)
 	}
-	if dirty, err := publicationDirty(bg); err != nil || !dirty {
-		t.Fatal("editorial change not detected", dirty, err)
-	}
+	expect(t, "editorial change is pending", "GET", "/api/admin/publish", nil, true, 200, `"dirty":true`)
 	if _, err := db.Exec(bg, `UPDATE products SET data=data||'{"name":"Product 1"}' WHERE id=1`); err != nil {
 		t.Fatal(err)
 	}
-	if dirty, err := publicationDirty(bg); err != nil || dirty {
-		t.Fatal("reverted edit still dirty", dirty, err)
-	}
+	expect(t, "reverted edit needs no publication", "GET", "/api/admin/publish", nil, true, 200, `"dirty":false`)
 	// A real change is queued once; its failure keeps the edit pending with a readable reason.
 	if _, err := db.Exec(bg, `UPDATE products SET data=data||'{"name":"Renamed"}' WHERE id=1`); err != nil {
 		t.Fatal(err)
@@ -317,9 +309,7 @@ func TestPublishSkipsUnchangedContentAndRecordsFailures(t *testing.T) {
 	if state != "failed" || failure != "The website build failed." || gotRun != run || !finished {
 		t.Fatal(state, failure, gotRun, finished)
 	}
-	if dirty, err := publicationDirty(bg); err != nil || !dirty {
-		t.Fatal("failed publication cleared pending edits", dirty, err)
-	}
+	expect(t, "failed publication keeps pending edits", "GET", "/api/admin/publish", nil, true, 200, `"dirty":true`)
 	// Retrying the same content after a failure dispatches a new build.
 	if _, _, err := freezeRelease(bg, true, true); err != nil {
 		t.Fatal("retry after failure refused", err)

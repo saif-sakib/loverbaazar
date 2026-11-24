@@ -4,14 +4,13 @@ import hashlib
 import json
 import math
 import os
-from pathlib import Path
 import re
 import struct
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from .core import Invalid, digest, file_hash, private, safe_url, write, now
+from .core import Invalid, digest, file_hash, now, private
 
 URL = re.compile(r'https?://[^\s\"\'<>\\)]+|/wp-content/[^\s\"\'<>\\)]+')
 

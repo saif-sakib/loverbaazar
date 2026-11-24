@@ -74,8 +74,10 @@ seed_mode=seed
 if [[ ${LB_ISOLATED:-0} == 1 ]]; then seed_mode=seed-fixture; fi
 (cd "$ROOT/apps/api" && go build -o "$BIN" . && "$BIN" "$seed_mode" seed/products.json ../store/src/data/content.json)
 export BUILD_OUTPUT="$ROOT/apps/store/dist"
+wrangler_state_args=()
 if [[ ${LB_ISOLATED:-0} == 1 ]]; then
  export BUILD_OUTPUT="$task_dir/store" BUILD_PUBLIC_DIR="$task_dir/public"
+ wrangler_state_args=(--persist-to "$task_dir/wrangler-state")
  mkdir -p "$BUILD_PUBLIC_DIR"
  for asset in "$ROOT/apps/store/public/"*; do
   [[ ${asset##*/} == uploads ]] || cp -a "$asset" "$BUILD_PUBLIC_DIR/"
@@ -91,5 +93,5 @@ done
 export BUILD_ENV=local CATALOG_URL="http://127.0.0.1:$api_port/api/catalog"
 node node_modules/.bin/astro build --outDir "$BUILD_OUTPUT" >/dev/null
 printf '\nShop: http://127.0.0.1:%s/\nAdmin: http://127.0.0.1:%s/admin/\n' "$store_port" "$store_port"
-WRANGLER_SEND_METRICS=false setsid npx wrangler dev --assets "$BUILD_OUTPUT" --port "$store_port" --ip 127.0.0.1 --var "API_ORIGIN:http://127.0.0.1:$api_port" --var ORIGIN_SECRET:dev & EDGE=$!
+WRANGLER_SEND_METRICS=false setsid npx wrangler dev --assets "$BUILD_OUTPUT" --port "$store_port" --ip 127.0.0.1 --var "API_ORIGIN:http://127.0.0.1:$api_port" --var ORIGIN_SECRET:dev "${wrangler_state_args[@]}" & EDGE=$!
 wait "$EDGE"

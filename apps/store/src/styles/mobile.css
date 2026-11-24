@@ -261,7 +261,6 @@ body.checkout-page { padding-bottom: var(--safe-bottom); }
 .admin .stick, .admin .editor .stick { position: static; margin-bottom: 16px; }
 .admin .stick .btn { min-height: 48px; }
 .admin .richbar { flex-wrap: wrap; }
-.admin .inlineform > .field { min-width: 0; width: 100%; flex-basis: 100%; }
 .admin #head h1 { font-size: 26px; }
 .admin #olist .tbl, .admin #olist tbody { display: block; min-width: 0; width: 100%; }
 .admin #olist thead { display: none; }
@@ -327,7 +326,6 @@ body.checkout-page { padding-bottom: var(--safe-bottom); }
   .admin .scroll-hint { display: none; }
   .admin .stick, .admin .editor .stick { position: sticky; bottom: 12px; }
   .admin .toolbar-date { width: auto; }
-  .admin .inlineform > .field { flex: 1; width: auto; flex-basis: auto; min-width: 180px; }
   .admin #olist .tbl { display: table; }
   .admin #olist thead { display: table-header-group; }
   .admin #olist tbody { display: table-row-group; }

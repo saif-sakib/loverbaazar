@@ -139,7 +139,7 @@ func TestSeedDoesNotInventInventoryFromAvailability(t *testing.T) {
 	if e := os.WriteFile(path, []byte(data), 0600); e != nil {
 		t.Fatal(e)
 	}
-	if e := seed(bg, path, ""); e != nil {
+	if e := seedCatalog(bg, path, "", false); e != nil {
 		t.Fatal(e)
 	}
 	var active bool

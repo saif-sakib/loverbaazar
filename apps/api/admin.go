@@ -958,44 +958,6 @@ func isImageRefUsed(ctx context.Context, needle string) bool {
 	return err != nil || used
 }
 
-func imageURLs(list []any) []string {
-	var urls []string
-	for _, x := range list {
-		if m, isMap := x.(map[string]any); isMap {
-			if src, _ := m["src"].(string); src != "" {
-				urls = append(urls, src)
-			}
-		}
-	}
-	return urls
-}
-
-func imageIDs(list []any) []string {
-	var ids []string
-	for _, u := range imageURLs(list) {
-		if id := publicID(u); id != "" {
-			ids = append(ids, id)
-		}
-	}
-	return ids
-}
-
-// unusedImages lists photos that were removed and that nothing else still shows. A product copy can
-// share a photo, and pages and settings can link to one, so all of them are checked first.
-func unusedImages(ctx context.Context, before, after []any) []string {
-	keep := imageIDs(after)
-	var out []string
-	for _, id := range imageIDs(before) {
-		if slices.Contains(keep, id) {
-			continue
-		}
-		if !isImageRefUsed(ctx, id) {
-			out = append(out, id)
-		}
-	}
-	return out
-}
-
 func unusedURLs(ctx context.Context, urls []string) (cloudIDs []string, localFiles []string) {
 	seenCloud := map[string]bool{}
 	seenLocal := map[string]bool{}

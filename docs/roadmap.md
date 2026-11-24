@@ -914,3 +914,12 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 - Move old generated storefront builds, Astro output and Python bytecode to a private recovery folder. Keep local data and machine-specific settings ignored by Git.
 
 **Verification, 25 November 2026.** Local Markdown paths and section anchors resolve. Go formatting, vet and API race checks passed, along with Worker, release, migration and maintenance tests. The disposable store passed production and preview build checks, all 62 UI tests, 19 accessibility scans and checkout and publication.
+
+### Task 74 — Remove obsolete code and generated files
+
+**Status** Done.
+
+- Remove obsolete API helpers, Admin selectors and styles, and unused migration imports. Exercise the active publication status and image cleanup paths in the existing tests.
+- Delete 54.2 MB of old generated builds, bytecode, local cache, and trace files. Put isolated Wrangler state inside the disposable fixture directory so shutdown can remove it.
+
+**Verification, 25 November 2026.** Go reachability checks, the API race suite, migration tests, production and preview builds, all 62 UI tests, 19 accessibility scans, and isolated checkout and publication passed. A second checkout and publication run confirmed that fixture teardown removed the temporary Wrangler state and left the regular cache and trace paths absent.

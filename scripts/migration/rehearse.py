@@ -8,7 +8,7 @@ import sys
 import time
 import socket
 import urllib.request
-from migration.core import CLASSES, POLICIES, approve, canonical, digest, file_hash, legacy_archive, make_plan, normalize, review_csv, write
+from migration.core import CLASSES, POLICIES, approve, canonical, file_hash, legacy_archive, make_plan, normalize, review_csv, write
 from migration.test_migration import bundle
 
 
