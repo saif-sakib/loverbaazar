@@ -14,7 +14,7 @@
   "dependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5",
     "@fontsource/noto-sans-bengali": "^5.3.0",
-    "astro": "7.4.12",
+    "astro": "7.4.13",
     "pdfmake": "0.3.14"
   },
   "devDependencies": {
