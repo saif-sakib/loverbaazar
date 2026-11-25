@@ -35,7 +35,13 @@ export const cats = pick("cats"),
   tags = pick("tags"),
   pages = pick("pages");
 export const posts = [...pick("posts")].sort((a, b) => String(b.date).localeCompare(String(a.date)));
-export const SITE: any = { ...defaults.site, ...store.site };
+const rawSite: any = store.site || {};
+export const SITE: any = {
+  ...defaults.site,
+  ...rawSite,
+  hero: { ...defaults.site.hero, ...(rawSite.hero || {}) },
+  offers: { ...defaults.site.offers, ...(rawSite.offers || {}) },
+};
 // Use the readable spacing of the configured wordmark as an alternate name.
 export const spacedSiteName = SITE.name.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
 // {phone}, {email} and {name} let the admin write text on Pages that stays right when those details change.
@@ -52,7 +58,11 @@ export const off = (p: any) => (p.regular > p.price ? Math.round(((p.regular - p
 export const inCat = (slug: string) => products.filter((p) => p.cats.includes(slug));
 // Everything priced below its regular price, biggest discount first. Home sections use the name "on-sale".
 export const onSale = () => products.filter((p) => off(p) > 0).sort((a, b) => off(b) - off(a));
-export const homeItems = (slug: string) => (slug === "on-sale" ? onSale() : inCat(slug));
+export const offersEnabled = () => SITE.offers?.enabled !== false;
+export const activeOffers = () => (offersEnabled() ? onSale() : []);
+export const showOffersNav = () => offersEnabled() && SITE.offers?.showInNav !== false && onSale().length > 0;
+export const offersNavLabel = () => String(SITE.offers?.navLabel || "").trim() || "Offers";
+export const homeItems = (slug: string) => (slug === "on-sale" ? activeOffers() : inCat(slug));
 // WordPress stores Bangla slugs percent-encoded, but a browser's request is decoded before the file
 // is looked up. So the build must write the real letters, or those pages answer 404.
 export const fileSlug = (s: string) => {

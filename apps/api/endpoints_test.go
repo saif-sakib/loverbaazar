@@ -243,7 +243,7 @@ func TestProductAddUpdateDelete(t *testing.T) {
 	}
 	expect(t, "edited", "GET", "/api/catalog", nil, false, 200, "Better Pan", "Nicer")
 	expect(t, "edit unknown", "PUT", "/api/admin/products/123456", M{"name": "A", "slug": "zz", "price": 1, "regular": 1}, true, 404)
-	expect(t, "quick price", "PATCH", "/api/admin/products/"+id, M{"price": 300}, true, 200)
+	expect(t, "quick price", "PATCH", "/api/admin/products/"+id, M{"price": 300}, true, 200, `"price":300`, `"regular":500`, `"stock":10`)
 	expect(t, "quick negative", "PATCH", "/api/admin/products/"+id, M{"price": -1}, true, 400)
 	expect(t, "quick stock floor", "PATCH", "/api/admin/products/"+id, M{"stockDelta": -999}, true, 200, `"stock":0`)
 	expect(t, "quick unknown", "PATCH", "/api/admin/products/123456", M{"price": 3}, true, 404)
@@ -355,17 +355,40 @@ func TestSettingsSaveAndValidate(t *testing.T) {
 		expect(t, "save", "PUT", "/api/admin/settings", M{"live": live, "site": site}, true, want)
 	}
 	site["name"], site["phone"], site["brandColor"] = "My Shop", "01900000000", "#112233"
+	site["hero"] = M{"title": "Hero", "text": "Text", "button": "Shop", "link": "/shop/", "featuredProduct": 1, "hideProduct": false}
+	site["offers"] = M{"enabled": true, "showInNav": true, "navLabel": "Deals", "title": "Deals", "intro": "Best deals", "showOnHome": true, "homeTitle": "Hot deals", "homeCount": 6}
 	live["ordersOpen"], live["notice"], live["freeOver"] = false, "Closed for Eid", 5000
+	live["lowStock"], live["maxPending"], live["showLeft"] = 3, 2, true
 	live["delivery"] = []M{{"id": "dhaka", "label": "Dhaka", "fee": 120, "days": "2 days"}}
 	put(200)
 	l, w := saved()
-	if w["name"] != "My Shop" || l.OrdersOpen || l.Notice != "Closed for Eid" || l.FreeOver != 5000 || l.Delivery[0].ID != "dhaka" {
-		t.Errorf("not saved: %+v %v", l, w["name"])
+	savedHero, _ := w["hero"].(map[string]any)
+	savedOffers, _ := w["offers"].(map[string]any)
+	if w["name"] != "My Shop" || l.OrdersOpen || l.Notice != "Closed for Eid" || l.FreeOver != 5000 || l.Delivery[0].ID != "dhaka" ||
+		l.LowStock != 3 || l.MaxPending != 2 || !l.ShowLeft || savedHero["featuredProduct"] != float64(1) || savedOffers["navLabel"] != "Deals" {
+		t.Errorf("not saved: %+v %v", l, w)
 	}
-	expect(t, "live at once", "GET", "/api/stock", nil, false, 200, "Closed for Eid", "dhaka")
+	expect(t, "storefront has hero & offers", "GET", "/api/storefront", nil, false, 200, `"featuredProduct":1`, `"navLabel":"Deals"`)
+	expect(t, "live at once", "GET", "/api/stock", nil, false, 200, "Closed for Eid", "dhaka", `"showLeft":true`)
+	site["hero"] = M{"featuredProduct": -5}
+	put(400)
+	site["hero"] = M{"hideProduct": "yes"}
+	put(400)
+	site["hero"] = M{"featuredProduct": 1, "hideProduct": false}
+	site["offers"] = M{"homeCount": 0}
+	put(400)
+	site["offers"] = M{"enabled": "yes"}
+	put(400)
+	site["offers"] = M{"enabled": true, "showInNav": true, "navLabel": "Deals", "title": "Deals", "intro": "", "showOnHome": true, "homeTitle": "Hot deals", "homeCount": 6}
 	site["brandColor"] = "red"
 	put(400)
 	site["brandColor"] = "#112233"
+	live["lowStock"] = -1
+	put(400)
+	live["lowStock"] = 5
+	live["maxPending"] = 1001
+	put(400)
+	live["maxPending"] = 3
 	live["delivery"] = []M{}
 	put(400)
 	live["delivery"] = []M{{"id": "a", "label": "", "fee": 1}}

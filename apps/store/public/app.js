@@ -201,6 +201,18 @@
       c.dataset.stocked = s && s[2] > 0 ? "1" : "0";
     });
     $$("[data-grid]").forEach((g) => g._update?.());
+    if (Object.keys(stock).length > 0) {
+      const hasOffers = Object.values(stock).some((s) => Array.isArray(s) && s[1] > s[0]);
+      $$("[data-offers-link]").forEach((el) => { el.hidden = !hasOffers; });
+      $$("[data-offers-section]").forEach((section) => {
+        const cards = $$("[data-card]", section);
+        const stillDiscounted = cards.some((card) => {
+          const s = stock[card.dataset.id];
+          return Array.isArray(s) && s[1] > s[0];
+        });
+        section.hidden = !hasOffers || (cards.length > 0 && !stillDiscounted);
+      });
+    }
   }
 
   function applyLive() {

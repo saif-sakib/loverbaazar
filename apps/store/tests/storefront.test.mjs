@@ -395,7 +395,7 @@ test('admin sections fit 320, 375 and 414px screens', () => shop(async page => {
   await ready(page, '/admin/');
   for (const width of [320, 375, 414]) {
    await page.setViewportSize({ width, height: 812 });
-  for (const tab of ['dashboard', 'analytics', 'products', 'orders', 'categories', 'home', 'menu', 'shop', 'delivery', 'customers', 'coupons', 'pages', 'blog', 'reviews', 'messages']) {
+  for (const tab of ['dashboard', 'analytics', 'products', 'orders', 'categories', 'home', 'menu', 'shop', 'delivery', 'customers', 'offers', 'coupons', 'pages', 'blog', 'reviews', 'messages']) {
     await page.locator('#admin-section').selectOption(tab);
     await page.waitForTimeout(150);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `Admin ${tab} overflows`);
@@ -1310,3 +1310,87 @@ test('ads.js initializes slots lazily, collapses unfilled slots, and avoids hori
   await page.waitForFunction(() => document.querySelector('[data-ad-slot-wrap]').hidden === true);
   assert.equal(await page.locator('[data-ad-slot-wrap]').isVisible(), false);
 }));
+
+test('admin hero featured product, offers management, delivery thresholds, and live offer hiding', () => shop(async (page, context) => {
+  await page.addInitScript(() => { if (location.protocol === 'http:') sessionStorage.setItem('t', 'local-admin-token-for-this-computer-only'); });
+  const original = await (await context.request.get('/api/admin/settings', { headers: { 'X-Admin-Token': 'local-admin-token-for-this-computer-only' } })).json();
+  let savedSettings = null;
+  let patchedProduct = null;
+  const fixtureProducts = [
+    { id: 101, slug: 'cooker-alpha', name: 'Kiam Cooker Alpha', sku: 'KC-1', price: 2000, regular: 2000, stock: 5, active: true, cats: ['rice-cooker'], images: [{ src: '/placeholder.svg', thumb: '/placeholder.svg' }] },
+    { id: 102, slug: 'kettle-beta', name: 'Walton Kettle Beta', sku: 'WK-2', price: 800, regular: 1000, stock: 3, active: true, cats: ['electric-kettle'], images: [{ src: '/placeholder.svg', thumb: '/placeholder.svg' }] },
+  ];
+  await context.route('**/api/admin/products', r => r.fulfill({ json: fixtureProducts }));
+  await context.route('**/api/admin/products/*', r => {
+    if (r.request().method() !== 'PATCH') return r.continue();
+    patchedProduct = { url: new URL(r.request().url()).pathname, body: r.request().postDataJSON() };
+    const id = Number(patchedProduct.url.split('/').pop());
+    const item = fixtureProducts.find(p => p.id === id);
+    const nextPrice = patchedProduct.body.price ?? item.price;
+    const nextRegular = Math.max(patchedProduct.body.regular ?? item.regular, nextPrice);
+    item.price = nextPrice;
+    item.regular = nextRegular;
+    return r.fulfill({ json: { price: item.price, regular: item.regular, stock: item.stock } });
+  });
+  await context.route('**/api/admin/settings', async r => {
+    if (r.request().method() === 'PUT') {
+      savedSettings = r.request().postDataJSON();
+      return r.fulfill({ json: { ok: true } });
+    }
+    return r.fulfill({ json: original });
+  });
+
+  await ready(page, '/admin/#home');
+  await page.locator('#hero-product-filter').fill('Walton');
+  assert.equal(await page.locator('#hero-product option[value="101"]').evaluate(o => o.hidden), true);
+  assert.equal(await page.locator('#hero-product option[value="102"]').evaluate(o => o.hidden), false);
+  await page.locator('#hero-product').selectOption('102');
+  assert.match(await page.locator('#hero-product-preview').textContent(), /Walton Kettle Beta/);
+  await page.locator('#sf .stick button').first().click();
+  await page.waitForFunction(() => document.querySelector('.save-status')?.textContent === 'All changes saved');
+  assert.equal(savedSettings.site.hero.featuredProduct, 102);
+  assert.equal(savedSettings.site.hero.hideProduct, false);
+
+  await page.locator('#hero-product').selectOption('none');
+  await page.locator('#sf .stick button').first().click();
+  await page.waitForFunction(() => document.querySelector('.save-status')?.textContent === 'All changes saved');
+  assert.equal(savedSettings.site.hero.featuredProduct, 0);
+  assert.equal(savedSettings.site.hero.hideProduct, true);
+
+  await page.goto('/admin/#offers');
+  await page.locator('#offers-settings-form').waitFor();
+  await page.locator('[name="showOnHome"]').check();
+  await page.locator('[name="navLabel"]').fill('Eid Deals');
+  await page.locator('#offers-settings-form .stick button').first().click();
+  await page.waitForFunction(() => document.querySelector('.save-status')?.textContent === 'All changes saved');
+  assert.equal(savedSettings.site.offers.showOnHome, true);
+  assert.equal(savedSettings.site.offers.navLabel, 'Eid Deals');
+
+  await page.locator('#offer-add-product').selectOption('101');
+  await page.locator('#add-offer-form [name="offerPrice"]').fill('1700');
+  await page.locator('#add-offer-form [name="oldPrice"]').fill('2000');
+  assert.match(await page.locator('#offer-add-preview').textContent(), /15% off/);
+  await page.locator('#add-offer-form button').click();
+  await page.waitForFunction(() => document.querySelectorAll('#offer-rows tr[data-id]').length === 2);
+  assert.equal(patchedProduct.url, '/api/admin/products/101');
+  assert.deepEqual(patchedProduct.body, { price: 1700, regular: 2000 });
+
+  await page.locator('#offer-rows tr[data-id="102"] [data-end-offer]').click();
+  await page.waitForFunction(() => document.querySelectorAll('#offer-rows tr[data-id]').length === 1);
+  assert.deepEqual(patchedProduct.body, { regular: 800 });
+
+  await page.goto('/admin/#delivery');
+  await page.locator('details.optional-fields summary').click();
+  await page.locator('[name="lowStock"]').fill('8');
+  await page.locator('[name="maxPending"]').fill('4');
+  await page.locator('[name="showLeft"]').check();
+  await page.locator('#sf .stick button').first().click();
+  await page.waitForFunction(() => document.querySelector('.save-status')?.textContent === 'All changes saved');
+  assert.equal(savedSettings.live.lowStock, 8);
+  assert.equal(savedSettings.live.maxPending, 4);
+  assert.equal(savedSettings.live.showLeft, true);
+
+  // Storefront hides Offers link automatically when live stock has no discounted items.
+  await ready(page, '/');
+  assert.equal(await page.locator('[data-offers-link]').isVisible(), false);
+}, { stock: { 1: [1000, 1000, 10], 2: [500, 500, 10] } }));

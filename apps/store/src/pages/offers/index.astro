@@ -2,12 +2,15 @@
 import Base from "../../layouts/Base.astro";
 import Grid from "../../components/Grid.astro";
 import { deliveryZonesText, jsonLd, priceBounds } from "../../lib/seo";
-import { LIVE, onSale, siteUrl, spacedSiteName, taka } from "../../lib/shop";
-const items = onSale();
+import { activeOffers, LIVE, offersEnabled, SITE, siteUrl, spacedSiteName, taka } from "../../lib/shop";
+const items = activeOffers();
+const heading = String(SITE.offers?.title || "").trim() || "Offers";
+const intro = String(SITE.offers?.intro || "").trim();
+const hasOffers = offersEnabled() && items.length > 0;
 const bounds = priceBounds(items);
 const deliverySummary = deliveryZonesText(LIVE);
-const offersTitle = "Home Appliance & Furniture Offers in Bangladesh";
-const offersDesc = items.length > 0 && bounds.min > 0
+const offersTitle = heading === "Offers" ? "Home Appliance & Furniture Offers in Bangladesh" : heading;
+const offersDesc = hasOffers && bounds.min > 0
   ? `Save on ${items.length} discounted home appliances, cookware and furniture from ${taka(bounds.min)} to ${taka(bounds.max)} at ${spacedSiteName}. ${deliverySummary}.`
   : `Browse discounted home appliances, cookware and furniture at ${spacedSiteName}. ${deliverySummary}.`;
 const crumbs = {
@@ -16,10 +19,10 @@ const crumbs = {
   itemListElement: [
     { "@type": "ListItem", position: 1, name: "Home", item: siteUrl("/") },
     { "@type": "ListItem", position: 2, name: "Shop", item: siteUrl("/shop/") },
-    { "@type": "ListItem", position: 3, name: "Offers" },
+    { "@type": "ListItem", position: 3, name: heading },
   ],
 };
-const collection = items.length > 0
+const collection = hasOffers
   ? {
       "@context": "https://schema.org",
       "@type": "CollectionPage",
@@ -40,21 +43,22 @@ const collection = items.length > 0
   : null;
 ---
 
-<Base title={offersTitle} description={offersDesc} preconnectCloudinary>
+<Base title={offersTitle} description={offersDesc} noindex={!hasOffers} preconnectCloudinary>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={jsonLd(crumbs)} />
     {collection && <script type="application/ld+json" set:html={jsonLd(collection)} />}
   </Fragment>
   <div class="wrap">
     <div class="pagehead">
-      <h1 class="title">Offers</h1>
-      {items.length > 0 && bounds.min > 0 && (
+      <h1 class="title">{heading}</h1>
+      {hasOffers && intro && <p class="cat-summary">{intro}</p>}
+      {hasOffers && bounds.min > 0 && (
         <p class="cat-summary">
           <strong>{items.length}</strong> discounted {items.length === 1 ? "product" : "products"} · Offer prices {bounds.max > bounds.min ? `${taka(bounds.min)} – ${taka(bounds.max)}` : taka(bounds.min)} ·{" "}
           {deliverySummary}
         </p>
       )}
     </div>
-    {items.length ? <Grid items={items} /> : <p>No offers right now. <a class="link" href="/shop/">See everything we sell</a>.</p>}
+    {hasOffers ? <Grid items={items} /> : <p>No offers right now. <a class="link" href="/shop/">See everything we sell</a>.</p>}
   </div>
 </Base>

@@ -3,7 +3,7 @@ import "../styles/fonts.css";
 import "../styles/site.css";
 import { hasNationwideDelivery, jsonLd, merchantReturnURL, organizationReturnPolicy, postalAddress, publicImage, schemaOpeningHours, storeAreaServed } from "../lib/seo";
 import "../styles/mobile.css";
-import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf, spacedSiteName } from "../lib/shop";
+import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf, spacedSiteName, showOffersNav, offersNavLabel } from "../lib/shop";
 import { resolveAdsenseClient, resolveAdSlot } from "../lib/adsense.mjs";
 const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", preconnectCloudinary = false, allowAds = false, language = languageOf(`${title || ""} ${description}`) } = Astro.props;
 const full = seoTitle || (title ? `${title} | ${spacedSiteName}` : `${spacedSiteName} | ${SITE.tagline}`);
@@ -236,7 +236,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
             </div>
           </details>
         ))}
-        <a href="/offers/">Offers</a>
+        {showOffersNav() && <a href="/offers/" data-offers-link>{offersNavLabel()}</a>}
         <a href="/contact-us/">Contact</a>
         <a href="/blog/">Blog</a>
         <a class="desktop-shopping-link" href="/track/">Track order</a>

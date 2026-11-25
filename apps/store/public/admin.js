@@ -32,6 +32,7 @@
   const SUBGROUPS = [
     { messages: "Messages", reviews: "Reviews" },
     { products: "All products", categories: "Categories", tags: "Search tags" },
+    { offers: "Offers", coupons: "Coupons" },
     { home: "Home page", menu: "Navigation menu", pages: "Pages", blog: "Blog" },
     { delivery: "Delivery and payment", shop: "Shop details" },
   ];
@@ -57,13 +58,14 @@
     products: ["Products", "Edit prices, old prices, stock, and visibility inline — they save automatically and go live in ~2 minutes. Click Edit for names, photos, categories, and descriptions.", "both"],
     categories: ["Categories", "Organize products into categories customers can browse.", "pub"],
     coupons: ["Coupons", "Discount codes customers apply on the Checkout page. Active coupons start working immediately.", "live"],
+    offers: ["Offers", "Control whether Offers appears in your menu and home page, and manage discounted products. Offers hide automatically when no products are discounted.", "both"],
     customers: ["Customers", "Everyone who has ordered. Click an order count to view their orders, or reset a forgotten customer account password.", ""],
     tags: ["Tags", "Optional keywords for organizing and finding products.", "pub"],
-    home: ["Home page", "Update your welcome message, banners, and featured products.", "pub"],
+    home: ["Home page", "Update your welcome text, hero featured product, banners, and product sections.", "pub"],
     menu: ["Navigation menu", "Choose the categories customers see in your website menu.", "pub"],
     pages: ["Pages", "Edit About Us, How To Buy, Terms, Privacy Policy, and other pages. Any extra published pages are added to the Company footer column.", "pub"],
     blog: ["Blog", "Write and update articles for your customers.", "pub"],
-    delivery: ["Delivery and payment", "Manage delivery charges, payment methods, and online ordering.", "live"],
+    delivery: ["Delivery and payment", "Manage delivery charges, payment methods, stock alerts, and online ordering.", "live"],
     shop: ["Shop details", "Keep your business identity and contact information up to date.", "pub"],
   };
 
@@ -71,6 +73,8 @@
   const JOBS = [
     ["Change a price or stock", "#products", "price stock quantity sold out discount offer"],
     ["Add a new product", "#new-product", "create product photo image"],
+    ["Manage Offers section & discounts", "#offers", "offers sale discount deal home page navigation"],
+    ["Choose hero featured product", "#home", "hero featured product home page banner"],
     ["Change delivery charges", "#delivery", "delivery charge free shipping fee courier area jashore dhaka"],
     ["Change payment numbers", "#delivery", "bkash nagad rocket payment cash number"],
     ["Edit the home page", "#home", "hero heading banner picture sections"],
@@ -415,7 +419,11 @@
     status.setAttribute("role", "status");
     status.textContent = "No unsaved changes";
     $(".stick", f)?.prepend(status);
-    const changed = () => { status.textContent = "Unsaved changes"; unsaved = true; };
+    const changed = (e) => {
+      if (e?.target?.matches?.("[data-pick-filter], [data-ignore-dirty]")) return;
+      status.textContent = "Unsaved changes";
+      unsaved = true;
+    };
     f.addEventListener("input", changed);
     f.addEventListener("change", changed);
     f.addEventListener("click", (e) => {
@@ -589,11 +597,13 @@
       const label = `<span class="flabel">${esc(f.label)}</span>${f.help ? `<small class="fhelp">${esc(f.help)}</small>` : ""}`;
       if (f.type === "bool")
         return `<label class="check"><input type="checkbox" data-k="${f.k}" ${v ? "checked" : ""}> <span>${esc(f.label)}</span></label>`;
-      if (f.type === "select")
-        return `<label>${label}<select data-k="${f.k}">${f
-          .options()
+      if (f.type === "select") {
+        const optsList = f.options();
+        const hasCurrent = !v || optsList.some(([val]) => val === v);
+        return `<label>${label}<select data-k="${f.k}">${!hasCurrent ? `<option value="${esc(v)}" selected>Missing category (${esc(v)})</option>` : ""}${optsList
           .map(([val, text]) => `<option value="${esc(val)}" ${val === v ? "selected" : ""}>${esc(text)}</option>`)
           .join("")}</select></label>`;
+      }
       if (f.type === "cats") return `<label class="wide">${label}<div data-k="${f.k}" data-cats>${checkList("c", v || [])}</div></label>`;
       if (f.type === "image")
         return `<div class="wide"><span class="flabel">${esc(f.label)}</span>${f.help ? `<small class="fhelp">${esc(f.help)}</small>` : ""}<div class="img-row"><img class="img-prev" src="${esc(v || "/placeholder.svg")}" alt=""><div class="inline"><input data-k="${f.k}" value="${esc(v)}" placeholder="${esc(f.placeholder || "Upload or paste image URL")}"><label class="btn ghost small upl-inline">Upload<input type="file" accept="image/*" data-up hidden></label></div></div></div>`;
@@ -1491,7 +1501,7 @@
     view().innerHTML = `<div class="toolbar"><button class="btn" id="new">Add product</button>
       <input id="pq" type="search" placeholder="Search name or SKU" value="${esc(productFilter.q)}" aria-label="Search products">
       <select id="pcat" aria-label="Category"><option value="">All categories</option>${categories.map((c) => `<option value="${esc(c.slug)}" ${c.slug === productFilter.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
-      <select id="pshow" aria-label="Show"><option value="">All products</option><option value="low">Low stock</option><option value="out">Sold out</option><option value="hidden">Hidden</option></select>
+      <select id="pshow" aria-label="Show"><option value="">All products</option><option value="offer">On offer</option><option value="low">Low stock</option><option value="out">Sold out</option><option value="hidden">Hidden</option></select>
       <span class="toolbar-count" id="pcount"></span></div>
       <div class="scroll"><table class="tbl"><tr><th></th><th>Product</th><th>Price</th><th>Old price</th><th>Stock</th><th>Visible</th><th></th></tr><tbody id="rows"></tbody></table></div><button class="btn ghost more" id="pmore" hidden>Show more</button>`;
     $("#pshow").value = productFilter.show;
@@ -1523,6 +1533,7 @@
         (p.name + " " + (p.sku || "")).toLowerCase().includes(text) &&
         (!cat || (p.cats || []).includes(cat)) &&
         (!show ||
+          (show === "offer" && p.regular > p.price) ||
           (show === "low" && p.stock > 0 && p.stock <= low) ||
           (show === "out" && p.stock === 0) ||
           (show === "hidden" && !p.active)),
@@ -1540,7 +1551,7 @@
         .map(
           (p) => `<tr data-id="${p.id}" class="${p.active ? "" : "off"}">
       <td><img class="mini" src="${esc(p.images?.[0]?.thumb || p.images?.[0]?.src || "/placeholder.svg")}" alt="" loading="lazy" decoding="async" width="44" height="44"></td>
-      <td><button type="button" class="link prod-title" data-e="${p.id}">${esc(p.name)}</button></td>
+      <td><button type="button" class="link prod-title" data-e="${p.id}">${esc(p.name)}</button>${p.regular > p.price ? ` <span class="tag delivered prod-offer-pill">−${Math.round(((p.regular - p.price) / p.regular) * 100)}%</span>` : ""}</td>
       <td data-l="Price"><input class="num" type="number" min="0" step="1" inputmode="numeric" data-q="price" value="${p.price}" aria-label="Price of ${esc(p.name)}"></td>
       <td data-l="Old price"><input class="num" type="number" min="0" step="1" inputmode="numeric" data-q="regular" value="${p.regular}" aria-label="Old price of ${esc(p.name)}"></td>
       <td data-l="Stock"><input class="num" type="number" min="0" step="1" inputmode="numeric" data-q="stock" value="${p.stock}" aria-label="Stock of ${esc(p.name)}"></td>
@@ -1556,7 +1567,7 @@
     $$("[data-dup]").forEach((b) => {
       b.onclick = () => {
         const p = find(b.dataset.dup);
-        editProduct({ ...p, id: undefined, stock: 0, name: p.name + " copy", slug: p.slug + "-copy", sku: "" }, true);
+        editProduct({ ...p, id: undefined, stock: 0, name: p.name + " copy", slug: p.slug + "-copy", sku: "", migrationBlocked: undefined, migrationIssues: undefined }, true);
       };
     });
     $$("[data-q]").forEach((i) => {
@@ -1582,13 +1593,31 @@
         } finally {
           i.disabled = false;
         }
+        const wasOffer = p.regular > p.price;
         if (key === "stock") {
           p.stock = r.stock;
           i.value = r.stock;
         } else if (key === "active") {
           p.active = i.checked;
           row.classList.toggle("off", !p.active);
-        } else p[key] = body[key];
+        } else {
+          p.price = r.price ?? (key === "price" ? body[key] : p.price);
+          p.regular = r.regular ?? (key === "regular" ? body[key] : p.regular);
+          const priceInp = $('[data-q="price"]', row);
+          const regInp = $('[data-q="regular"]', row);
+          if (priceInp) priceInp.value = p.price;
+          if (regInp) regInp.value = p.regular;
+          const titleCell = row.children[1];
+          const oldPill = $(".prod-offer-pill", titleCell);
+          if (p.regular > p.price) {
+            const pct = Math.round(((p.regular - p.price) / p.regular) * 100);
+            if (oldPill) oldPill.textContent = `−${pct}%`;
+            else titleCell?.insertAdjacentHTML("beforeend", ` <span class="tag delivered prod-offer-pill">−${pct}%</span>`);
+          } else {
+            oldPill?.remove();
+          }
+        }
+        if (wasOffer !== (p.regular > p.price)) publicationStatus();
         i.classList.add("saved");
         setTimeout(() => i.classList.remove("saved"), 1500);
         say(key === "active" ? `${p.name} is ${p.active ? "visible" : "hidden"}.` : `${p.name} saved. Live within about 2 minutes.`);
@@ -1611,7 +1640,7 @@
       </details>
       <div class="fields3">
         ${field("Selling price (৳)", "price", p.price, "required min=0 step=1", "number", "Actual checkout price. Live in ~2 min.")}
-        ${field("Old price (৳)", "regular", p.regular, "min=0 step=1", "number", "Crossed out to show % off & list on /offers/. 0 for none.")}
+        ${field("Old price (৳)", "regular", p.regular, "min=0 step=1", "number", "Set higher than selling price to show % off and list under Offers (after Publish). 0 for none.")}
         ${field("Stock quantity", "stock", p.stock, "required min=0 step=1", "number", "0 marks the item as Sold out. Live in ~2 min.")}
       </div>
       ${field("Short description", "short", p.short, "maxlength=300", "text", "Shown right beside the main photo and used as the Google search snippet.")}
@@ -1901,8 +1930,10 @@
           : `<p class="meta"><b>Web address:</b> <code class="code-pill">/product-category/${esc(c.path)}/</code></p>`
       }
       ${seoFields(c.seo)}
+      <div class="field"><span class="flabel">Category guide (optional)</span><small class="fhelp">Helpful buying tips shown below the price list on this category page. (Needs Publish)</small><div id="catbody"></div></div>
       <div class="stick"><button class="btn">Save category</button> <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button> <button type="button" class="btn ghost" id="back">Back</button></div></form>`;
     const f = $("#cf");
+    const catBody = rich($("#catbody"), c.html);
     const nameEl = $('[name="name"]', f);
     if (isNew)
       nameEl.addEventListener("input", () => {
@@ -1914,7 +1945,7 @@
       const parent = isNew ? f.parent.value : parentPath;
       await api("/content/cat/" + encodeURIComponent(slug), {
         method: "PUT",
-        body: { ...c, seo: readSEO(f, c.seo), name: nameEl.value.trim(), path: parent ? `${parent}/${slug}` : slug },
+        body: { ...c, seo: readSEO(f, c.seo), name: nameEl.value.trim(), path: parent ? `${parent}/${slug}` : slug, html: catBody() },
       });
       await loadCategories(true);
       await cats();
@@ -2092,9 +2123,11 @@
     $$("[data-x]").forEach((b) => {
       b.onclick = run(async () => {
         if (confirm("Delete this review?")) {
+          const item = l.find((x) => String(x.id) === b.dataset.x);
           await api("/reviews/" + b.dataset.x, { method: "DELETE" });
           await reviews();
           counts();
+          if (item?.approved) needsPublish("Review deleted. Click Publish changes to remove it from the product page.");
         }
       });
     });
@@ -2261,12 +2294,30 @@
 
   // ---- Settings ----
 
+  const activeProducts = () => allProducts.filter((p) => p.active);
+  const offPct = (p) => (p.regular > p.price ? Math.round(((p.regular - p.price) / p.regular) * 100) : 0);
+
   const settings = run(async (only) => {
-    const [s, pageList] = await Promise.all([api("/settings"), api("/content/page"), loadCategories()]);
+    const [s, pageList] = await Promise.all([
+      api("/settings"),
+      api("/content/page"),
+      loadCategories(),
+      ...(only === "home" ? [ensureCatalog()] : []),
+    ]);
     let L = s.live,
       W = s.site;
     site = W;
-    const catOptions = () => [["on-sale", "★ Products on offer (any discounted product)"], ...categories.map((c) => [c.slug, c.name])];
+    const catOptions = () => {
+      const active = activeProducts();
+      const offerCount = active.filter((p) => p.regular > p.price).length;
+      return [
+        ["on-sale", `★ Products on offer (${offerCount} discounted${W.offers?.enabled === false ? ", off in Offers" : ""})`],
+        ...categories.map((c) => {
+          const count = active.filter((p) => (p.cats || []).includes(c.slug)).length;
+          return [c.slug, `${c.name} (${count})`];
+        }),
+      ];
+    };
     const places = [
       ["/shop/", "All products"],
       ["/offers/", "Offers: every discounted product"],
@@ -2296,11 +2347,14 @@
         <section class="panel">
           ${secHead("Delivery areas & order rules", "Configure delivery areas and base charges shown on product pages and checkout.", "Product pages, Cart & Checkout", "live")}
           <div id="zones"></div>
-          <details class="advanced optional-fields"><summary>Optional order rules <small>Free delivery &amp; minimum order</small></summary>
+          <details class="advanced optional-fields"><summary>Optional order &amp; stock rules <small>Free delivery, minimum order, low stock alerts &amp; pending limit</small></summary>
           <div class="fields2">
             ${field("Free delivery threshold (৳)", "freeOver", L.freeOver, "min=0 step=1", "number", "Orders at or above this subtotal (after coupon discount) get free delivery everywhere. Set 0 to disable.")}
             ${field("Minimum order amount (৳)", "minOrder", L.minOrder, "min=0 step=1", "number", "Smallest cart subtotal allowed to place an online order. Set 0 for no minimum.")}
+            ${field("Low stock alert threshold", "lowStock", L.lowStock ?? 5, "min=0 max=1000000 step=1", "number", "Products at or below this quantity show in Low stock on Overview and Analytics.")}
+            ${field("Max pending orders per phone", "maxPending", L.maxPending ?? 3, "min=0 max=1000 step=1", "number", "Limits unconfirmed orders from one mobile number to block spam. Set 0 for unlimited.")}
           </div>
+          ${toggle("Show 'Only X left' on low-stock products", "showLeft", L.showLeft, "Displays remaining stock count on product pages when stock is at or below the low stock threshold.")}
           </details>
         </section>
         <section class="panel">
@@ -2316,16 +2370,17 @@
           ${secHead("Shop identity & logo", "Your business name, tagline, header logo, and descriptions shown in the footer and search engines.", "Header, Browser tab, Footer & Google search", "pub")}
           <div class="fields2">
             ${field("Shop name", "name", W.name, "required", "text", "Shown in the header, footer, emails, and printed customer invoices.")}
-            ${field("Tagline", "tagline", W.tagline, "", "text", "Shown above the hero headline on the home page and in browser tab titles.")}
+            ${field("Tagline", "tagline", W.tagline, "", "text", "Shown in browser tab titles and search previews (e.g. LoverBaazar | Tagline).")}
           </div>
           <div class="field">
             <span class="flabel">Logo image</span>
-            <small class="fhelp">Shown in the top header instead of the text logo. Leave empty to display your styled shop name.</small>
+            <small class="fhelp">Shown in the top header and footer. Leave empty to use the default LoverBaazar mark.</small>
             <div class="img-row">
-              <img class="img-prev" id="logoprev" src="${esc(W.logo || "/favicon.svg")}" alt="Shop logo preview">
+              <img class="img-prev" id="logoprev" src="${esc(W.logo || "/logo/primary-logo-80.webp")}" alt="Shop logo preview">
               <div class="inline">
                 <input name="logo" value="${esc(W.logo)}" placeholder="Upload an image or paste a URL">
                 <label class="btn ghost small upl-inline">Upload<input type="file" accept="image/*" id="logoup" hidden></label>
+                <button type="button" class="btn ghost small" id="logoclear">Reset</button>
               </div>
             </div>
           </div>
@@ -2339,7 +2394,7 @@
           <div class="fields2">
             ${field("Main phone number", "phone", W.phone, "required", "text", "Used in the top call line, product pages ('Order by phone'), Contact page, invoices, and floating call button.")}
             ${field("WhatsApp number", "whatsapp", W.whatsapp, "", "text", "Enables the floating WhatsApp chat button and 'WhatsApp' order link on products. Leave empty to hide.")}
-            ${field("Email address", "email", W.email, "", "email", "Shown on Contact Us and receives new order/message notifications.")}
+            ${field("Email address", "email", W.email, "", "email", "Shown on Contact Us, footer/store metadata, and printed invoices.")}
             ${field("Opening hours", "hours", W.hours, "placeholder='Sun–Thu 10:00 AM – 6:00 PM'", "text", "Shown on the Contact Us page and in the footer. Leave empty to hide.")}
           </div>
           ${field("Shop address", "address", W.address, "", "text", "Shown in the footer, Contact Us page, and printed on customer invoices.")}
@@ -2356,24 +2411,47 @@
         </section>`;
     } else if (only === "home") {
       stickBtn = "Save home page";
+      const heroCfg = W.hero || {};
+      const pickedId = Number(heroCfg.featuredProduct) || 0;
+      const selectedHeroVal = heroCfg.hideProduct ? "none" : pickedId > 0 ? String(pickedId) : "";
+      const active = activeProducts();
+      const inStockOpts = active.filter((p) => p.stock > 0);
+      const soldOutOpts = active.filter((p) => p.stock === 0);
+      const pickedRecord = pickedId > 0 ? allProducts.find((p) => p.id === pickedId) : null;
+      const pickedHiddenOrMissing = pickedId > 0 && !active.some((p) => p.id === pickedId);
+      const hasAutoOffers = W.offers?.enabled !== false && W.offers?.showOnHome && !(W.home || []).some((h) => h.cat === "on-sale");
       html = `
         <section class="panel">
-          ${secHead("Hero introduction", "The welcome block at the top of your home page. The 3 product photos beside it are picked automatically from your featured product sections below.", "Top of Home page (/)", "pub")}
-          ${field("Main headline", "heroTitle", W.hero.title, "", "text", "The last word is automatically highlighted in your brand red colour.")}
-          ${area("Introductory text", "heroText", W.hero.text, 2, "Short paragraph displayed directly underneath the main headline.")}
+          ${secHead("Hero introduction", "The welcome banner at the top of your home page. Choose which featured product appears beside it, or let the shop pick automatically.", "Top of Home page (/)", "pub")}
+          ${field("Main headline", "heroTitle", heroCfg.title, "", "text", "Shown directly under your shop name in the hero banner.")}
+          ${area("Introductory text", "heroText", heroCfg.text, 2, "Short paragraph displayed directly underneath the main headline.")}
           <div class="fields2">
-            ${field("Button label", "heroButton", W.hero.button, "", "text", "Text inside the main action button (e.g. 'Shop all products').")}
-            ${field("Button link", "heroLink", W.hero.link, 'list="sitelinks"', "text", "Page or category opened when customers click the button.")}
+            ${field("Button label", "heroButton", heroCfg.button, "", "text", "Text inside the main action button (use {count} to insert total product count).")}
+            ${field("Button link", "heroLink", heroCfg.link, 'list="sitelinks"', "text", "Page or category opened when customers click the button.")}
+          </div>
+          <div class="field hero-product-picker">
+            <label for="hero-product"><span class="flabel">Featured product in hero</span></label>
+            <small class="fhelp">Choose a specific product to highlight in the top banner, leave on Automatic to pick the first in-stock item from your sections below, or choose None to hide the card.</small>
+            <input type="search" id="hero-product-filter" data-ignore-dirty placeholder="Filter products by name or SKU…" aria-label="Filter hero product list">
+            <select name="heroProduct" id="hero-product">
+              <option value="" ${selectedHeroVal === "" ? "selected" : ""}>Automatic (first in-stock product from homepage sections)</option>
+              <option value="none" ${selectedHeroVal === "none" ? "selected" : ""}>None (hide featured product card)</option>
+              ${pickedHiddenOrMissing ? `<optgroup label="Current selection (not shown in shop)"><option value="${pickedId}" selected>${esc(pickedRecord ? `${pickedRecord.name} — ${money(pickedRecord.price)} (Hidden in shop)` : `Deleted product #${pickedId}`)}</option></optgroup>` : ""}
+              ${inStockOpts.length ? `<optgroup label="In stock (${inStockOpts.length})">${inStockOpts.map((p) => `<option value="${p.id}" data-search="${esc((p.name + " " + (p.sku || "")).toLowerCase())}" ${selectedHeroVal === String(p.id) ? "selected" : ""}>${esc(p.name)} — ${esc(money(p.price))}</option>`).join("")}</optgroup>` : ""}
+              ${soldOutOpts.length ? `<optgroup label="Sold out (${soldOutOpts.length})">${soldOutOpts.map((p) => `<option value="${p.id}" data-search="${esc((p.name + " " + (p.sku || "")).toLowerCase())}" ${selectedHeroVal === String(p.id) ? "selected" : ""}>${esc(p.name)} — ${esc(money(p.price))} (Sold out)</option>`).join("")}</optgroup>` : ""}
+            </select>
+            <div id="hero-product-preview" class="hero-pick-preview" aria-live="polite"></div>
           </div>
 
         </section>
         <section class="panel">
-          ${secHead("Promotional banners", "Optional sale or campaign images shown directly below the hero. Leave empty for no banners.", "Below Hero on Home page (/)", "pub")}
+          ${secHead("Promotional banners", "Optional sale or campaign images shown above the featured product rows on the home page. Leave empty for no banners.", "Below Hero on Home page (/)", "pub")}
           <div id="banners"></div>
 
         </section>
         <section class="panel">
           ${secHead("Featured product sections", "Rows of products on the home page. Choose any category or '★ Products on offer' (all discounted items, biggest savings first). Use ▲ / ▼ to reorder.", "Main rows on Home page (/)", "pub")}
+          ${hasAutoOffers ? `<p class="hint-box"><strong>Automatic Offers row enabled:</strong> Your "${esc(W.offers?.homeTitle || "Special offers")}" row from <a class="link" href="#offers">Discounts → Offers</a> appears above these sections whenever products are discounted.</p>` : ""}
           <div id="home"></div>
 
         </section>`;
@@ -2382,7 +2460,7 @@
       html = `
         <section class="panel">
           ${secHead("Header category menus & home category grid", "Each group appears as a dropdown in the top navigation bar. The categories chosen here also power the 'Shop by category' grid on the home page.", "Top navigation bar & Home page category grid", "pub")}
-          <p class="hint-box"><strong>Note:</strong> Standard store links (Shop all, Offers, New, Popular, Blog, Track order, Contact) and footer Company/Policies columns are managed automatically.</p>
+          <p class="hint-box"><strong>Note:</strong> Standard store links (Shop all, Offers when discounted items exist, Blog, Track order, Contact) and footer Company/Policies columns are managed automatically. Configure Offers visibility under <a class="link" href="#offers">Discounts → Offers</a>.</p>
           <div id="menu"></div>
         </section>`;
     }
@@ -2438,9 +2516,16 @@
       });
       f.logo.addEventListener("input", () => {
         const val = f.logo.value.trim();
-        $("#logoprev").src = val || "/favicon.svg";
+        $("#logoprev").src = val || "/logo/primary-logo-80.webp";
         $("#logoprev").hidden = false;
       });
+      $("#logoclear").onclick = () => {
+        const prevUrl = f.logo.value.trim();
+        if (prevUrl && pendingUploads.has(prevUrl)) cleanupUploads([prevUrl]);
+        f.logo.value = "";
+        $("#logoprev").src = "/logo/primary-logo-80.webp";
+        unsaved = true;
+      };
     }
 
     if (only === "home") {
@@ -2466,6 +2551,103 @@
         { title: "", cat: categories[0]?.slug || "", count: 8 },
         { addLabel: "+ Add product section", empty: "No product sections added yet." },
       );
+
+      const heroSel = $("#hero-product");
+      const heroFilter = $("#hero-product-filter");
+      const heroPrev = $("#hero-product-preview");
+      const computeAutoHero = () => {
+        const offersOn = W.offers?.enabled !== false;
+        const configured = (home ? home() : (W.home || [])).filter((h) => (h.title || "").trim());
+        const hasExplicitOfferRow = configured.some((h) => h.cat === "on-sale");
+        const rawSections = [
+          ...(offersOn && W.offers?.showOnHome && !hasExplicitOfferRow
+            ? [{ title: String(W.offers?.homeTitle || "").trim() || "Special offers", cat: "on-sale" }]
+            : []),
+          ...configured,
+        ];
+        const active = activeProducts();
+        const itemsFor = (catSlug) => {
+          const list = catSlug === "on-sale"
+            ? (offersOn ? active.filter((p) => p.regular > p.price).sort((a, b) => offPct(b) - offPct(a)) : [])
+            : active.filter((p) => (p.cats || []).includes(catSlug));
+          return [...list].sort((a, b) => Number(b.stock > 0) - Number(a.stock > 0));
+        };
+        const resolved = rawSections.map((sec) => ({ ...sec, items: itemsFor(sec.cat) })).filter((sec) => sec.items.length);
+        const nonOffers = resolved.filter((sec) => sec.cat !== "on-sale");
+        const pick = (list, source) => {
+          const hit = list.find((p) => p.stock > 0 && p.images?.[0]?.src);
+          return hit ? { product: hit, source } : null;
+        };
+        for (const sec of nonOffers) {
+          const hit = pick(sec.items, `Auto-picked from "${sec.title}"`);
+          if (hit) return hit;
+        }
+        for (const sec of resolved) {
+          const hit = pick(sec.items, `Auto-picked from "${sec.title}"`);
+          if (hit) return hit;
+        }
+        return pick(active, "Auto-picked from active catalog");
+      };
+
+      const renderHeroPreview = () => {
+        const val = heroSel.value;
+        if (val === "none") {
+          heroPrev.innerHTML = `<div class="hero-pick-empty">Hero featured product card will be hidden. The welcome text will expand across the banner.</div>`;
+          return;
+        }
+        let product = null;
+        let note = "";
+        let warn = "";
+        if (!val) {
+          const hit = computeAutoHero();
+          if (!hit) {
+            heroPrev.innerHTML = `<div class="hero-pick-empty">No in-stock product with a photo is currently available to show in the hero.</div>`;
+            return;
+          }
+          product = hit.product;
+          note = hit.source;
+        } else {
+          product = allProducts.find((p) => String(p.id) === val) || null;
+          if (!product) {
+            heroPrev.innerHTML = `<div class="hero-pick-empty">This saved product (#${esc(val)}) no longer exists. On Publish, the shop will fall back to Automatic.</div>`;
+            return;
+          }
+          if (!product.active) warn = "This product is hidden in the shop. Customers won't see it until it is visible.";
+          else if (product.stock === 0) warn = "Currently sold out (still shown if selected).";
+          else if (!product.images?.[0]?.src) warn = "This product has no photo yet — a placeholder will be shown.";
+          note = "Manually selected for the hero banner";
+        }
+        const thumb = product.images?.[0]?.thumb || product.images?.[0]?.src || "/placeholder.svg";
+        heroPrev.innerHTML = `<img src="${esc(thumb)}" alt="" width="48" height="48">
+          <div class="hero-pick-meta">
+            <b>${esc(product.name)}</b>
+            <span>${esc(money(product.price))}${product.regular > product.price ? ` <s>${esc(money(product.regular))}</s>` : ""} · ${product.stock > 0 ? "In stock" : "Sold out"}</span>
+            <small>${esc(note)}${warn ? ` · <strong class="hero-pick-warn">${esc(warn)}</strong>` : ""}</small>
+          </div>`;
+      };
+
+      heroFilter.addEventListener("input", () => {
+        const q = heroFilter.value.trim().toLowerCase();
+        const cur = heroSel.value;
+        $$("optgroup", heroSel).forEach((grp) => {
+          let visibleCount = 0;
+          $$("option", grp).forEach((opt) => {
+            const match = !q || opt.value === cur || (opt.dataset.search || opt.textContent.toLowerCase()).includes(q);
+            opt.hidden = !match;
+            if (match) visibleCount++;
+          });
+          grp.hidden = visibleCount === 0;
+        });
+      });
+      heroSel.addEventListener("change", renderHeroPreview);
+      const homeHost = $("#home");
+      const refreshAutoHero = () => requestAnimationFrame(renderHeroPreview);
+      homeHost.addEventListener("input", refreshAutoHero);
+      homeHost.addEventListener("change", refreshAutoHero);
+      homeHost.addEventListener("click", (e) => {
+        if (e.target.closest("[data-add-row], [data-remove], [data-up-row], [data-down]")) refreshAutoHero();
+      });
+      renderHeroPreview();
     }
 
     if (only === "menu") {
@@ -2502,6 +2684,9 @@
           notice: d.notice.trim(),
           freeOver: Math.max(0, Math.floor(+d.freeOver) || 0),
           minOrder: Math.max(0, Math.floor(+d.minOrder) || 0),
+          lowStock: Math.max(0, Math.min(1000000, Math.floor(Number(d.lowStock ?? 5)) || 0)),
+          maxPending: Math.max(0, Math.min(1000, Math.floor(Number(d.maxPending ?? 3)) || 0)),
+          showLeft: f.showLeft.checked,
           delivery: zoneList,
           payments: payList,
         };
@@ -2533,9 +2718,20 @@
           logo: d.logo.trim(),
         };
       } else if (only === "home") {
+        const heroVal = d.heroProduct || "";
+        const hideProduct = heroVal === "none";
+        const featuredProduct = !hideProduct && heroVal ? Math.max(0, Math.floor(+heroVal) || 0) : 0;
         shop = {
           ...W,
-          hero: { title: (d.heroTitle ?? "").trim(), text: d.heroText, button: d.heroButton, link: d.heroLink },
+          hero: {
+            ...(W.hero || {}),
+            title: (d.heroTitle ?? "").trim(),
+            text: d.heroText,
+            button: d.heroButton,
+            link: d.heroLink,
+            featuredProduct,
+            hideProduct,
+          },
           banners: banners()
             .map((b) => ({ ...b, title: (b.title || "").trim(), link: (b.link || "").trim() || "/shop/", image: (b.image || "").trim() }))
             .filter((b) => b.image),
@@ -2558,7 +2754,7 @@
       };
       if (only === "delivery") {
         shop = latest.site;
-        live = { ...latest.live, ...Object.fromEntries(["ordersOpen", "closedNote", "notice", "freeOver", "minOrder", "delivery", "payments"].map(key => [key, live[key]])) };
+        live = { ...latest.live, ...Object.fromEntries(["ordersOpen", "closedNote", "notice", "freeOver", "minOrder", "lowStock", "maxPending", "showLeft", "delivery", "payments"].map(key => [key, live[key]])) };
       } else {
         live = latest.live;
         shop = { ...latest.site, ...Object.fromEntries((siteFields[only] || []).map(key => [key, shop[key]])) };
@@ -2573,6 +2769,237 @@
     });
   });
 
+  // ---- Offers ----
+
+  const offers = run(async () => {
+    const [s] = await Promise.all([api("/settings"), ensureCatalog()]);
+    let W = s.site || {};
+    site = W;
+    const offersCfg = W.offers || {};
+    const showOnHomeInit = Boolean(offersCfg.showOnHome || (W.home || []).some((h) => h.cat === "on-sale"));
+
+    view().innerHTML = `
+      <form id="offers-settings-form" class="settings" novalidate>
+        <section class="panel">
+          ${secHead("Offers visibility & labels", "Choose whether Offers appear in your top menu and home page. Even when enabled, Offers hide automatically everywhere if no visible products are discounted.", "Top navigation, Home page & /offers/", "pub")}
+          <p class="hint-box" id="offers-live-summary" role="status"></p>
+          ${toggle("Enable Offers section", "offersEnabled", offersCfg.enabled !== false, "Turn off to hide Offers from the navigation bar, home page, and search indexing.")}
+          <div class="offers-dependent">
+            ${toggle("Show Offers link in top navigation", "showInNav", offersCfg.showInNav !== false, "Automatically hidden when no visible products are discounted.")}
+            ${toggle("Show Offers section on Home page", "showOnHome", showOnHomeInit, "Displays a row of discounted products near the top of the home page when offers exist.")}
+            <div class="fields2">
+              ${field("Navigation link label", "navLabel", offersCfg.navLabel || "Offers", "maxlength=40", "text", "Label in the top menu bar.")}
+              ${field("Offers page heading", "offersTitle", offersCfg.title || "Offers", "maxlength=120", "text", "Main heading on /offers/.")}
+            </div>
+            <div class="fields2">
+              ${field("Home section heading", "homeTitle", offersCfg.homeTitle || "Special offers", "maxlength=120", "text", "Heading shown on the home page.")}
+              ${field("Home products to show", "homeCount", offersCfg.homeCount || 8, "min=1 max=24 step=1", "number", "How many discounted products to display on the home page.")}
+            </div>
+            ${field("Offers page intro (optional)", "offersIntro", offersCfg.intro || "", "maxlength=240", "text", "Optional short summary displayed under the heading on /offers/.")}
+          </div>
+        </section>
+        <div class="stick"><button class="btn">Save offer settings</button> <button type="button" class="btn pub-now" id="savepub">Save &amp; Publish now</button><span class="stick-hint">Save your edits here, then Publish to update the website.</span></div>
+      </form>
+      <section class="panel offers-products-panel" id="offers-list-panel"></section>`;
+
+    const sf = $("#offers-settings-form");
+    const dep = $(".offers-dependent", sf);
+    const updateOffersSummary = () => {
+      const activeDiscounted = allProducts.filter((p) => p.active && p.regular > p.price).length;
+      const enabled = sf.offersEnabled.checked;
+      const summary = $("#offers-live-summary");
+      if (!enabled) {
+        summary.innerHTML = `<strong>Offers are turned off.</strong> Customers will not see the Offers link or home page Offers shelf (${activeDiscounted} discounted ${activeDiscounted === 1 ? "product" : "products"} in catalog).`;
+      } else if (activeDiscounted === 0) {
+        summary.innerHTML = `<strong>No products are currently on offer.</strong> Offers are automatically hidden from the navigation bar and home page until at least one visible product has an Old price higher than its Selling price.`;
+      } else {
+        const where = [sf.showInNav.checked && "top navigation", sf.showOnHome.checked && "home page", "/offers/"].filter(Boolean).join(", ");
+        summary.innerHTML = `<strong>${activeDiscounted} visible ${activeDiscounted === 1 ? "product is" : "products are"} on offer.</strong> Active locations: ${esc(where)}.`;
+      }
+    };
+    const syncOffersDisabled = () => {
+      const on = sf.offersEnabled.checked;
+      dep.classList.toggle("is-disabled", !on);
+      $$("input, select, textarea", dep).forEach((el) => { el.disabled = !on; });
+      updateOffersSummary();
+    };
+    sf.offersEnabled.addEventListener("change", syncOffersDisabled);
+    sf.showInNav.addEventListener("change", updateOffersSummary);
+    sf.showOnHome.addEventListener("change", updateOffersSummary);
+    syncOffersDisabled();
+
+    bindSavePublish(sf, async () => {
+      const latest = await api("/settings");
+      const nextOffers = {
+        enabled: sf.offersEnabled.checked,
+        showInNav: sf.showInNav.checked,
+        navLabel: sf.navLabel.value.trim() || "Offers",
+        title: sf.offersTitle.value.trim() || "Offers",
+        intro: sf.offersIntro.value.trim(),
+        showOnHome: sf.showOnHome.checked,
+        homeTitle: sf.homeTitle.value.trim() || "Special offers",
+        homeCount: Math.max(1, Math.min(24, Math.floor(+sf.homeCount.value) || 8)),
+      };
+      let homeList = Array.isArray(latest.site?.home) ? [...latest.site.home] : [];
+      if (!nextOffers.showOnHome) {
+        homeList = homeList.filter((h) => h.cat !== "on-sale");
+      } else {
+        homeList = homeList.map((h) => (h.cat === "on-sale" ? { ...h, title: nextOffers.homeTitle, count: nextOffers.homeCount } : h));
+      }
+      const nextSite = { ...latest.site, offers: nextOffers, home: homeList };
+      await api("/settings", { method: "PUT", body: { live: latest.live, site: nextSite } });
+      W = nextSite;
+      site = nextSite;
+      needsPublish("Offer settings saved.");
+    });
+
+    const renderOffersProducts = () => {
+      const panel = $("#offers-list-panel");
+      const discounted = allProducts
+        .filter((p) => p.regular > p.price)
+        .sort((a, b) => offPct(b) - offPct(a) || b.id - a.id);
+      const candidates = allProducts.filter((p) => p.active && p.regular <= p.price);
+      const firstCand = candidates[0];
+      panel.innerHTML = `
+        ${secHead("Products on offer", "Discounted items have an Old price higher than their Selling price. Add or update offers below — prices go live in ~2 minutes; newly adding or removing an item's offer status requires Publish to update /offers/.", "Storefront & /offers/", "both")}
+        <form id="add-offer-form" class="offer-add-form">
+          <h3 id="add-offer-heading">Add a product to Offers</h3>
+          ${candidates.length ? `
+            <div class="field">
+              <label for="offer-add-product"><span class="flabel">Product</span></label>
+              <input type="search" id="offer-add-filter" data-ignore-dirty placeholder="Filter products by name or SKU…" aria-label="Filter products to discount">
+              <select name="productId" id="offer-add-product">
+                ${candidates.map((p) => `<option value="${p.id}" data-search="${esc((p.name + " " + (p.sku || "")).toLowerCase())}">${esc(p.name)} — ${esc(money(p.price))}</option>`).join("")}
+              </select>
+            </div>
+            <div class="fields2">
+              ${field("Offer price (৳)", "offerPrice", firstCand?.price ?? 0, "required min=0 step=1", "number", "Lower selling price customers will pay.")}
+              ${field("Old price (৳)", "oldPrice", firstCand?.price ?? 0, "required min=1 step=1", "number", "Higher crossed-out price (must be above Offer price).")}
+            </div>
+            <div class="inline-actions">
+              <button class="btn">Add to offers</button>
+              <span class="offer-add-preview" id="offer-add-preview" aria-live="polite"></span>
+            </div>
+          ` : `<p class="empty-state">All active products are already on offer, or no active products exist yet.</p>`}
+        </form>
+        <div class="summary-bar"><span><b>${discounted.length}</b> ${discounted.length === 1 ? "product" : "products"} currently discounted</span><span>Edit prices inline or click Remove offer to restore regular pricing.</span></div>
+        <div class="scroll"><table class="tbl"><tr><th></th><th>Product</th><th>Offer price (৳)</th><th>Old price (৳)</th><th>Discount</th><th></th></tr><tbody id="offer-rows">
+        ${discounted.map((p) => {
+          const pct = offPct(p);
+          const saveAmt = p.regular - p.price;
+          return `<tr data-id="${p.id}" class="${p.active ? "" : "off"}">
+            <td><img class="mini" src="${esc(p.images?.[0]?.thumb || p.images?.[0]?.src || "/placeholder.svg")}" alt="" loading="lazy" decoding="async" width="44" height="44"></td>
+            <td><a class="link prod-title" href="#product/${p.id}">${esc(p.name)}</a>${!p.active ? ` <span class="tag">Hidden</span>` : ""}${p.stock === 0 ? ` <span class="tag warn">Sold out</span>` : ""}</td>
+            <td data-l="Offer price"><input class="num" type="number" min="0" step="1" inputmode="numeric" data-offer-q="price" value="${p.price}" aria-label="Offer price of ${esc(p.name)}"></td>
+            <td data-l="Old price"><input class="num" type="number" min="0" step="1" inputmode="numeric" data-offer-q="regular" value="${p.regular}" aria-label="Old price of ${esc(p.name)}"></td>
+            <td data-l="Discount"><span class="tag delivered">−${pct}%</span> <small class="offer-discount-meta">Save ${money(saveAmt)}</small></td>
+            <td class="actions"><button type="button" class="link" data-end-offer="${p.id}">Remove offer</button></td>
+          </tr>`;
+        }).join("") || `<tr><td colspan="6" class="empty-cell">No discounted products right now. Use the form above to add an offer.</td></tr>`}
+        </tbody></table></div>`;
+
+      updateOffersSummary();
+
+      const addForm = $("#add-offer-form", panel);
+      const sel = $("#offer-add-product", panel);
+      const filter = $("#offer-add-filter", panel);
+      const preview = $("#offer-add-preview", panel);
+      if (addForm && sel) {
+        const updateAddPreview = () => {
+          const offerP = Math.floor(+addForm.offerPrice.value);
+          const oldP = Math.floor(+addForm.oldPrice.value);
+          if (!Number.isFinite(offerP) || !Number.isFinite(oldP) || oldP <= 0) {
+            preview.textContent = "";
+            return;
+          }
+          if (oldP <= offerP) {
+            preview.textContent = "Old price must be higher than Offer price.";
+            return;
+          }
+          const pct = Math.round(((oldP - offerP) / oldP) * 100);
+          preview.textContent = `Shows −${pct}% off (saves ${money(oldP - offerP)})`;
+        };
+        sel.addEventListener("change", () => {
+          const prod = allProducts.find((p) => String(p.id) === sel.value);
+          if (prod) {
+            addForm.offerPrice.value = prod.price;
+            addForm.oldPrice.value = prod.price;
+            updateAddPreview();
+          }
+        });
+        addForm.offerPrice.addEventListener("input", updateAddPreview);
+        addForm.oldPrice.addEventListener("input", updateAddPreview);
+        filter?.addEventListener("input", () => {
+          const q = filter.value.trim().toLowerCase();
+          const cur = sel.value;
+          $$("option", sel).forEach((opt) => {
+            opt.hidden = Boolean(q && opt.value !== cur && !(opt.dataset.search || opt.textContent.toLowerCase()).includes(q));
+          });
+        });
+        updateAddPreview();
+        addForm.onsubmit = run(async (e) => {
+          e.preventDefault();
+          const prod = allProducts.find((p) => String(p.id) === sel.value);
+          if (!prod) return;
+          const offerP = Math.max(0, Math.floor(+addForm.offerPrice.value) || 0);
+          const oldP = Math.max(0, Math.floor(+addForm.oldPrice.value) || 0);
+          if (oldP <= offerP) throw new Error("Old price must be higher than Offer price to create an offer.");
+          const r = await api("/products/" + prod.id, { method: "PATCH", body: { price: offerP, regular: oldP } });
+          prod.price = r.price ?? offerP;
+          prod.regular = r.regular ?? oldP;
+          if (r.stock !== undefined) prod.stock = r.stock;
+          unsaved = $(".save-status", sf)?.textContent === "Unsaved changes";
+          renderOffersProducts();
+          publicationStatus();
+          say(`${prod.name} added to Offers.`);
+        });
+      }
+
+      $$("[data-offer-q]", panel).forEach((inp) => {
+        inp.onchange = run(async () => {
+          if (inp.disabled || !inp.reportValidity()) return;
+          const row = inp.closest("tr");
+          const p = allProducts.find((x) => x.id === +row.dataset.id);
+          if (!p) return;
+          const key = inp.dataset.offerQ;
+          const val = Math.max(0, Math.floor(+inp.value) || 0);
+          inp.disabled = true;
+          let r;
+          try {
+            r = await api("/products/" + p.id, { method: "PATCH", body: { [key]: val } });
+          } catch (error) {
+            inp.value = p[key];
+            throw error;
+          } finally {
+            inp.disabled = false;
+          }
+          const wasOffer = p.regular > p.price;
+          p.price = r.price ?? (key === "price" ? val : p.price);
+          p.regular = r.regular ?? (key === "regular" ? val : p.regular);
+          if (r.stock !== undefined) p.stock = r.stock;
+          renderOffersProducts();
+          if (wasOffer !== (p.regular > p.price)) publicationStatus();
+          say(p.regular > p.price ? `${p.name} offer updated.` : `${p.name} removed from Offers.`);
+        });
+      });
+
+      $$("[data-end-offer]", panel).forEach((btn) => {
+        btn.onclick = run(async () => {
+          const p = allProducts.find((x) => String(x.id) === btn.dataset.endOffer);
+          if (!p) return;
+          const r = await api("/products/" + p.id, { method: "PATCH", body: { regular: p.price } });
+          p.price = r.price ?? p.price;
+          p.regular = r.regular ?? p.price;
+          if (r.stock !== undefined) p.stock = r.stock;
+          renderOffersProducts();
+          publicationStatus();
+          say(`${p.name} removed from Offers.`);
+        });
+      });
+    };
+    renderOffersProducts();
+  });
+
   // ---- Start ----
 
   const blog = writing("post", "post");
@@ -2584,6 +3011,7 @@
     products,
     categories: cats,
     coupons,
+    offers,
     customers,
     reviews,
     messages,
@@ -2640,7 +3068,7 @@
     here = location.hash.slice(1);
     const nav = NAVTAB[tab] || tab;
     $("#admin-section").value = nav;
-    const primary = ["categories", "tags"].includes(nav) ? "products" : ["menu", "pages", "blog"].includes(nav) ? "home" : nav === "shop" ? "delivery" : nav;
+    const primary = ["categories", "tags"].includes(nav) ? "products" : ["menu", "pages", "blog"].includes(nav) ? "home" : nav === "shop" ? "delivery" : nav === "offers" ? "coupons" : nav;
     say("");
     $("#err").textContent = "";
     const [title, help, mode] = HEADS[nav] || ["", "", ""];
@@ -2753,7 +3181,7 @@
     renderPublication();
   };
   document.addEventListener("input", (e) => {
-    if (e.target.closest("#view form")) unsaved = true;
+    if (e.target.closest("#view form") && !e.target.matches("[data-pick-filter], [data-ignore-dirty]")) unsaved = true;
   });
   addEventListener("beforeunload", (e) => {
     if (unsaved) e.preventDefault();

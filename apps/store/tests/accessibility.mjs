@@ -62,6 +62,12 @@ try {
     await page.goto("/admin/#analytics");
     await page.waitForSelector(".analytics-status");
     await scan("admin visitor analytics");
+    await page.goto("/admin/#home");
+    await page.waitForSelector("#hero-product");
+    await scan("admin home settings");
+    await page.goto("/admin/#offers");
+    await page.waitForSelector("#offers-settings-form");
+    await scan("admin offers management");
   }
 
   // Reflow at two narrow CSS viewport sizes, including the 320 px WCAG width.

@@ -336,7 +336,7 @@ body.checkout-page { padding-bottom: var(--safe-bottom); }
 .admin .scroll { max-width: 100%; overflow: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
 .admin .scroll:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .admin .scroll .tbl { min-width: 520px; }
-.admin .scroll:has(#rows) .tbl { min-width: 0; }
+.admin .scroll:has(#rows) .tbl, .admin .scroll:has(#offer-rows) .tbl { min-width: 0; }
 .admin .scroll-hint { margin: 6px 0 12px; color: var(--mute); font-size: 12px; }
 .admin .panel { padding: 16px; }
 .admin .toolbar-date { width: 100%; }
@@ -423,7 +423,7 @@ body.checkout-page { padding-bottom: var(--safe-bottom); }
 .card .heart { color: var(--mute); background: white; }
 .card .heart.on { color: var(--brand); }
 .admin #head h1:focus { outline: none; }
-.admin .scroll-hint:has(+ .scroll:has(#rows)), .admin #olist .scroll-hint { display: none; }
+.admin .scroll-hint:has(+ .scroll:has(#rows)), .admin .scroll-hint:has(+ .scroll:has(#offer-rows)), .admin #olist .scroll-hint { display: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }

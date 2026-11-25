@@ -29,6 +29,9 @@ var migrationSQL string
 
 //go:embed migrations-v8.sql
 var publishSQL string
+
+//go:embed migrations-v9.sql
+var offerRevisionSQL string
 var localPublishMu sync.Mutex
 var buildsMu sync.RWMutex
 var builds = map[string]struct {
@@ -97,7 +100,7 @@ func migrate(ctx context.Context) error {
 		if _, e := tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations(version INT PRIMARY KEY, checksum TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`); e != nil {
 			return e
 		}
-		for i, sql := range []string{schema, migrationSQL, catalogMigrationSQL, notificationSQL, productPhotoSQL, orderUpdateMailSQL, analyticsSQL, publishSQL} {
+		for i, sql := range []string{schema, migrationSQL, catalogMigrationSQL, notificationSQL, productPhotoSQL, orderUpdateMailSQL, analyticsSQL, publishSQL, offerRevisionSQL} {
 			sum := hashTok(sql)
 			var old string
 			e := tx.QueryRow(ctx, `SELECT checksum FROM schema_migrations WHERE version=$1`, i+1).Scan(&old)
@@ -169,6 +172,9 @@ func contentHash(products, store []byte) (string, error) {
 		list = []map[string]any{}
 	}
 	for _, p := range list {
+		price, _ := wholeNumber(p["price"])
+		regular, _ := wholeNumber(p["regular"])
+		p["onOffer"] = regular > price
 		for _, k := range liveProductFields {
 			delete(p, k)
 		}

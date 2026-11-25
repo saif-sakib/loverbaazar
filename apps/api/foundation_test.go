@@ -280,6 +280,11 @@ func TestPublishSkipsUnchangedContentAndRecordsFailures(t *testing.T) {
 	if _, _, err := freezeRelease(bg, true, true); !errors.As(err, &existing) || existing.state != "published" {
 		t.Fatal("unchanged content queued a build", err)
 	}
+	// Turning an item onto or off offer changes /offers/ and navigation visibility, so Publish detects it.
+	expect(t, "put product on offer", "PATCH", "/api/admin/products/1", M{"regular": 1500}, true, 200)
+	expect(t, "offer addition is dirty", "GET", "/api/admin/publish", nil, true, 200, `"dirty":true`)
+	expect(t, "remove product from offer", "PATCH", "/api/admin/products/1", M{"regular": 1005}, true, 200)
+	expect(t, "offer removal reverts dirty", "GET", "/api/admin/publish", nil, true, 200, `"dirty":false`)
 	// An edit, then its exact revert, is again nothing to publish.
 	if _, err := db.Exec(bg, `UPDATE products SET data=data||'{"name":"Renamed"}' WHERE id=1`); err != nil {
 		t.Fatal(err)

@@ -246,6 +246,8 @@ try {
   const sitemap = await read("production", "sitemap-0.xml");
   assert.equal(sitemap.match(/<loc>https:\/\/loverbaazar.com\/<\/loc>/g)?.length, 1);
   assert.ok(sitemap.includes(productURL));
+  assert.ok(sitemap.includes("https://loverbaazar.com/offers/"));
+  assert.match(home, /<a href="\/offers\/" data-offers-link>Offers<\/a>/);
   assert.doesNotMatch(sitemap, /\/(admin|cart|checkout|search|track|wishlist|my-account|404|seo-hidden-fixture|seo-duplicate-fixture|seo-draft-fixture)\//);
   const hiddenFixtureHTML = await read("production", "seo-hidden-fixture/index.html");
   assert.match(hiddenFixtureHTML, /noindex, follow/);
@@ -364,6 +366,40 @@ try {
   await build("production", "product-ads-disabled", "");
   const adFreeProduct = await read("product-ads-disabled", "product/fixture-rice-cooker-18l/index.html");
   assert.doesNotMatch(adFreeProduct, /googlesyndication\.com|data-ad-slot-wrap|src="\/ads\.js/);
+
+  // Explicit hero product selection + homepage offers row.
+  const prevHero = structuredClone(store.site.hero);
+  const prevOffers = structuredClone(store.site.offers);
+  store.site.hero = { ...prevHero, featuredProduct: riceCookerFixture.id, hideProduct: false };
+  store.site.offers = { ...prevOffers, enabled: true, showInNav: true, navLabel: "Hot Deals", title: "Hot Deals", showOnHome: true, homeTitle: "Top Deals", homeCount: 4 };
+  await build("production", "hero-and-offers-on");
+  const heroOffersHome = await read("hero-and-offers-on", "index.html");
+  assert.match(heroOffersHome, /<a class="hero-feature" href="\/product\/fixture-rice-cooker-18l\/"[^>]*>/);
+  assert.match(heroOffersHome, /<a href="\/offers\/" data-offers-link>Hot Deals<\/a>/);
+  assert.match(heroOffersHome, /<section aria-labelledby="home-section-0" data-offers-section[^>]*>[\s\S]*Top Deals/);
+
+  // Hidden hero product + disabled Offers hides hero card, offers nav/shelf, and noindexes /offers/.
+  store.site.hero = { ...prevHero, featuredProduct: 0, hideProduct: true };
+  store.site.offers = { ...prevOffers, enabled: false };
+  await build("production", "offers-disabled");
+  const offersOffHome = await read("offers-disabled", "index.html");
+  assert.doesNotMatch(offersOffHome.slice(offersOffHome.indexOf("</head>")), /class="hero-feature"|has-featured-product|data-offers-link|data-offers-section/);
+  const offersOffPage = await read("offers-disabled", "offers/index.html");
+  assert.match(offersOffPage, /noindex, follow/);
+  assert.doesNotMatch(await read("offers-disabled", "sitemap-0.xml"), /\/offers\//);
+
+  // Enabled Offers with zero discounted products also auto-hides Offers everywhere.
+  store.site.hero = prevHero;
+  store.site.offers = { ...prevOffers, enabled: true, showInNav: true, showOnHome: true };
+  const savedRegulars = products.map(item => item.regular);
+  for (const item of products) item.regular = item.price;
+  await build("production", "offers-empty");
+  const offersEmptyHome = await read("offers-empty", "index.html");
+  assert.doesNotMatch(offersEmptyHome.slice(offersEmptyHome.indexOf("</head>")), /data-offers-link|data-offers-section/);
+  assert.match(await read("offers-empty", "offers/index.html"), /noindex, follow/);
+  assert.doesNotMatch(await read("offers-empty", "sitemap-0.xml"), /\/offers\//);
+  products.forEach((item, index) => { item.regular = savedRegulars[index]; });
+  store.site.offers = prevOffers;
 
   product.price = 999;
   product.inStock = false;

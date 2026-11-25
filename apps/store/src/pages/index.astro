@@ -3,17 +3,32 @@ import Base from "../layouts/Base.astro";
 import { responsiveImage } from "../lib/image-delivery.mjs";
 import { freeLocalArea, hasNationwideDelivery, isMerchandisingCategory, merchantReturnURL, summary } from "../lib/seo";
 import Card from "../components/Card.astro";
-import { products, inCat, homeItems, MENU, catUrl, languageOf, SITE, cats, LIVE, spacedSiteName, taka, telOf } from "../lib/shop";
-const sections = SITE.home.map((section: any) => ({
+import { products, inCat, homeItems, offersEnabled, MENU, catUrl, languageOf, SITE, cats, LIVE, spacedSiteName, taka, telOf } from "../lib/shop";
+const hero = SITE.hero;
+const offersCfg = SITE.offers;
+const configuredSections = Array.isArray(SITE.home) ? SITE.home : [];
+const hasExplicitOffersSection = configuredSections.some((section: any) => section.cat === "on-sale");
+const rawSections = [
+  ...(offersEnabled() && offersCfg?.showOnHome && !hasExplicitOffersSection
+    ? [{ title: String(offersCfg.homeTitle || "").trim() || "Special offers", cat: "on-sale", count: Math.max(1, Number(offersCfg.homeCount) || 8) }]
+    : []),
+  ...configuredSections,
+];
+const sections = rawSections.map((section: any) => ({
   ...section,
   items: homeItems(section.cat).sort((a, b) => Number(b.inStock) - Number(a.inStock)),
 })).filter((section: any) => section.items.length);
-const featured = [...sections.flatMap((section: any) => section.items), ...products]
+const nonOfferSections = sections.filter((section: any) => section.cat !== "on-sale");
+const autoFeatured = [...nonOfferSections.flatMap((section: any) => section.items), ...sections.flatMap((section: any) => section.items), ...products]
   .find((p) => p.inStock && p.images[0]?.src);
-const featurePhoto = featured && responsiveImage(featured.images[0].src, featured.images[0].src, [160, 320, 640]);
+const pickedFeaturedId = Number(hero.featuredProduct) || 0;
+const pickedFeatured = pickedFeaturedId > 0 ? products.find((p) => p.id === pickedFeaturedId) : null;
+const featured = hero.hideProduct ? null : (pickedFeatured || autoFeatured);
+const featurePhoto = featured && responsiveImage(featured.images[0]?.src, featured.images[0]?.thumb || featured.images[0]?.src, [160, 320, 640]);
 const shown = new Set(featured ? [featured.id] : []);
 const shelves = sections.map((section: any) => {
-  const items = section.items.filter((p: any) => !shown.has(p.id)).slice(0, section.count || 8);
+  const fresh = section.items.filter((p: any) => !shown.has(p.id));
+  const items = (fresh.length ? fresh : section.items).slice(0, section.count || 8);
   items.forEach((p: any) => shown.add(p.id));
   return { ...section, items };
 }).filter((section: any) => section.items.length);
@@ -30,7 +45,6 @@ const tiles = [...new Map([...homeCategories, ...menuHighlights, ...menuTiles, .
   .filter((c) => c.count);
 const quickCategories = tiles.slice(0, 6);
 const moreCategories = tiles.slice(6);
-const hero = SITE.hero;
 const brandWords = spacedSiteName.trim().split(/\s+/);
 const brandEnd = brandWords.pop();
 const nationwide = hasNationwideDelivery(LIVE);
@@ -108,7 +122,7 @@ const freeArea = freeLocalArea(LIVE);
     )}
 
     {shelves.map((h: any, index: number) => (
-      <section aria-labelledby={`home-section-${index}`}>
+      <section aria-labelledby={`home-section-${index}`} data-offers-section={h.cat === "on-sale" ? "" : undefined}>
         <div class="sec">
           <h2 id={`home-section-${index}`}>{h.title}</h2>
           <a href={h.cat === "on-sale" ? "/offers/" : catUrl(cats.find((c: any) => c.slug === h.cat) || { path: h.cat })}>All {h.title.toLowerCase()}</a>

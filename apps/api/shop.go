@@ -79,6 +79,19 @@ type Live struct {
 	MaxPending int    `json:"maxPending"`
 }
 
+// fillMissingMap copies default keys into dst when missing so existing settings rows inherit new sub-fields.
+func fillMissingMap(dst, defaults map[string]any) map[string]any {
+	if dst == nil {
+		dst = map[string]any{}
+	}
+	for k, v := range defaults {
+		if _, exists := dst[k]; !exists {
+			dst[k] = v
+		}
+	}
+	return dst
+}
+
 // loadSettings overlays what the admin saved on defaults.json, so a new setting works without a migration.
 func loadSettings(ctx context.Context) (Live, map[string]any, error) { return settingsFrom(ctx, db) }
 func settingsFrom(ctx context.Context, q querier) (Live, map[string]any, error) {
@@ -89,6 +102,8 @@ func settingsFrom(ctx context.Context, q querier) (Live, map[string]any, error) 
 	if err := json.Unmarshal(defaultsJSON, &d); err != nil {
 		return d.Live, nil, err
 	}
+	defaultHero, _ := d.Site["hero"].(map[string]any)
+	defaultOffers, _ := d.Site["offers"].(map[string]any)
 	rows, err := q.Query(ctx, `SELECT key,data::text FROM settings`)
 	if err != nil {
 		return d.Live, nil, err
@@ -100,6 +115,12 @@ func settingsFrom(ctx context.Context, q querier) (Live, map[string]any, error) 
 		}
 		return json.Unmarshal([]byte(data), &d.Site)
 	})
+	if err == nil {
+		hero, _ := d.Site["hero"].(map[string]any)
+		d.Site["hero"] = fillMissingMap(hero, defaultHero)
+		offers, _ := d.Site["offers"].(map[string]any)
+		d.Site["offers"] = fillMissingMap(offers, defaultOffers)
+	}
 	return d.Live, d.Site, err
 }
 

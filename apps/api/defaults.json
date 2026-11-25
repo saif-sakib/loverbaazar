@@ -37,7 +37,19 @@
       "title": "Cookware, appliances & furniture",
       "text": "Shop rice cookers, cookware, chairs and wardrobes from Kiam, RFL and Akij.",
       "button": "Shop all products",
-      "link": "/shop/"
+      "link": "/shop/",
+      "featuredProduct": 0,
+      "hideProduct": false
+    },
+    "offers": {
+      "enabled": true,
+      "showInNav": true,
+      "navLabel": "Offers",
+      "title": "Offers",
+      "intro": "",
+      "showOnHome": false,
+      "homeTitle": "Special offers",
+      "homeCount": 8
     },
     "banners": [],
     "home": [

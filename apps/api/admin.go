@@ -442,9 +442,9 @@ func adminQuickEdit(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	var stock int
+	var price, regular, stock int64
 	err := db.QueryRow(r.Context(), `UPDATE products SET price=coalesce($2,price),regular=GREATEST(coalesce($3,regular),coalesce($2,price)),stock=GREATEST(stock+$4,0),active=coalesce($5,active)
-		WHERE id=$1 RETURNING stock`, paramID(r, "id"), in.Price, in.Regular, in.StockDelta, in.Active).Scan(&stock)
+		WHERE id=$1 RETURNING price,regular,stock`, paramID(r, "id"), in.Price, in.Regular, in.StockDelta, in.Active).Scan(&price, &regular, &stock)
 	if errors.Is(err, pgx.ErrNoRows) {
 		fail(w, 404, "product not found")
 		return
@@ -453,7 +453,7 @@ func adminQuickEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	refreshProducts()
-	ok(w, map[string]any{"stock": stock})
+	ok(w, map[string]any{"price": price, "regular": regular, "stock": stock})
 }
 
 // adminDeleteProduct removes a product for good. One that has been ordered is only hidden, because
@@ -733,8 +733,8 @@ func validLive(l Live) error {
 	if !open {
 		return userErr{400, "keep at least one payment method turned on"}
 	}
-	if l.FreeOver < 0 || l.MinOrder < 0 || l.MinOrder > maxMoney || l.FreeOver > maxMoney || l.LowStock < 0 || l.MaxPending < 0 {
-		return userErr{400, "amounts cannot be negative"}
+	if l.FreeOver < 0 || l.MinOrder < 0 || l.MinOrder > maxMoney || l.FreeOver > maxMoney || l.LowStock < 0 || l.LowStock > int(maxStock) || l.MaxPending < 0 || l.MaxPending > 1000 {
+		return userErr{400, "amounts and limits must be within supported bounds"}
 	}
 	return nil
 }
@@ -768,6 +768,54 @@ func adminSaveSettings(w http.ResponseWriter, r *http.Request) {
 	if !validateURLs(in.Site) {
 		fail(w, 400, "invalid website link or image URL")
 		return
+	}
+	if heroRaw, exists := in.Site["hero"]; exists && heroRaw != nil {
+		hero, isMap := heroRaw.(map[string]any)
+		if !isMap {
+			fail(w, 400, "invalid hero settings")
+			return
+		}
+		if v, ok := hero["featuredProduct"]; ok && v != nil {
+			if _, valid := integer(v, 0, maxMoney); !valid {
+				fail(w, 400, "featuredProduct must be a non-negative whole product ID")
+				return
+			}
+		}
+		if v, ok := hero["hideProduct"]; ok && v != nil {
+			if _, isBool := v.(bool); !isBool {
+				fail(w, 400, "hideProduct must be true or false")
+				return
+			}
+		}
+	}
+	if offersRaw, exists := in.Site["offers"]; exists && offersRaw != nil {
+		offers, isMap := offersRaw.(map[string]any)
+		if !isMap {
+			fail(w, 400, "invalid offers settings")
+			return
+		}
+		for _, k := range []string{"enabled", "showInNav", "showOnHome"} {
+			if v, ok := offers[k]; ok && v != nil {
+				if _, isBool := v.(bool); !isBool {
+					fail(w, 400, k+" must be true or false")
+					return
+				}
+			}
+		}
+		if v, ok := offers["homeCount"]; ok && v != nil {
+			if _, valid := integer(v, 1, 100); !valid {
+				fail(w, 400, "offers homeCount must be between 1 and 100")
+				return
+			}
+		}
+		for _, k := range []string{"navLabel", "title", "intro", "homeTitle"} {
+			if v, ok := offers[k]; ok && v != nil {
+				if _, isStr := v.(string); !isStr {
+					fail(w, 400, k+" must be text")
+					return
+				}
+			}
+		}
 	}
 	live, _ := json.Marshal(in.Live)
 	site, _ := json.Marshal(in.Site)
