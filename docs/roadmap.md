@@ -724,13 +724,13 @@ Follow the [go-live skill](../.claude/skills/go-live/SKILL.md) for Namecheap and
 
 **Status:** In progress, pending deployed SEO verification · **Depends on:** 25, 29, 49
 
-- Link the homepage and About footer to the foundation's canonical About page. Keep checkout, tracking and product browsing focused on the shop. The foundation site maintains its own canonical URLs and pairs its English and Bengali sitemap entries.
+- The Hasnahena Foundation footer link was removed on 25 November 2026 per owner request, keeping the LoverBaazar footer focused on the shop. The foundation site maintains its own canonical URLs and pairs its English and Bengali sitemap entries.
 - Review capacity at 15,000 public visits/month or around 50–60 orders/day when each typical order generates three recipient attempts. Use observed traffic and measured service limits to decide when to act. A hosting move addresses API latency, uptime and compute capacity. Image and email thresholds have their own remedies.
 - The private owner audit compares both projects using read-only provider metrics, service configurations, public browser samples and backup records. Keep account figures and data outside Git. Confirm actual limits in the dashboards before using an estimated visitor count to justify spending.
 
 **Actions required**
 
-1. Review and merge the SEO changes through each project's release process, then confirm the footer link and public sitemaps.
+1. Review, merge and deploy the storefront update through the regular release process, and confirm the public sitemaps.
 2. Record the remaining provider and traffic baselines from the private audit. Check Hasnahena's Vercel eligibility and R2 billing terms before relying on the current hosting model.
 
 ## Launch gates

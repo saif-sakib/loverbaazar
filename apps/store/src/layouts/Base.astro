@@ -306,9 +306,6 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
           <a href="/about-us/">About us</a>
           <a href="/blog/">Blog</a>
           <a href="/online-shopping-jashore/">Online shopping in Jashore</a>
-          {["/", "/about-us/", "/about-us"].includes(Astro.url.pathname) && (
-            <a class="community-link" href="https://www.hasnahenafoundation.com/about">Hasnahena Foundation in Jashore</a>
-          )}
           {extraPages.map((p: any) => (
             <a href={`/${p.slug}/`}>{p.title}</a>
           ))}

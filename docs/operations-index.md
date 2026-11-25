@@ -11,7 +11,7 @@ Use the [numbered roadmap](roadmap.md) for priorities, dependencies, evidence an
 | Old and current customer records | [Retention](data-retention.md) for current behavior and owner decisions. [Migration](migration.md) for any private WordPress records and outstanding support. |
 | Backup and recovery | [Maintenance](maintenance.md#missed-backup--recovery-drill) and tasks 35, 36. Independently verify the encrypted copy and key. Restore to an isolated empty database first. |
 | Domain, email and release handover | [Launch checklist](go-live.md) and tasks 43–48. Preserve the registrar registration and separate the domain, mail and hosting decisions. |
-| SEO, discoverability and performance | [SEO and performance](seo-performance.md), [crawl evidence](records/seo-performance-results.md) and task 57 for the foundation link. |
+| SEO, discoverability and performance | [SEO and performance](seo-performance.md) and [crawl evidence](records/seo-performance-results.md). |
 | Costs and growth | [Measured upgrade triggers](maintenance.md#measurements-that-trigger-a-decision) and tasks 49, 50 and 57. Use the owner-held capacity audit for the latest two-project baseline. |
 
 Before merging or changing production, match the relevant roadmap task and verify its acceptance criteria. A passing CI check and a successfully served production release are separate pieces of evidence. Record the live checks only after they have been performed.
