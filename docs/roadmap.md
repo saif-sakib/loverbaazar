@@ -944,7 +944,7 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 
 - Keep the familiar storefront header at checkout. Show Back to cart, support and a cart loading message immediately. Show the order with photos, quantities and subtotal before the delivery form on phones. Place the order button after the delivery and payment fields.
 - Use product photos and names to open the full product page. Give Add to cart the full card width and keep the wishlist button. Remove the quick view button, dialog and static preview assets.
-- Keep product photos clear of overlaid arrows. Use thumbnails, swipes and arrow keys on the product page. Put Previous and Next below the enlarged photo and return focus to the gallery when closing it.
+- Keep product photos clear of overlaid arrows. Use consistent previous/next arrow buttons beside the thumbnails on the product page and below the enlarged photo in the viewer (with swipes and arrow keys) across mobile and desktop, and return focus to the gallery when closing it.
 
 **Reproduction, 25 November 2026.** At 390 px, the previous checkout hid search, categories and the loading message before the storefront script ran. Once the cart loaded, the order summary started 1,104 px down the page. The revised summary starts at 341 px in the same one-item checkout.
 

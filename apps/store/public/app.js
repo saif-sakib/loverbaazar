@@ -981,11 +981,15 @@
       const rail = thumb.parentElement;
       const row = rail.getBoundingClientRect();
       const item = thumb.getBoundingClientRect();
-      if (item.left < row.left) rail.scrollLeft += item.left - row.left;
-      if (item.right > row.right) rail.scrollLeft += item.right - row.right;
+      if (item.left < row.left + 3) rail.scrollLeft += item.left - row.left - 3;
+      if (item.right > row.right - 3) rail.scrollLeft += item.right - row.right + 3;
     };
     const move = (step) => selectPhoto(current + step);
     const connectNavigation = (area, surface) => {
+      area.addEventListener("click", (event) => {
+        const step = event.target.closest("[data-photo-step]");
+        if (step) move(Number(step.dataset.photoStep));
+      });
       area.addEventListener("keydown", (event) => {
         if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
         if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
@@ -1011,8 +1015,6 @@
         trigger.focus({ preventScroll: true });
       };
       box.addEventListener("click", (event) => {
-        const step = event.target.closest("[data-photo-step]");
-        if (step) move(Number(step.dataset.photoStep));
         if (event.target === box || event.target.closest("[data-close-photo]")) close();
       });
       box.addEventListener("cancel", (event) => { event.preventDefault(); close(); });

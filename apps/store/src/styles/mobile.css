@@ -103,7 +103,47 @@ fieldset.panel { margin: 0; }
 }
 .pd .gal button { min-width: 64px; min-height: 64px; }
 .pd .gal button:focus-visible { outline-offset: -3px; }
-.pd .gal img { mix-blend-mode: normal; }
+.pd .gal img { width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 8px; mix-blend-mode: normal; }
+.photo-rail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.photo-rail .gal {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-top: 0;
+  padding: 3px;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #b89993 transparent;
+}
+.photo-step {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  border: 1px solid #968d84;
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background var(--ease), border-color var(--ease), color var(--ease);
+}
+.photo-step:hover {
+  border-color: var(--brand);
+  color: var(--brand2);
+  background: var(--blush);
+}
+.photo-step svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
 .buy { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: end; margin: 8px 0 12px; }
 .product-qty { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; font-size: .875rem; font-weight: 650; }
 .quantity-stepper {
@@ -238,8 +278,27 @@ html:has(.lightbox[open]) { overflow: hidden; }
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 6px 12px;
+  gap: 6px 14px;
   font-size: .875rem;
+}
+.photo-viewer-count {
+  min-width: 7.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.lightbox .photo-step {
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  border: 1px solid #fff9;
+  border-radius: 50%;
+  background: #fff1;
+  color: white;
+}
+.lightbox .photo-step:hover {
+  border-color: white;
+  background: #fff3;
+  color: white;
 }
 .lightbox button {
   min-height: var(--touch);

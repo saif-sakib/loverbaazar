@@ -149,6 +149,7 @@ try {
   await shot(buyer, 'filters-375');
   await buyer.goto(`/product/${product.slug}/`);
   await buyer.waitForFunction(() => document.querySelector('[data-main]')?.naturalWidth === 2);
+  assert.equal(await buyer.locator('[data-photo-step]').count(), 0);
   const stock = await request('GET', '/api/stock', undefined, false);
   const paidZone = stock.settings.delivery.find(zone => zone.fee > 0);
   assert.ok(paidZone, 'Fixture requires a paid delivery zone');

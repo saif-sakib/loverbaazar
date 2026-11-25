@@ -242,6 +242,7 @@ try {
   assert.match(page, /lang="bn-BD"/);
   assert.ok(/content="বাংলা বিবরণ (?:&amp;|&#38;) তথ্য"/.test(page), "SEO description is escaped plain text");
   assert.match(page, /<h1[^>]*>বাংলা পরীক্ষার পণ্য<\/h1>/);
+  assert.doesNotMatch(page, /data-photo-step/);
   const sitemap = await read("production", "sitemap-0.xml");
   assert.equal(sitemap.match(/<loc>https:\/\/loverbaazar.com\/<\/loc>/g)?.length, 1);
   assert.ok(sitemap.includes(productURL));
@@ -303,6 +304,7 @@ try {
   assert.match(rcPage, /<link rel="preload" as="image"[^>]*imagesrcset="[^"]*640w"[^>]*fetchpriority="high">/);
   assert.match(rcPage, /<img class="main" data-main[^>]*srcset="[^"]*640w"[^>]*data-zoom="https:\/\/res\.cloudinary\.com\/test\/image\/upload\/c_limit,w_960\/q_auto\/f_auto\/loverbaazar\/products\/rice-cooker\/fixture-rice-cooker-18l-1\.jpg"[^>]*decoding="sync" fetchpriority="high">/);
   assert.doesNotMatch(rcPage, /<img class="main"[^>]*960w/);
+  assert.equal(rcPage.match(/data-photo-step="/g)?.length, 4);
   const shopHTML = await read("production", "shop/index.html");
   assert.match(shopHTML, /Browse categories/);
   const shopLD = entities(shopHTML).find(item => item["@type"] === "CollectionPage");

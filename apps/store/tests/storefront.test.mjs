@@ -308,10 +308,19 @@ test('product photos share one selection across swipe, arrows, thumbnails and th
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   };
 
-  assert.equal(await gallery.locator('[data-photo-step]').count(), 0);
-  await thumbs.nth(1).tap();
+  const assertArrowButtons = async (container, count) => {
+    const arrows = container.locator('[data-photo-step]');
+    assert.equal(await arrows.count(), count);
+    for (const arrow of await arrows.all()) {
+      assert.equal((await arrow.textContent()).trim(), '');
+      assert.equal(await arrow.locator('svg[aria-hidden="true"]').count(), 1);
+    }
+  };
+
+  await assertArrowButtons(gallery, 2);
+  await gallery.getByRole('button', { name: 'Next photo' }).tap();
   await assertPhoto(1);
-  await thumbs.first().tap();
+  await gallery.getByRole('button', { name: 'Previous photo' }).tap();
   await assertPhoto(0);
   await trigger.focus();
   await page.keyboard.press('ArrowLeft');
@@ -319,6 +328,7 @@ test('product photos share one selection across swipe, arrows, thumbnails and th
   await thumbs.nth(1).tap();
   await trigger.tap({ position: { x: 130, y: 90 } });
   await lightbox.waitFor();
+  await assertArrowButtons(lightbox, 2);
   const enlarged = lightbox.locator('[data-expanded-photo]');
   assert.equal(await enlarged.getAttribute('src'), await thumbs.nth(1).getAttribute('data-zoom'));
   await lightbox.getByRole('button', { name: 'Next photo' }).tap();
@@ -332,17 +342,31 @@ test('product photos share one selection across swipe, arrows, thumbnails and th
   await assertPhoto(0);
   assert.equal(await trigger.evaluate(el => el === document.activeElement), true);
 
-  for (const width of [320, 360, 375, 390, 414, 768, 1440]) {
-    await page.setViewportSize({ width, height: 900 });
-    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Gallery fits at ${width}px`);
+  for (const [width, height] of [[320, 900], [360, 900], [375, 900], [390, 900], [414, 900], [844, 390], [768, 900], [1024, 900], [1440, 900]]) {
+    await page.setViewportSize({ width, height });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Gallery fits at ${width}×${height}`);
+    const stageBox = await trigger.boundingBox();
+    for (const control of await gallery.locator('[data-photo-step]').all()) {
+      const box = await control.boundingBox();
+      assert.ok(box && box.width >= 44 && box.height >= 44 && box.x >= 0 && box.x + box.width <= width && box.y >= stageBox.y + stageBox.height - 1, `Gallery arrow fits below the image at ${width}×${height}`);
+    }
     await trigger.click();
     const photo = await enlarged.boundingBox();
     for (const control of await lightbox.locator('[data-photo-step]').all()) {
       const box = await control.boundingBox();
-      assert.ok(box.width >= 44 && box.height >= 44 && box.x >= 0 && box.x + box.width <= width && box.y >= photo.y + photo.height - 1, `Photo controls fit below the image at ${width}px`);
+      assert.ok(box && box.width >= 44 && box.height >= 44 && box.x >= 0 && box.x + box.width <= width && box.y >= photo.y + photo.height - 1, `Lightbox arrow fits below the image at ${width}×${height}`);
     }
     await page.keyboard.press('Escape');
   }
+  await gallery.getByRole('button', { name: 'Next photo' }).click();
+  await assertPhoto(1);
+  await trigger.click();
+  await lightbox.waitFor();
+  assert.equal(await lightbox.getByRole('status').textContent(), `Photo 2 of ${count}`);
+  await lightbox.getByRole('button', { name: 'Previous photo' }).click();
+  assert.equal(await lightbox.getByRole('status').textContent(), `Photo 1 of ${count}`);
+  await lightbox.getByRole('button', { name: 'Close enlarged photo' }).click();
+  await assertPhoto(0);
   await page.setViewportSize({ width: 375, height: 812 });
   await trigger.evaluate(el => el.scrollIntoView({ block: 'center' }));
   const startY = await page.evaluate(() => scrollY);

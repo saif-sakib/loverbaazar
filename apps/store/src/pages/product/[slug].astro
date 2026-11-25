@@ -40,8 +40,12 @@ const mainImage = p.images[0];
 const displayImage = (image: any) => responsiveImage(image?.src, image?.src || image?.thumb, [320, 640]);
 const imageSet = displayImage(mainImage);
 const thumbnail = (image: any) => responsiveImage(image.src, image.thumb || image.src, [160]).src;
-const multiplePhotos = mainImage?.src && p.images.length > 1;
+const multiplePhotos = Boolean(mainImage?.src && p.images.length > 1);
 const firstPhotoPosition = `Photo 1 of ${p.images.length}`;
+const photoStepControls = [
+  { step: -1, label: "Previous photo", path: "m15 18-6-6 6-6" },
+  { step: 1, label: "Next photo", path: "m9 18 6-6-6-6" },
+];
 const ld = {
   "@context": "https://schema.org",
   "@type": "Product",
@@ -157,14 +161,26 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
         </button> : <div class="stage"><img class="main" {...imageSet} alt="Product photo unavailable" width="600" height="600" /></div>}
         {multiplePhotos && (
           <>
-            <div class="gal" role="group" aria-label="Choose a photo">
-              {p.images.map((i: any, n: number) => {
-                const photo = displayImage(i);
-                return <button type="button" class={n === 0 ? "on" : undefined} data-thumb={photo.src} data-srcset={photo.srcset} data-zoom={sizedImage(i.src, 960)}
-                  data-alt={i.alt || p.name} aria-label={`View photo ${n + 1} of ${p.images.length}`} aria-pressed={n === 0}>
-                  <img src={thumbnail(i)} alt="" loading="lazy" width="66" height="66" />
-                </button>;
-              })}
+            <div class="photo-rail">
+              <button class="photo-step" type="button" data-photo-step={photoStepControls[0].step} aria-label={photoStepControls[0].label}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d={photoStepControls[0].path} />
+                </svg>
+              </button>
+              <div class="gal" role="group" aria-label="Choose a photo">
+                {p.images.map((i: any, n: number) => {
+                  const photo = displayImage(i);
+                  return <button type="button" class={n === 0 ? "on" : undefined} data-thumb={photo.src} data-srcset={photo.srcset} data-zoom={sizedImage(i.src, 960)}
+                    data-alt={i.alt || p.name} aria-label={`View photo ${n + 1} of ${p.images.length}`} aria-pressed={n === 0}>
+                    <img src={thumbnail(i)} alt="" loading="lazy" width="66" height="66" />
+                  </button>;
+                })}
+              </div>
+              <button class="photo-step" type="button" data-photo-step={photoStepControls[1].step} aria-label={photoStepControls[1].label}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d={photoStepControls[1].path} />
+                </svg>
+              </button>
             </div>
             <span class="sr-only" role="status" data-photo-position>{firstPhotoPosition}</span>
           </>
@@ -177,9 +193,17 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
               </div>
               <img data-expanded-photo alt="" draggable="false" />
               {multiplePhotos && <div class="photo-viewer-controls" role="group" aria-label="Photo navigation">
-                <button type="button" data-photo-step="-1" aria-label="Previous photo">Previous</button>
-                <span role="status" data-photo-position>{firstPhotoPosition}</span>
-                <button type="button" data-photo-step="1" aria-label="Next photo">Next</button>
+                <button class="photo-step" type="button" data-photo-step={photoStepControls[0].step} aria-label={photoStepControls[0].label}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d={photoStepControls[0].path} />
+                  </svg>
+                </button>
+                <span class="photo-viewer-count" role="status" data-photo-position>{firstPhotoPosition}</span>
+                <button class="photo-step" type="button" data-photo-step={photoStepControls[1].step} aria-label={photoStepControls[1].label}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d={photoStepControls[1].path} />
+                  </svg>
+                </button>
               </div>}
             </dialog>
           </template>
