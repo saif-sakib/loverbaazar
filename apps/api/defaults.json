@@ -4,8 +4,8 @@
     "closedNote": "We are not taking online orders right now. Please call us.",
     "notice": "",
     "delivery": [
-      { "id": "jashore", "label": "Inside Jashore", "fee": 0, "days": "" },
-      { "id": "outside", "label": "Outside Jashore", "fee": 100, "days": "" }
+      { "id": "jashore", "label": "Inside Jashore", "fee": 0, "days": "3–5 days" },
+      { "id": "outside", "label": "Outside Jashore", "fee": 100, "days": "3–5 days" }
     ],
     "payments": [
       { "id": "cod", "label": "Cash on delivery", "number": "", "enabled": true },
@@ -28,8 +28,8 @@
     "email": "loverbaazar@gmail.com",
     "whatsapp": "01710-076076",
     "address": "Vekutia, Jashore",
-    "returns": "",
-    "hours": "",
+    "returns": "You can request a return within 7 days of delivery. We process approved refunds within 5–7 business days via bKash, Nagad, Rocket, or bank transfer.",
+    "hours": "Sat–Thu 9:00 AM – 9:00 PM",
     "facebook": "https://www.facebook.com/profile.php?id=100091885353080",
     "youtube": "https://www.youtube.com/channel/UCZu0It_vU51HDCGxWnGjIQA",
     "logo": "",

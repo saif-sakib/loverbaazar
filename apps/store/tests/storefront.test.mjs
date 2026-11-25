@@ -54,6 +54,33 @@ test('an empty live catalogue disables every static add button', () => shop(asyn
   assert.equal(await page.locator('[data-add]:enabled').count(), 0);
 }, { stock: {} }));
 
+test('proceeding to checkout keeps navigation visible and shows the order before the delivery form', () => shop(async (page, context) => {
+  await ready(page, '/cart/');
+  let releaseScript;
+  const pending = new Promise(resolve => { releaseScript = resolve; });
+  await context.route('**/app.js*', async route => { await pending; await route.continue(); });
+  try {
+    await page.getByRole('link', { name: 'Proceed to checkout' }).click({ noWaitAfter: true });
+    await page.waitForURL('**/checkout/', { waitUntil: 'commit' });
+    await page.getByText('Loading your cart…', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('combobox', { name: 'Search products' }).isVisible(), true);
+    assert.equal(await page.getByRole('link', { name: 'Back to cart' }).isVisible(), true);
+    assert.equal(await page.locator('[data-checkout]').isVisible(), false);
+  } finally {
+    releaseScript();
+  }
+  const order = page.getByRole('region', { name: 'Your order' });
+  await order.waitFor();
+  assert.match(await order.locator('.checkout-item').textContent(), /Test cooker[\s\S]*Qty 2[\s\S]*৳2,000/);
+  assert.equal(await order.locator('.checkout-item img').count(), 1);
+  const summary = await order.boundingBox();
+  const delivery = await page.locator('[data-details-fields]').boundingBox();
+  assert.ok(summary.y + summary.height <= delivery.y);
+  assert.ok(summary.y + summary.height <= page.viewportSize().height);
+  await page.getByRole('link', { name: 'Back to cart' }).click();
+  assert.equal(await page.locator('[data-line="1"]').inputValue(), '2');
+}, { cart: { 1: 2 }, hasTouch: true }));
+
 test('mobile storefront leads with the current delivery coverage', () => shop(async (page, context) => {
   const local = { id: 'jashore', label: 'Inside Jashore', fee: 0 };
   let delivery = [local, { id: 'outside', label: 'Outside Jashore', fee: 200 }];
@@ -113,6 +140,29 @@ test('checkout labels the subtotal until the buyer chooses a delivery area', () 
   assert.equal(await page.locator('[data-checkout-total]').textContent(), 'Delivery ৳200 · Total ৳1,200');
   assert.equal(await total.locator('span').first().textContent(), 'Total');
 }, { cart: { 1: 1 }, live: { delivery: [{ id: 'local', label: 'Local', fee: 0 }, { id: 'outside', label: 'Outside', fee: 200 }] } }));
+
+test('a product delivery label leaves cart and checkout unchanged', () => shop(async (page, context) => {
+  // A previously published search index may still include the label.
+  const labeledIndex = products.map(product => product.id === 2 ? { ...product, jashoreOnly: true } : product);
+  await context.route('**/search-index.json', route => route.fulfill({ json: labeledIndex }));
+  await ready(page, '/cart/');
+  assert.match(await page.locator('[data-cart]').textContent(), /Test kettle/);
+  assert.equal(await page.getByText(/Jashore only/i).count(), 0);
+  await page.getByRole('link', { name: 'Proceed to checkout' }).click();
+  await page.waitForLoadState('networkidle');
+  const areas = page.locator('[name="area"] option');
+  assert.deepEqual(await areas.evaluateAll(options => options.map(option => option.value)), ['', 'jashore', 'outside']);
+  assert.equal(await page.locator('[name="area"]').inputValue(), '');
+  assert.equal(await page.getByText(/Jashore only/i).count(), 0);
+  await page.locator('[name="area"]').selectOption('outside');
+  await page.locator('[data-eta]').waitFor();
+  assert.match(await page.locator('[data-eta]').textContent(), /3–5 days/);
+  assert.equal(await page.locator('[data-checkout-total]').textContent(), 'Delivery ৳400 · Total ৳1,900');
+  assert.equal(await page.getByRole('button', { name: 'Place order' }).isEnabled(), true);
+}, { cart: { 1: 1, 2: 1 }, live: { delivery: [
+  { id: 'jashore', label: 'Inside Jashore', fee: 0, days: '3–5 days' },
+  { id: 'outside', label: 'Outside Jashore', fee: 200, days: '3–5 days' },
+] }, hasTouch: true }));
 
 test('a stale snapshot keeps mobile payment details hidden while cash on delivery stays available', () => shop(async (page, context) => {
   let stale = true;
@@ -258,9 +308,10 @@ test('product photos share one selection across swipe, arrows, thumbnails and th
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   };
 
-  await gallery.getByRole('button', { name: 'Next photo' }).tap();
+  assert.equal(await gallery.locator('[data-photo-step]').count(), 0);
+  await thumbs.nth(1).tap();
   await assertPhoto(1);
-  await gallery.getByRole('button', { name: 'Previous photo' }).tap();
+  await thumbs.first().tap();
   await assertPhoto(0);
   await trigger.focus();
   await page.keyboard.press('ArrowLeft');
@@ -284,10 +335,13 @@ test('product photos share one selection across swipe, arrows, thumbnails and th
   for (const width of [320, 360, 375, 390, 414, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Gallery fits at ${width}px`);
-    for (const arrow of await gallery.locator('[data-photo-step]').all()) {
-      const box = await arrow.boundingBox();
-      assert.ok(box.width >= 44 && box.height >= 44 && box.x >= 0 && box.x + box.width <= width, `Arrow fits at ${width}px`);
+    await trigger.click();
+    const photo = await enlarged.boundingBox();
+    for (const control of await lightbox.locator('[data-photo-step]').all()) {
+      const box = await control.boundingBox();
+      assert.ok(box.width >= 44 && box.height >= 44 && box.x >= 0 && box.x + box.width <= width && box.y >= photo.y + photo.height - 1, `Photo controls fit below the image at ${width}px`);
     }
+    await page.keyboard.press('Escape');
   }
   await page.setViewportSize({ width: 375, height: 812 });
   await trigger.evaluate(el => el.scrollIntoView({ block: 'center' }));

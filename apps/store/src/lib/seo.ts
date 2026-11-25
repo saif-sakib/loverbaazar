@@ -1,4 +1,4 @@
-import { languageOf, pages, siteUrl } from "./shop";
+import { fill, languageOf, pages, siteUrl } from "./shop";
 
 const entities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 export function plainText(input: unknown) {
@@ -14,6 +14,23 @@ export function summary(input: unknown, limit = 160) {
   const text = plainText(input);
   const graphemes = Array.from(new Intl.Segmenter("bn").segment(text), item => item.segment);
   return graphemes.length > limit ? graphemes.slice(0, limit - 1).join("").trimEnd() + "…" : text;
+}
+
+export function schemaOpeningHours(input: unknown) {
+  if (typeof input !== "string") return undefined;
+  const value = input.trim();
+  if (/^(?:Mo|Tu|We|Th|Fr|Sa|Su)(?:[-,](?:Mo|Tu|We|Th|Fr|Sa|Su))* (?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) return value;
+  const match = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:\s*[-–—]\s*(Mon|Tue|Wed|Thu|Fri|Sat|Sun))?,?\s+(0?[1-9]|1[0-2]):([0-5]\d)\s*(AM|PM)\s*[-–—]\s*(0?[1-9]|1[0-2]):([0-5]\d)\s*(AM|PM)$/i.exec(value);
+  if (!match) return undefined;
+  const [, first, last, openHour, openMinute, openPeriod, closeHour, closeMinute, closePeriod] = match;
+  const days = ["mo", "tu", "we", "th", "fr", "sa", "su"];
+  const start = days.indexOf(first.slice(0, 2).toLowerCase());
+  const end = days.indexOf((last || first).slice(0, 2).toLowerCase());
+  const openDays = start <= end ? days.slice(start, end + 1) : [...days.slice(start), ...days.slice(0, end + 1)];
+  const clock = (hour: string, minute: string, period: string) =>
+    String(Number(hour) % 12 + (period.toUpperCase() === "PM" ? 12 : 0)).padStart(2, "0") + ":" + minute;
+  return openDays.map(day => day[0].toUpperCase() + day[1]).join(",") + " " +
+    clock(openHour, openMinute, openPeriod) + "-" + clock(closeHour, closeMinute, closePeriod);
 }
 
 const literal = (input: unknown) => /%[a-z][a-z0-9_]*(?:\([^)]*\))?%/i.test(String(input)) ? "" : plainText(input);
@@ -78,7 +95,7 @@ const toAsciiDigits = (text: string) => text.replace(/[০-৯]/g, d => banglaDi
 /** Derive MerchantReturnPolicy JSON-LD truthfully from a public, indexable terms page. */
 export function resolveMerchantReturn(page: any, url: string) {
   const seo = page && recordSEO(page, "");
-  const text = seo && !seo.noindex && (!seo.canonical || seo.canonical === url) ? plainText(page.html) : "";
+  const text = seo && !seo.noindex && (!seo.canonical || seo.canonical === url) ? plainText(fill(page.html)) : "";
   if (!/\b(?:returns|return policy|refunds)\b|ফেরত/iu.test(text)) {
     return { url: undefined, offerPolicy: undefined, orgPolicy: undefined };
   }

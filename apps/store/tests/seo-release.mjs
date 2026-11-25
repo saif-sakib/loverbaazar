@@ -150,12 +150,12 @@ try {
   const home = await read("production", "index.html");
   assert.match(home, /<title>Lover Baazar \| Home Appliances &amp; Furniture in Bangladesh<\/title>/);
   assert.match(home, /<meta name="description" content="Lover Baazar\. Shop rice cookers, [^"]*Delivery across Bangladesh\."/);
-  assert.match(home, /href="\/how-to-buy\/#delivery" data-delivery-coverage>Delivery across Bangladesh<\/a>/);
+  assert.match(home, /href="\/how-to-buy\/#delivery" data-delivery-coverage(?:="true")?>\s*Delivery across Bangladesh\s*<\/a>/);
   assert.match(home, /<meta property="og:site_name" content="Lover Baazar">/);
   const headings = [...home.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)];
   assert.equal(headings.length, 1);
   assert.equal(headings[0][1].replace(/<[^>]+>/g, "").trim(), "Lover Baazar");
-  assert.match(home, /<p class="hero-title" lang="en-BD">Cookware, appliances &amp; furniture<\/p>/);
+  assert.match(home, /<p class="hero-title" lang="en-BD"[^>]*>Cookware, appliances &amp; furniture<\/p>/);
   assert.match(home, /<link rel="canonical" href="https:\/\/loverbaazar.com\/">/);
   assert.match(home, /<meta name="robots" content="index, follow/);
   assert.match(home, /<link rel="icon" href="\/favicon\.ico" sizes="16x16 32x32 48x48">/);
@@ -204,6 +204,7 @@ try {
   assert.equal(shops[0].address.addressLocality, "Jashore");
   assert.equal(shops[0].address.addressRegion, "Khulna Division");
   assert.equal(shops[0].address.addressCountry, "BD");
+  assert.equal(shops[0].openingHours, "Sa,Su,Mo,Tu,We,Th 09:00-21:00");
   assert.ok(Array.isArray(shops[0].areaServed) && shops[0].areaServed.some(a => a.name === "Jashore" && a.alternateName?.includes("Jessore")) && shops[0].areaServed.some(a => a.name === "Bangladesh"));
   assert.match(home, /href="\/online-shopping-jashore\/"/);
   assert.match(home, /Free delivery in Jashore/);
@@ -211,12 +212,16 @@ try {
     "@type": "MerchantReturnPolicy",
     applicableCountry: "BD",
     returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-    merchantReturnDays: 30,
+    merchantReturnDays: 7,
     returnMethod: "https://schema.org/ReturnByMail",
     returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
     merchantReturnLink: "https://loverbaazar.com/terms-conditions/",
   };
   assert.deepEqual(shops[0].hasMerchantReturnPolicy, expectedReturnPolicy);
+  const terms = await read("production", "terms-conditions/index.html");
+  assert.match(terms, /return within 7 days of delivery/);
+  assert.match(terms, /5–7 business days via bKash, Nagad, Rocket, or bank transfer/);
+  assert.doesNotMatch(terms, /return policy lasts 30 days|\{returns\}/);
   const page = await read("production", `product/${product.slug}/index.html`);
   assert.doesNotMatch(page, /name="(?:msvalidate\.01|google-site-verification)"/);
   const htmlLD = entities(page);
@@ -273,10 +278,14 @@ try {
   assert.match(rcPage, /<title>Fixture Kiam Rice Cooker 1\.8L Price in Bangladesh \| Lover Baazar<\/title>/);
   assert.match(rcPage, /<meta name="description" content="Fixture Kiam Rice Cooker 1\.8L price in Bangladesh is ৳1,450 at Lover Baazar\./);
   assert.match(rcPage, /<meta name="description" content="[^"]*Delivery in Jashore only[^"]*">/);
-  assert.match(rcPage, /Delivery available only in Jashore\./);
-  assert.match(rcPage, /<div class="ticker"[^>]*>\s*<div>\s*<span>\s*<a href="#purchase-info-title">Delivery in Jashore only<\/a>/);
+  assert.match(rcPage, /<span class="delivery-label" data-jashore-label>Jashore only<\/span>/);
+  assert.match(rcPage, /<div class="ticker"[^>]*>\s*<div>\s*<span>\s*<a href="\/how-to-buy\/#delivery" data-delivery-coverage>\s*Delivery across Bangladesh\s*<\/a>/);
+  assert.doesNotMatch(rcPage, /Delivery available only in Jashore\./);
   assert.match(rcPage, /Double pot rice cooker for 4 to 6 people\./);
-  assert.doesNotMatch(rcPage, /Delivery time 4-7 days|<ul class="delivery" data-delivery>/);
+  assert.doesNotMatch(rcPage, /Delivery time 4-7 days/);
+  const localDelivery = rcPage.match(/<ul class="delivery" data-delivery[^>]*>([\s\S]*?)<\/ul>/)?.[1];
+  assert.match(localDelivery || "", /Inside Jashore[\s\S]*3–5 days/);
+  assert.doesNotMatch(localDelivery || "", /Outside Jashore/);
   const rcLD = entities(rcPage);
   const rcProductLD = rcLD.find(item => item["@type"] === "Product");
   assert.equal(rcProductLD.category, "Rice Cooker");
@@ -375,7 +384,7 @@ try {
   assert.match(await read("preview", "_headers"), /X-Robots-Tag: noindex, nofollow/);
   const previewHome = await read("preview", "index.html");
   assert.match(previewHome, /noindex, nofollow/);
-  assert.match(previewHome, /data-delivery-coverage>Delivery information<\/a>/);
+  assert.match(previewHome, /data-delivery-coverage(?:="true")?>\s*Delivery information\s*<\/a>/);
   assert.doesNotMatch(previewHome, /name="(?:msvalidate\.01|google-site-verification|google-adsense-account)"/);
   assert.doesNotMatch(previewHome, /cloudflareinsights\.com|googlesyndication\.com|data-ad-slot-wrap/);
   await assert.rejects(read("preview", "ads.txt"), { code: "ENOENT" });

@@ -43,8 +43,19 @@ for (const name of selected) {
     await page.locator('a[href="/checkout/"]:visible').first().click();
     await page.waitForURL('**/checkout/');
     await page.waitForFunction(() => document.querySelector('[data-sum]')?.textContent.includes('Mobile fixture cooker'));
+    assert.equal(await page.getByRole('link', { name: 'Back to cart' }).isVisible(), true);
+    assert.equal(await page.locator('.find input').isVisible(), true);
+    const summary = await page.getByRole('region', { name: 'Your order' }).boundingBox();
+    const details = await page.locator('[data-details-fields]').boundingBox();
+    assert.ok(summary.y + summary.height <= details.y, 'The order appears before the delivery details on phones');
 
-    for (const route of ['/', product, '/cart/', '/checkout/', '/track/', '/admin/']) {
+    await page.goto('/');
+    const shelfPhoto = page.locator('.product-shelf .shelf-thumb').last();
+    assert.equal(await shelfPhoto.locator('template[data-shelf-photo]').count(), 1, 'Offscreen shelf images stay deferred');
+    await shelfPhoto.scrollIntoViewIfNeeded();
+    await shelfPhoto.locator('img').waitFor({ state: 'attached' });
+
+    for (const route of ['/', '/shop/', product, '/cart/', '/checkout/', '/track/', '/admin/']) {
       await page.goto(route);
       if (route === product) await page.waitForFunction(() => document.querySelector('[data-main]')?.naturalWidth === 2);
       for (const [width, height] of dimensions) {
@@ -58,7 +69,7 @@ for (const name of selected) {
       }
     }
     assert.deepEqual(errors, []);
-    console.log(`PASS: ${name} ${browser.version()}, published image, cart and checkout under delayed stock requests, six routes at eight viewport sizes.`);
+    console.log(`PASS: ${name} ${browser.version()}, published image, shelf photos, cart and order summary under delayed stock requests, seven routes at eight viewport sizes.`);
   } finally {
     await browser.close();
   }

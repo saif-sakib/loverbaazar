@@ -52,18 +52,19 @@ const collection = products.length > 0
       <h1 class="title">All products</h1>
       {products.length > 0 && bounds.min > 0 && (
         <p class="cat-summary">
-          <strong>{products.length}</strong> products across <strong>{activeCats.length}</strong> categories
-          {bounds.inStockCount > 0 && ` (${bounds.inStockCount} in stock)`} · Price {taka(bounds.min)} – {taka(bounds.max)} ·{" "}
-          {deliverySummary} ·{" "}
+          {deliverySummary}.{" "}
           <a class="link" href="/online-shopping-jashore/">Online shopping in Jashore</a>
         </p>
       )}
       {activeCats.length > 0 && (
-        <nav class="cat-pills" aria-label="Browse categories">
-          {activeCats.map((c: any) => (
-            <a href={catUrl(c)} lang={languageOf(c.name)}>{c.name} ({c.count})</a>
-          ))}
-        </nav>
+        <details class="more-categories">
+          <summary>Browse categories <span class="meta">({activeCats.length})</span></summary>
+          <nav class="cat-pills" aria-label="Browse categories">
+            {activeCats.map((c: any) => (
+              <a href={catUrl(c)} lang={languageOf(c.name)}>{c.name} ({c.count})</a>
+            ))}
+          </nav>
+        </details>
       )}
     </div>
     <Grid items={products} />

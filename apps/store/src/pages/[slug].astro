@@ -2,9 +2,10 @@
 import { jsonLd, merchantReturnURL, recordSEO, summary as snippet, publicImage } from "../lib/seo";
 import Base from "../layouts/Base.astro";
 import AdSlot from "../components/AdSlot.astro";
-import { pages, posts, fileSlug, fill, SITE, siteUrl, languageOf } from "../lib/shop";
+import { pages, posts, fileSlug, fill, LIVE, SITE, siteUrl, languageOf } from "../lib/shop";
 export const getStaticPaths = () => [...pages, ...posts].filter(p => !p.draft).map((p) => ({ params: { slug: fileSlug(p.slug) }, props: { p } }));
 const { p } = Astro.props;
+const deliveryTimes = LIVE.delivery.filter((zone: any) => zone.days);
 const html = fill(p.html).replace(/href="tel:([^"]*)"/g, (_, n) => `href="tel:${n.replace(/[^\d+]/g, "")}"`);
 const summary = snippet(p.excerpt || html) || p.title;
 const date = p.date && new Date(p.date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Dhaka" });
@@ -58,7 +59,12 @@ const seo = recordSEO(p, pageDescriptions[p.slug] || summary);
       {p.slug === "how-to-buy" && (
         <section id="delivery" aria-labelledby="delivery-guide-title">
           <h2 id="delivery-guide-title">Delivery charges and order tracking</h2>
-          <p>Check the product page for delivery area limits. At checkout, choose your area to see the delivery charge and order total. Where there’s a delivery fee, it’s charged per item.</p>
+          <p>At checkout, choose your area to see the delivery charge and order total. Where there’s a delivery fee, it’s charged per item.</p>
+          <ul data-delivery-times hidden={!deliveryTimes.length}>
+            {deliveryTimes.map((zone: any) => <li><strong>{zone.label}</strong>{" · "}Estimated delivery in {zone.days}</li>)}
+          </ul>
+          <p>Some products are marked <strong>Jashore only</strong> on their product pages. <a href="/contact-us/">Contact us</a> if you have a question about delivery for an item.</p>
+          <p lang="bn-BD">কোনো পণ্যের পাতায় <strong lang="en-BD">Jashore only</strong> লেখা থাকলে সেটি শুধু যশোরের মধ্যে ডেলিভারি করা হয়। ডেলিভারি সম্পর্কে জানতে আমাদের সঙ্গে যোগাযোগ করুন।</p>
           <p>Keep your order number and use it with the mobile number you ordered with to <a href="/track/">track your order</a>. {merchantReturnURL && <><a href={merchantReturnURL}>Read the returns and exchanges policy</a>.</>}</p>
         </section>
       )}

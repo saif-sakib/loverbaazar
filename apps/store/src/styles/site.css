@@ -303,34 +303,6 @@ h3 {
   color: var(--brand);
   border-color: var(--brand);
 }
-.cats {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 14px;
-}
-.cats a {
-  background: var(--stone);
-  border-radius: var(--r);
-  padding: 16px;
-  font-weight: 600;
-  font-size: 14px;
-  line-height: 1.35;
-  transition: background var(--ease);
-}
-.cats img {
-  aspect-ratio: 1;
-  border-radius: 10px;
-  object-fit: contain;
-  margin-bottom: 12px;
-  mix-blend-mode: multiply;
-}
-.cats small {
-  display: block;
-  color: var(--mute);
-  font-weight: 400;
-  font-size: 12.5px;
-  margin-top: 2px;
-}
 .banners {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -624,34 +596,6 @@ textarea:focus {
   border-radius: 22px;
   padding: 4%;
   position: relative;
-}
-.lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: #000d;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-  cursor: zoom-out;
-}
-.lightbox img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  background: #fff;
-  border-radius: 12px;
-}
-.lightbox .x {
-  position: absolute;
-  top: 12px;
-  right: 16px;
-  border: 0;
-  background: none;
-  color: #fff;
-  font-size: 36px;
-  line-height: 1;
-  cursor: pointer;
 }
 .pd .main {
   aspect-ratio: 1;
@@ -1207,22 +1151,6 @@ main {
   display: flow-root;
   min-height: 45vh;
 }
-.cats a:nth-child(4n + 1),
-.card:nth-child(4n + 1) .thumb {
-  background: var(--blush);
-}
-.cats a:nth-child(4n + 2),
-.card:nth-child(4n + 2) .thumb {
-  background: var(--sage);
-}
-.cats a:nth-child(4n + 3),
-.card:nth-child(4n + 3) .thumb {
-  background: var(--butter);
-}
-.cats a:nth-child(4n),
-.card:nth-child(4n) .thumb {
-  background: var(--sky);
-}
 .delivery {
   background: var(--sage);
 }
@@ -1260,11 +1188,6 @@ main {
     transform var(--ease),
     box-shadow var(--ease);
 }
-.cats a {
-  transition:
-    transform var(--ease),
-    box-shadow var(--ease);
-}
 .btn:not(.ghost, .small) {
   position: relative;
   overflow: hidden;
@@ -1277,10 +1200,6 @@ main {
   transform: translateX(-100%);
 }
 @media (hover: hover) {
-  .cats a:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow);
-  }
   .card:hover .btn.small:not(:disabled) {
     background: var(--brand);
     color: #fff;
@@ -1325,14 +1244,6 @@ main {
   .icons {
     margin-left: auto;
   }
-  .cats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .cats a {
-    padding: 10px;
-    font-size: 12.5px;
-  }
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 28px 12px;
@@ -1368,19 +1279,13 @@ main {
   }
 }
 .card .thumb { border-radius: 12px; background: #f5f6f8; }
-.card:nth-child(n) .thumb { background: #f5f6f8; }
 .card .heart { top: 18px; right: 18px; width: 38px; height: 38px; border: 1px solid var(--line); background: #fff; }
 .card .btn.small { min-height: 42px; border-radius: 10px; }
 .card .name { font-weight: 600; }
 .mobile-nav { display: none; }
-.checkout-heading { margin: 0 0 18px; font-size: 19px; }
-.checkout-edit { display: inline-block; font-size: 13px; margin: -8px 0 18px; }
-[data-checkout] > aside { position: sticky; top: 145px; }
 [data-checkout] .row > span { min-width: 0; overflow-wrap: anywhere; }
 [data-checkout] .row > b { white-space: nowrap; }
 [data-checkout] button[type="submit"] { width: 100%; min-height: 48px; }
-.lightbox { margin: 0; border: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; }
-.lightbox::backdrop { background: #000d; }
 .toast { max-width: calc(100% - 32px); width: max-content; text-align: center; overflow-wrap: anywhere; }
 button, a, input, select, textarea { touch-action: manipulation; }
 .nav [aria-current="page"] { color: var(--brand); font-weight: 700; }
@@ -1398,7 +1303,6 @@ button, a, input, select, textarea { touch-action: manipulation; }
   .floats { bottom: calc(84px + env(safe-area-inset-bottom)); right: 12px; }
   .float { width: 42px; height: 42px; }
   .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
-  [data-checkout] > aside { position: static; }
   .panel { padding: 20px; }
   .card { padding: 6px; border-radius: 14px; }
   .card .body { padding: 10px 4px 4px; }

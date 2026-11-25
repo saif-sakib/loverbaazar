@@ -1,11 +1,11 @@
 ---
 import "../styles/fonts.css";
 import "../styles/site.css";
-import { hasNationwideDelivery, jsonLd, merchantReturnURL, organizationReturnPolicy, postalAddress, publicImage, storeAreaServed } from "../lib/seo";
+import { hasNationwideDelivery, jsonLd, merchantReturnURL, organizationReturnPolicy, postalAddress, publicImage, schemaOpeningHours, storeAreaServed } from "../lib/seo";
 import "../styles/mobile.css";
 import { MENU, SITE, LIVE, pages, catUrl, telOf, waOf, siteUrl, languageOf, spacedSiteName } from "../lib/shop";
 import { resolveAdsenseClient, resolveAdSlot } from "../lib/adsense.mjs";
-const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", preconnectCloudinary = false, allowAds = false, localDeliveryOnly = false, language = languageOf(`${title || ""} ${description}`) } = Astro.props;
+const { title, seoTitle, description = SITE.description, image, noindex, canonical, socialTitle, socialDescription, type = "website", preconnectCloudinary = false, allowAds = false, language = languageOf(`${title || ""} ${description}`) } = Astro.props;
 const full = seoTitle || (title ? `${title} | ${spacedSiteName}` : `${spacedSiteName} | ${SITE.tagline}`);
 const appScript = process.env.GITHUB_SHA ? `/app.js?v=${encodeURIComponent(process.env.GITHUB_SHA)}` : "/app.js";
 const canon = canonical || siteUrl(Astro.url.pathname);
@@ -57,7 +57,7 @@ const org = {
   hasMerchantReturnPolicy: organizationReturnPolicy,
   address: postalAddress(SITE.address),
   areaServed: storeAreaServed(SITE.address, LIVE),
-  openingHours: SITE.hours || undefined,
+  openingHours: schemaOpeningHours(SITE.hours),
   knowsLanguage: ["en-BD", "bn-BD"],
   sameAs: [SITE.facebook, SITE.youtube].filter(Boolean),
 };
@@ -153,9 +153,10 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
     <div class="notice" data-notice hidden role="status"></div>
     <div class="ticker" lang="en-BD">
       <div>
-        <span>{localDeliveryOnly
-          ? <a href="#purchase-info-title">Delivery in Jashore only</a>
-          : <a href="/how-to-buy/#delivery" data-delivery-coverage>{hasNationwideDelivery(LIVE) ? "Delivery across Bangladesh" : "Delivery information"}</a>}
+        <span>
+          <a href="/how-to-buy/#delivery" data-delivery-coverage>
+            {hasNationwideDelivery(LIVE) ? "Delivery across Bangladesh" : "Delivery information"}
+          </a>
         </span>
         <span data-payment-summary>{payments.map((p: any) => p.label).join(" · ") || "Contact the shop for payment options"}</span>
         {SITE.phone && <span><a href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a></span>}
@@ -170,7 +171,6 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
             <small class="logo-sub">Kitchen &amp; Home</small>
           </span>
         </a>
-        {isCheckout && SITE.phone && <a class="link checkout-help" href={`tel:${telOf(SITE.phone)}`}>Call for help</a>}
         <form action="/search/" class="find" role="search">
           <input
             name="q"
@@ -238,8 +238,6 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
         ))}
         <a href="/offers/">Offers</a>
         <a href="/contact-us/">Contact</a>
-        <a href="/product-category/latest-product/">New</a>
-        <a href="/product-category/popular-item/">Popular</a>
         <a href="/blog/">Blog</a>
         <a class="desktop-shopping-link" href="/track/">Track order</a>
       </nav>
@@ -290,6 +288,7 @@ const extraPages = pages.filter((p: any) => !p.draft && !standardSlugs.has(p.slu
         </div>
         <div>
           <h4>Customer support</h4>
+          {SITE.hours && <p>{SITE.hours}</p>}
           {SITE.phone && <a href={`tel:${telOf(SITE.phone)}`}>Call {SITE.phone}</a>}
           {SITE.whatsapp && <a href={waOf(SITE.whatsapp)} rel="noopener">Chat on WhatsApp</a>}
           <a href="/contact-us/">Contact us</a>

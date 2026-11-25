@@ -1601,6 +1601,7 @@
     clearProductPhotoPreviews();
     let previousPhotoSave = null;
     let images = (p.images || []).map((i) => ({ ...i }));
+    const jashoreOnly = p.jashoreOnly ?? String(p.short || "").includes("Delivery available only in Jashore.");
     view().innerHTML = `<form class="panel editor" id="pf">
       ${p.migrationBlocked ? `<p class="note" role="status">Migration review required: ${esc((p.migrationIssues || []).join(", "))}. Keep this product hidden until its source data is corrected and reviewed.</p>` : ""}
       ${secHead(isNew ? "Add product" : "Edit product", "Fill in product details below. Price, stock and visibility update live; name, photos, categories and text require Publish.", isNew ? "Shop & new /product/<slug>/ page" : `/product/${p.slug}/`, "both")}
@@ -1614,6 +1615,7 @@
         ${field("Stock quantity", "stock", p.stock, "required min=0 step=1", "number", "0 marks the item as Sold out. Live in ~2 min.")}
       </div>
       ${field("Short description", "short", p.short, "maxlength=300", "text", "Shown right beside the main photo and used as the Google search snippet.")}
+      ${toggle("Show Jashore only label", "jashoreOnly", jashoreOnly, "Use for products you deliver within Jashore. Publish to update the product page.")}
       <div class="field"><span class="flabel">Categories</span><small class="fhelp">Choose which category pages and home page rows include this product. (Needs Publish)</small><div id="pcatpick">${checkList("cat", p.cats || [], true)}</div><div class="inline-cats"><input id="quickcat" placeholder="Need a new category? Type name…" aria-label="New category name"><button type="button" class="btn ghost small" id="addquickcat">+ Add category</button></div></div>
       <div class="field"><span class="flabel">Product photos</span><small class="fhelp">Photos upload when you save the product. Use ◀ / ▶ to reorder. The first photo appears on product cards.</small><div id="imgs" class="imgs"></div>
         <label class="btn ghost small upl">Choose photos<input id="up" type="file" accept="image/*" multiple hidden></label>
@@ -1773,6 +1775,7 @@
         mpn: d.get("mpn").trim(),
         seo: readSEO(f, p.seo),
         short: d.get("short").trim(),
+        jashoreOnly: d.has("jashoreOnly"),
         desc: desc(),
         active: !!d.get("active"),
         cats: d.getAll("cat"),
@@ -2337,14 +2340,14 @@
             ${field("Main phone number", "phone", W.phone, "required", "text", "Used in the top call line, product pages ('Order by phone'), Contact page, invoices, and floating call button.")}
             ${field("WhatsApp number", "whatsapp", W.whatsapp, "", "text", "Enables the floating WhatsApp chat button and 'WhatsApp' order link on products. Leave empty to hide.")}
             ${field("Email address", "email", W.email, "", "email", "Shown on Contact Us and receives new order/message notifications.")}
-            ${field("Opening hours", "hours", W.hours, "placeholder='Sat–Thu, 9:00 AM – 9:00 PM'", "text", "Shown on the Contact Us page. Leave empty to hide.")}
+            ${field("Opening hours", "hours", W.hours, "placeholder='Sun–Thu 10:00 AM – 6:00 PM'", "text", "Shown on the Contact Us page and in the footer. Leave empty to hide.")}
           </div>
           ${field("Shop address", "address", W.address, "", "text", "Shown in the footer, Contact Us page, and printed on customer invoices.")}
 
         </section>
         <section class="panel">
           ${secHead("Return policy & social links", "Warranty/return details shown on product pages and social media links in the footer.", "Product pages & Website footer", "pub")}
-          ${area("Return and warranty policy", "returns", W.returns, 2, "Shown on every product page below the delivery charges. Leave empty to hide.")}
+          ${area("Return and refund summary", "returns", W.returns, 3, "Shown on product pages and inserted in Terms where it uses {returns}. Edit detailed return conditions in Pages.")}
           <div class="fields2">
             ${field("Facebook page URL", "facebook", W.facebook, "", "url", "Shows the Facebook icon in the website footer. Leave empty to hide.")}
             ${field("YouTube channel URL", "youtube", W.youtube, "", "url", "Shows the YouTube icon in the website footer. Leave empty to hide.")}

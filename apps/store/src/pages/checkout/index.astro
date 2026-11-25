@@ -7,25 +7,30 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
 <Base title="Checkout" noindex>
   {site && <script slot="head" is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
   <div class="wrap checkout-wrap">
-    <div class="pagehead">
-      <p class="crumbs"><a href="/cart/">Cart</a> <span aria-hidden="true">/</span> Checkout</p>
+    <div class="pagehead checkout-head">
+      <div class="checkout-links">
+        <a class="link" href="/cart/">Back to cart</a>
+        <a class="link" href={SITE.phone ? `tel:${telOf(SITE.phone)}` : "/contact-us/"}>{SITE.phone ? "Call for help" : "Contact the shop"}</a>
+      </div>
       <h1 class="title">Checkout</h1>
       <p>Order without an account.</p>
     </div>
-    <div class="note" data-checkout-loading hidden>
-      <p data-checkout-status role="status"></p>
+    <div class="panel checkout-state" data-checkout-loading>
+      <p data-checkout-status role="status">Loading your cart…</p>
       <button class="btn ghost" type="button" data-checkout-retry hidden>Try again</button>
     </div>
-    <noscript><p class="note">Enable JavaScript to order online, or <a class="link" href="/contact-us/">contact the shop</a>.</p></noscript>
-    <p data-empty hidden>
-      Your cart is empty.{" "}
-      <a class="link" href="/shop/">
-        Start shopping
-      </a>
-    </p>
+    <noscript>
+      <style is:inline>[data-checkout-loading] { display: none; }</style>
+      <p class="note">Enable JavaScript to order online, or <a class="link" href="/contact-us/">contact the shop</a>.</p>
+    </noscript>
+    <p class="note" data-cart-notice role="status" hidden></p>
+    <div class="panel checkout-state" data-empty hidden>
+      <h2 class="checkout-heading">Your cart is empty</h2>
+      <a class="btn" href="/shop/">Continue shopping</a>
+    </div>
     <p class="note" data-closed hidden></p>
     <form
-      class="two"
+      class="checkout-form"
       method="post"
       data-checkout
       hidden
@@ -38,6 +43,10 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
         closedNote: LIVE.closedNote,
       })}
     >
+      <section class="panel checkout-summary" aria-labelledby="checkout-order-title">
+        <h2 class="checkout-heading" id="checkout-order-title">Your order</h2>
+        <div data-sum></div>
+      </section>
       <fieldset class="panel" data-details-fields>
         <legend class="sr-only">Delivery and payment details</legend>
         <h2 class="checkout-heading">Delivery &amp; payment</h2>
@@ -79,10 +88,7 @@ const site = import.meta.env.PUBLIC_TURNSTILE_SITE;
           </label>
         </details>
       </fieldset>
-      <aside class="panel">
-        <h2 class="checkout-heading">Review your order</h2>
-        <a class="link checkout-edit" href="/cart/">Edit items or quantities</a>
-        <div data-sum></div>
+      <aside class="panel checkout-actions" aria-label="Place your order">
         <details class="checkout-extra">
           <summary>Have a coupon?</summary>
           <div class="coupon">

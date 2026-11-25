@@ -150,6 +150,11 @@ func checkProduct(p map[string]any) error {
 	if p["migrationBlocked"] == true && p["active"] != false {
 		return fmt.Errorf("product is quarantined; resolve the migration review before activating it")
 	}
+	if value, exists := p["jashoreOnly"]; exists {
+		if _, ok := value.(bool); !ok {
+			return fmt.Errorf("the Jashore only label must be true or false")
+		}
+	}
 	for _, k := range []string{"cats", "tags", "images", "attrs"} {
 		if v, exists := p[k]; exists {
 			if _, ok := v.([]any); !ok {

@@ -155,7 +155,9 @@ try {
   const delivery = buyer.locator('[data-delivery]');
   const quantity = buyer.locator('[data-qty]');
   assert.doesNotMatch(await delivery.textContent(), /charged per item/i);
-  await quantity.fill('2');
+  assert.ok(await buyer.getByRole('button', { name: 'Decrease quantity' }).isDisabled());
+  await buyer.getByRole('button', { name: 'Increase quantity' }).click();
+  assert.equal(await quantity.inputValue(), '2');
   const freeForTwo = stock.settings.freeOver > 0 && 2000 >= stock.settings.freeOver;
   const deliveryAmount = freeForTwo ? 'Free' : '৳' + (paidZone.fee * 2).toLocaleString('en-IN');
   await buyer.waitForFunction(({ label, amount }) =>
@@ -165,13 +167,18 @@ try {
   const zoneRow = delivery.locator('li').filter({ hasText: paidZone.label });
   assert.equal(await zoneRow.locator('b').textContent(), deliveryAmount);
   assert.equal((await delivery.textContent()).includes('Delivery is charged per item for this area (2 items).'), !freeForTwo);
-  await quantity.fill('1');
+  await buyer.getByRole('button', { name: 'Decrease quantity' }).click();
+  assert.equal(await quantity.inputValue(), '1');
   assert.doesNotMatch(await delivery.textContent(), /charged per item/i);
   await buyer.locator('.buy button[data-add]:not([data-buy])').click();
   await buyer.goto('/cart/');
   await buyer.locator('[data-cart]').getByText('Mobile fixture cooker', { exact: true }).waitFor();
   await buyer.locator('a[href="/checkout/"]:visible').first().click();
   await buyer.waitForURL('**/checkout/');
+  const summary = buyer.getByRole('region', { name: 'Your order' });
+  await summary.locator('.checkout-item').filter({ hasText: 'Mobile fixture cooker' }).waitFor();
+  assert.equal(await buyer.locator('.find input').isVisible(), true);
+  await shot(buyer, 'checkout-summary-375');
   await buyer.locator('[name="name"]').fill('Mobile fixture buyer');
   await buyer.locator('[name="phone"]').fill('০১৭১০০০০০০০');
   await buyer.locator('[name="address"]').fill('Fixture address, Jashore, Bangladesh');

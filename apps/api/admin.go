@@ -393,6 +393,17 @@ func writeSavedProduct(ctx context.Context, tx pgx.Tx, id int64, creating bool, 
 		if err != nil {
 			return 0, err
 		}
+		if _, hasDeliveryLabel := p["jashoreOnly"]; !hasDeliveryLabel {
+			var prior struct {
+				JashoreOnly *bool `json:"jashoreOnly"`
+			}
+			if err := json.Unmarshal([]byte(oldData), &prior); err != nil {
+				return 0, err
+			}
+			if prior.JashoreOnly != nil {
+				p["jashoreOnly"] = *prior.JashoreOnly
+			}
+		}
 	}
 	p["id"] = id
 	data, _ := json.Marshal(p)

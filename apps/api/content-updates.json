@@ -507,5 +507,17 @@
     "sql": [
       "UPDATE content SET data=jsonb_set(data,'{html}',to_jsonb(replace(data->>'html','We display Google AdSense advertisements on the blog and its buying guides.','Google AdSense may display advertisements on our blog and on selected product pages.'))) WHERE kind='page' AND slug='privacy-policy' AND position('We display Google AdSense advertisements on the blog and its buying guides.' in data->>'html')>0"
     ]
+  },
+  {
+    "id": "2026-11-shop-hours-delivery-returns",
+    "sqlWithDefaults": [
+      "UPDATE settings SET data=data||jsonb_build_object('hours',$1::jsonb#>'{site,hours}','returns',$1::jsonb#>'{site,returns}') WHERE key='site'",
+      "UPDATE settings SET data=jsonb_set(data,'{delivery}',(SELECT COALESCE(jsonb_agg(zone||jsonb_build_object('days',$1::jsonb#>'{live,delivery,0,days}') ORDER BY seq),'[]'::jsonb) FROM jsonb_array_elements(data->'delivery') WITH ORDINALITY AS d(zone,seq))) WHERE key='live' AND jsonb_typeof(data->'delivery')='array'"
+    ],
+    "sql": [
+      "UPDATE content SET data=jsonb_set(data,'{html}',to_jsonb(replace(data->>'html','<p>Our return policy lasts 30 days from your purchase. After 30 days we cannot offer a full refund or exchange.</p>','<p>{returns}</p>'))) WHERE kind='page' AND slug='terms-conditions' AND position('<p>Our return policy lasts 30 days from your purchase. After 30 days we cannot offer a full refund or exchange.</p>' in data->>'html')>0",
+      "UPDATE content SET data=jsonb_set(data,'{html}',to_jsonb(replace(data->>'html','<p>When we receive your return we will inspect it and tell you whether your refund is approved. If it is, we will send the money back by your original payment method or another method we agree with you.</p>','<p>We’ll inspect your return when it reaches us and let you know whether the refund was approved.</p>'))) WHERE kind='page' AND slug='terms-conditions' AND position('<p>When we receive your return we will inspect it and tell you whether your refund is approved. If it is, we will send the money back by your original payment method or another method we agree with you.</p>' in data->>'html')>0",
+      "UPDATE products SET data=data||'{\"jashoreOnly\":true}'::jsonb WHERE NOT (data ? 'jashoreOnly') AND slug IN ('akij-kloud-almira-windy-kidz-2d-with-lock-14214','akij-kloud-almira-tweety-kidz-2d-with-lock-14213','akij-wardrobe-almira-couple-3d-windy-with-lock-14218','akij-wardrobe-almira-couple-3d-tweety-with-lock-14217','akij-wardrobe-almira-couple-3d-lily-with-lock-14219','big-premium-rack-5-step-double-tray-red','premium-rack-5-step-double-tray-blue','standard-kitchen-rack-5-step-red-white','rfl-pvc-big-almirah-rajdut','rfl-pvc-small-almirah-rosebee','rfl-trendy-pvc-big-almirah-rosebee','trendy-pvc-cup-board-rosebee','rfl-wardrobe-double-5d-kd-deluxe-aurora','rfl-wardrobe-double-5d-kd-deluxe-blue','rfl-wardrobe-double-5d-kd-deluxe-crimson','rfl-wardrobe-double-5d-kd-deluxe-daisy','rfl-wardrobe-double-5d-kd-deluxe-hd-diva','rfl-wardrobe-double-5d-kd-deluxe-hd-zara','rfl-wardrobe-double-5d-kd-deluxe-pallabi','rfl-wardrobe-double-5d-kd-deluxe-red-love-new-arrival','rfl-wardrobe-platinum-4d-aroma','rfl-wardrobe-platinum-4d-eva','rfl-wardrobe-platinum-5d-aroma','rfl-wardrobe-platinum-5d-eva','rfl-wardrobe-platinum-5d-spark','rfl-wardrobe-single-4d-kd-deluxe-aurora','rfl-wardrobe-single-5d-kd-deluxe-aurora','rfl-wardrobe-single-5d-kd-deluxe-blue')"
+    ]
   }
 ]

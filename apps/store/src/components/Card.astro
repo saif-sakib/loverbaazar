@@ -1,23 +1,29 @@
 ---
 import { cardSizes, responsiveImage } from "../lib/image-delivery.mjs";
 import { taka, off, attributeValues, languageOf } from "../lib/shop";
-const { p, eager, priority = false, hidden = false } = Astro.props;
+const { p, eager, priority = false, hidden = false, deferPhoto = false } = Astro.props;
 const d = off(p);
 const photo = responsiveImage(p.images[0]?.src, p.images[0]?.thumb, [160, 320, 640]);
+const image = {
+  ...photo,
+  sizes: photo.srcset ? cardSizes : undefined,
+  alt: p.images[0]?.alt || p.name,
+  loading: eager ? "eager" : "lazy",
+  decoding: priority ? "sync" : "async",
+  fetchpriority: priority ? "high" : undefined,
+  width: 300,
+  height: 300,
+} as const;
 ---
 
 <article class="card" data-card data-name={p.name.toLowerCase()} data-price={p.price} data-id={p.id} data-stocked={p.inStock ? "1" : "0"} data-brands={JSON.stringify(attributeValues(p,"brand"))} data-colors={JSON.stringify(attributeValues(p,"color"))} hidden={hidden}>
-  <a href={`/product/${p.slug}/`} class="thumb">
-    <img
-      {...photo}
-      sizes={photo.srcset ? cardSizes : undefined}
-      alt={p.images[0]?.alt || p.name}
-      loading={eager ? "eager" : "lazy"}
-      decoding={priority ? "sync" : "async"}
-      fetchpriority={priority ? "high" : undefined}
-      width="300"
-      height="300"
-    />
+  <a href={`/product/${p.slug}/`} class:list={["thumb", { "shelf-thumb": deferPhoto }]}>
+    {deferPhoto ? (
+      <>
+        <template data-shelf-photo><img {...image} /></template>
+        <noscript><img {...image} /></noscript>
+      </>
+    ) : <img {...image} />}
     <span class="badge" data-off={p.id} hidden={d === 0}>
       -{d}%
     </span>
@@ -34,7 +40,7 @@ const photo = responsiveImage(p.images[0]?.src, p.images[0]?.thumb, [160, 320, 6
       {p.regular > p.price && <s>{taka(p.regular)}</s>}
     </div>
     <span class="card-stock" data-stock-for={p.id}>{p.inStock ? "In stock" : "Sold out"}</span>
-    <button class="btn small" data-add={p.id} data-label="Add to cart" disabled={!p.inStock}>
+    <button type="button" class="btn small" data-add={p.id} data-label="Add to cart" disabled={!p.inStock}>
       {p.inStock ? "Add to cart" : "Sold out"}
     </button>
   </div>

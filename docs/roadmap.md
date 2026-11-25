@@ -923,3 +923,56 @@ Prioritize tasks 59 and 60 before implementing data cleanup or changing producti
 - Delete 54.2 MB of old generated builds, bytecode, local cache, and trace files. Put isolated Wrangler state inside the disposable fixture directory so shutdown can remove it.
 
 **Verification, 25 November 2026.** Go reachability checks, the API race suite, migration tests, production and preview builds, all 62 UI tests, 19 accessibility scans, and isolated checkout and publication passed. A second checkout and publication run confirmed that fixture teardown removed the temporary Wrangler state and left the regular cache and trace paths absent.
+
+### Task 75 — Improve storefront browsing and product previews
+
+**Status** In progress. Release and physical Android and iPhone checks are pending.
+
+- Give the homepage larger category photos and swipeable product collections based on the published homepage settings. Show each product once across the featured product and collections. Collapse the full category list in Shop so products appear earlier on phones. [Loftique collections](https://www.loftique.com.bd/)
+- Open a product preview from a card with its photo, current taka price, stock, published specifications and Add to cart. Fetch the preview details from a static asset only when it opens. Add quantity buttons to the product page and update the delivery estimate when the quantity changes. [Impresia category browsing](https://impresiabd.com/product-category/couple-ring-price-in-bd/)
+- Load shelf photos when shoppers approach them. Keep static photo markup available when JavaScript is disabled. The existing stock snapshot and guest checkout handle price, stock and ordering.
+
+**Visual comparison, 25 November 2026.** Reviewed the reference home, collection and product pages alongside the live LoverBaazar storefront in desktop and phone viewports. In the final 390 px replay using matching photos from the public Cloudinary catalog, the redesigned homepage loaded 6 photos and transferred 76 KB of photo data during the initial view. The previous layout loaded 16 and transferred 257 KB in the same browser lab test.
+
+**Local verification, 25 November 2026.** The production and preview build checks, 63 storefront tests, 20 axe scans, the API race suite and 13 Worker tests passed. The disposable shop completed publication, guest checkout, a signed-in payment retry and the last-unit inventory race. Chromium, Firefox and WebKit verified shelf photo loading, keyboard focus in quick view, checkout and layouts from 320 px to 1440 px. All six pages met the throttled-phone transfer budgets, with cold transfers of 107–156 KB in the fixture. [Performance checks](seo-performance.md)
+
+**Follow-up.** [Task 76](#task-76--keep-checkout-continuity-and-simplify-product-controls) removes quick view and carries forward the homepage and collection improvements.
+
+### Task 76 — Keep checkout continuity and simplify product controls
+
+**Status** In progress. Release and physical Android and iPhone checks are pending.
+
+- Keep the familiar storefront header at checkout. Show Back to cart, support and a cart loading message immediately. Show the order with photos, quantities and subtotal before the delivery form on phones. Place the order button after the delivery and payment fields.
+- Use product photos and names to open the full product page. Give Add to cart the full card width and keep the wishlist button. Remove the quick view button, dialog and static preview assets.
+- Keep product photos clear of overlaid arrows. Use thumbnails, swipes and arrow keys on the product page. Put Previous and Next below the enlarged photo and return focus to the gallery when closing it.
+
+**Reproduction, 25 November 2026.** At 390 px, the previous checkout hid search, categories and the loading message before the storefront script ran. Once the cart loaded, the order summary started 1,104 px down the page. The revised summary starts at 341 px in the same one-item checkout.
+
+**Local verification, 25 November 2026.** Production and preview builds, 63 storefront tests, 19 axe scans, the API race suite and 13 Worker tests passed. A stalled cart request reached Try again and recovered. The disposable shop completed publication, guest checkout, the signed-in payment retry and the last-unit race. Chromium, Firefox and WebKit verified seven routes at eight viewport sizes and kept the enlarged photo controls clear of the image in portrait and landscape. All six measured pages met the transfer budgets.
+
+**Release verification.** After the code release, check Cart → Proceed to checkout on a physical Android and iPhone. Confirm the item and subtotal are visible above the delivery fields, Back to cart preserves quantities, and the gallery supports thumbnail taps, swipes and closing the enlarged photo.
+
+### Task 77 — Set shop hours, return terms and delivery notices
+
+**Status** In progress. Release, Admin Publish and physical-phone checks are pending.
+
+- Set the shop hours to Sat–Thu, 9:00 AM – 9:00 PM, and the estimated delivery time to 3–5 days. Show the hours on Contact us and in the footer. Use the delivery settings on product pages, checkout and How to Buy.
+- Use a 7-day return window counted from delivery. Display the approved-refund timeframe of 5–7 business days and the four refund methods from Shop settings. The one-time update changes the matching old Terms paragraphs and preserves other saved copy and delivery charges.
+- Mark the 28 reviewed plastic almirahs, wardrobes and kitchen racks or shelves with a product delivery notice. Task 78 defines where the label appears and how admins manage it.
+
+**Local verification, 25 November 2026.** The isolated database applied the settings and product changes once and marked all 28 reviewed products. The Standard 5-Step Kitchen Rack lists polypropylene, and the two Royal Kitchen Shelf models list steel. [Standard Kitchen Rack](https://loverbaazar.com/product/standard-kitchen-rack-5-step-red-white/) · [Royal Kitchen Shelf](https://loverbaazar.com/product/royal-kitchen-shelf-medium-basic/)
+
+Production and preview builds, the API race suite, 64 storefront tests and 19 accessibility scans passed. Chromium, Firefox and WebKit verified the guest order flow and eight viewport sizes. All six pages met the throttled-phone transfer budgets.
+
+**Release verification.** After the code release, open Admin → Shop and Delivery & payment and check the saved values. Publish the updated Terms, shop details and catalog. Check the hours, delivery estimate and returns copy on a physical Android and iPhone. See Task 78 for the product label and checkout checks.
+
+### Task 78 — Make Jashore only an editable product label
+
+**Status** In progress. Release, Admin Publish and physical-phone checks are pending.
+
+- Provide a **Show Jashore only label** checkbox when creating or editing any product. Show the badge next to the product's delivery details after Publish. An explicit admin choice takes precedence over an imported delivery note.
+- Offer the configured delivery areas and ordinary fees for every cart at checkout, including carts with labeled products. Process these orders with the same stock and payment checks as other orders.
+
+**Local verification, 25 November 2026.** The API race suite verified mixed carts in both areas at the applicable charge. The 64 storefront tests, production and preview builds, and accessibility scans passed. Playwright added a labeled product through Admin, checked the published badge at eight viewport widths, completed an Outside Jashore guest order at the configured fee, and published the product again with the label cleared. The cleared setting took precedence over the old notice in its short description.
+
+**Release verification.** After the code release, click Publish in Admin. On a physical Android and iPhone, open a labeled product and check for the badge beside its delivery details. Add it to the cart and confirm that checkout offers Inside Jashore and Outside Jashore. Admins can set or clear the checkbox in the product editor, then save and publish.

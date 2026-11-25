@@ -335,6 +335,55 @@ func TestDeliveryCharges(t *testing.T) {
 	}
 }
 
+func TestCheckoutAcceptsEitherAreaWithJashoreLabel(t *testing.T) {
+	reset(t)
+	if _, err := db.Exec(bg, `UPDATE products SET data=data||'{"jashoreOnly":true}' WHERE id=2`); err != nil {
+		t.Fatal(err)
+	}
+	items := []M{{"id": 1, "qty": 1}, {"id": 2, "qty": 1}}
+	code, out := call(t, nil, "POST", "/api/checkout", order(M{"area": "outside"}, items...), false)
+	if code != 200 || out["total"] != float64(1700) {
+		t.Fatalf("outside-Jashore mixed cart: %d %v", code, out)
+	}
+	code, out = call(t, nil, "POST", "/api/checkout", order(nil, items...), false)
+	if code != 200 || out["total"] != float64(1620) {
+		t.Fatalf("inside-Jashore mixed cart: %d %v", code, out)
+	}
+	if stockOf(t, 1) != 48 || stockOf(t, 2) != 48 {
+		t.Fatal("stock should reflect both accepted orders")
+	}
+}
+
+func TestAdminControlsJashoreLabel(t *testing.T) {
+	reset(t)
+	wardrobe := M{"name": "Fixture PVC wardrobe", "slug": "fixture-pvc-wardrobe", "price": 1000, "regular": 1000,
+		"jashoreOnly": true, "attrs": []M{{"name": "Material", "values": []string{"Polypropylene"}}}}
+	code, out := call(t, nil, "POST", "/api/admin/products", wardrobe, true)
+	if code != 200 {
+		t.Fatalf("create wardrobe: %d %v", code, out)
+	}
+	path := fmt.Sprintf("/api/admin/products/%.0f", out["id"])
+	assertLabel := func(want bool) {
+		t.Helper()
+		var got bool
+		if err := db.QueryRow(bg, `SELECT (data->>'jashoreOnly')::boolean FROM products WHERE slug=$1`, wardrobe["slug"]).Scan(&got); err != nil || got != want {
+			t.Fatalf("wardrobe label: got %t, want %t, error %v", got, want, err)
+		}
+	}
+	assertLabel(true)
+	// Older clients omit the field when saving other edits.
+	delete(wardrobe, "jashoreOnly")
+	if code, out := call(t, nil, "PUT", path, wardrobe, true); code != 200 {
+		t.Fatalf("save wardrobe: %d %v", code, out)
+	}
+	assertLabel(true)
+	wardrobe["jashoreOnly"] = false
+	if code, out := call(t, nil, "PUT", path, wardrobe, true); code != 200 {
+		t.Fatalf("remove wardrobe label: %d %v", code, out)
+	}
+	assertLabel(false)
+}
+
 func TestGuestNeedsNoAccount(t *testing.T) {
 	reset(t)
 	code, out := call(t, nil, "POST", "/api/checkout", order(nil, M{"id": 1, "qty": 1}), false)
@@ -726,6 +775,50 @@ func TestContentUpdatesRunOnceAndKeepOwnerEdits(t *testing.T) {
 	}
 	if html("about-us") != "Our App store again" {
 		t.Error("the update must run only once")
+	}
+}
+
+func TestHoursDeliveryAndReturnPolicyUpdate(t *testing.T) {
+	reset(t)
+	exec := func(q string) {
+		t.Helper()
+		if _, err := db.Exec(bg, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`INSERT INTO settings VALUES('site','{"hours":"","returns":"","address":"Owner address"}')`)
+	exec(`UPDATE settings SET data='{"delivery":[{"id":"jashore","label":"Inside Jashore","fee":25,"days":""},{"id":"outside","label":"Outside Jashore","fee":200,"days":"4–7 days"}],"freeOver":5000}' WHERE key='live'`)
+	exec(`INSERT INTO content(kind,slug,data) VALUES('page','terms-conditions', '{"html":"<p>Our return policy lasts 30 days from your purchase. After 30 days we cannot offer a full refund or exchange.</p><p>Owner eligibility note.</p>"}')`)
+	exec(`UPDATE products SET slug='standard-kitchen-rack-5-step-red-white' WHERE id=1`)
+	exec(`UPDATE products SET slug='royal-kitchen-shelf-mega' WHERE id=2`)
+	if err := applyContentUpdates(bg); err != nil {
+		t.Fatal(err)
+	}
+	live, site, err := loadSettings(bg)
+	if err != nil || site["hours"] != "Sat–Thu 9:00 AM – 9:00 PM" || site["address"] != "Owner address" ||
+		!strings.Contains(fmt.Sprint(site["returns"]), "5–7 business days via bKash, Nagad, Rocket, or bank transfer") {
+		t.Fatalf("shop policies: %v %v", site, err)
+	}
+	if len(live.Delivery) != 2 || live.Delivery[0].Days != "3–5 days" || live.Delivery[1].Days != "3–5 days" ||
+		live.Delivery[0].Fee != 25 || live.Delivery[1].Fee != 200 || live.FreeOver != 5000 {
+		t.Fatalf("updated delivery: %+v", live)
+	}
+	var terms string
+	if err := db.QueryRow(bg, `SELECT data->>'html' FROM content WHERE kind='page' AND slug='terms-conditions'`).Scan(&terms); err != nil ||
+		terms != "<p>{returns}</p><p>Owner eligibility note.</p>" {
+		t.Fatalf("updated terms: %q, %v", terms, err)
+	}
+	var restricted int
+	if err := db.QueryRow(bg, `SELECT count(*) FROM products WHERE data->'jashoreOnly'='true'::jsonb`).Scan(&restricted); err != nil || restricted != 1 {
+		t.Fatalf("plastic kitchen rack without restricting the steel shelf: %d %v", restricted, err)
+	}
+	exec(`UPDATE settings SET data=data||'{"hours":"Owner edited hours"}' WHERE key='site'`)
+	if err := applyContentUpdates(bg); err != nil {
+		t.Fatal(err)
+	}
+	_, site, err = loadSettings(bg)
+	if err != nil || site["hours"] != "Owner edited hours" {
+		t.Fatalf("policy update ran again: %v %v", site["hours"], err)
 	}
 }
 

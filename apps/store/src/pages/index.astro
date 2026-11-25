@@ -1,7 +1,7 @@
 ---
 import Base from "../layouts/Base.astro";
-import { responsiveImage, sizedImage } from "../lib/image-delivery.mjs";
-import { freeLocalArea, hasNationwideDelivery, isMerchandisingCategory, merchantReturnURL, priceBounds, summary } from "../lib/seo";
+import { responsiveImage } from "../lib/image-delivery.mjs";
+import { freeLocalArea, hasNationwideDelivery, isMerchandisingCategory, merchantReturnURL, summary } from "../lib/seo";
 import Card from "../components/Card.astro";
 import { products, inCat, homeItems, MENU, catUrl, languageOf, SITE, cats, LIVE, spacedSiteName, taka, telOf } from "../lib/shop";
 const sections = SITE.home.map((section: any) => ({
@@ -11,15 +11,21 @@ const sections = SITE.home.map((section: any) => ({
 const featured = [...sections.flatMap((section: any) => section.items), ...products]
   .find((p) => p.inStock && p.images[0]?.src);
 const featurePhoto = featured && responsiveImage(featured.images[0].src, featured.images[0].src, [160, 320, 640]);
+const shown = new Set(featured ? [featured.id] : []);
+const shelves = sections.map((section: any) => {
+  const items = section.items.filter((p: any) => !shown.has(p.id)).slice(0, section.count || 8);
+  items.forEach((p: any) => shown.add(p.id));
+  return { ...section, items };
+}).filter((section: any) => section.items.length);
+const menuHighlights = MENU.map((group: any) => group.items[0]);
 const menuTiles = MENU.flatMap((g: any) => g.items);
-const extraTiles = cats.filter((c: any) => !isMerchandisingCategory(c.slug));
-const homeCategories = sections.map((section: any) => extraTiles.find((c: any) => c.slug === section.cat)).filter(Boolean);
-const tiles = [...new Map([...homeCategories, ...menuTiles, ...extraTiles].map((c: any) => [c.slug, c])).values()]
+const homeCategories = sections.map((section: any) => cats.find((c: any) => c.slug === section.cat)).filter(Boolean);
+const tiles = [...new Map([...homeCategories, ...menuHighlights, ...menuTiles, ...cats].map((c: any) => [c.slug, c])).values()]
   .filter((c: any) => !isMerchandisingCategory(c.slug))
   .map((c: any) => {
     const items = inCat(c.slug);
     const image = (items.find((p) => p.inStock && p.images[0]) || items.find((p) => p.images[0]))?.images[0];
-    return { ...c, count: items.length, minPrice: priceBounds(items).min, thumb: sizedImage(image?.src || image?.thumb, 160) };
+    return { ...c, count: items.length, photo: responsiveImage(image?.src, image?.thumb, [160, 320]) };
   })
   .filter((c) => c.count);
 const quickCategories = tiles.slice(0, 6);
@@ -42,71 +48,82 @@ const freeArea = freeLocalArea(LIVE);
         {hero.text && <p class="hero-description" lang={languageOf(hero.text)}>{hero.text}</p>}
         <div class="hero-actions">
           <a class="btn" href={hero.link || "/shop/"}>{(hero.button || "Shop all products").replace("{count}", String(products.length))}</a>
-          <a class="hero-offers" href="/offers/">See offers <span aria-hidden="true">→</span></a>
+          {quickCategories.length > 0 && <a class="link" href="#shop-categories">Browse categories</a>}
         </div>
       </div>
       {featured && <a class="hero-feature" href={`/product/${featured.slug}/`}>
-        <img {...featurePhoto} sizes={featurePhoto?.srcset ? "(min-width: 1200px) 250px, (min-width: 861px) 21vw, 104px" : undefined}
-          alt="" width="280" height="280" fetchpriority="high" />
+        <img {...featurePhoto} sizes={featurePhoto?.srcset ? "(min-width: 1200px) 260px, (min-width: 768px) 22vw, (min-width: 480px) 180px, 34vw" : undefined}
+          alt="" width="280" height="280" fetchpriority="high" decoding="async" />
         <span class="hero-feature-details">
           <strong lang={languageOf(featured.name)}>{featured.name}</strong>
           <span class="price" data-price-for={featured.id}>
             <b>{taka(featured.price)}</b>
             {featured.regular > featured.price && <s>{taka(featured.regular)}</s>}
           </span>
-          <span class="hero-feature-link">View product <span aria-hidden="true">→</span></span>
+          <span class="hero-feature-link">View product</span>
         </span>
       </a>}
     </section>
-    <nav class="shop-guide" aria-label="Shopping information">
-      <a href="/how-to-buy/#delivery"><strong data-delivery-coverage>{nationwide ? "Delivery across Bangladesh" : "Delivery information"}</strong><span data-delivery-feature>{freeArea ? `Free delivery in ${freeArea.area}` : "See the cost before ordering"}</span></a>
-      <a href="/how-to-buy/"><strong data-payment-feature>{(payments.find((p: any) => p.id === "cod") || payments[0])?.label || "Payment options"}</strong><span>Order without an account</span></a>
-      <a href="/contact-us/"><strong>Contact the shop</strong><span>{SITE.phone ? `Call ${SITE.phone}` : "Send us a message"}</span></a>
-      {merchantReturnURL && <a href={merchantReturnURL}><strong>Returns &amp; exchanges</strong><span>Check the shop’s policy</span></a>}
-    </nav>
-    {SITE.banners.length > 0 && (
-      <section class="banners">
-        {SITE.banners.map((b: any) => (
-          <a href={b.link || "/shop/"}>
-            <img src={b.image} alt={b.title || "Explore featured products"} loading="lazy" decoding="async" />
-          </a>
-        ))}
-      </section>
-    )}
+
     {quickCategories.length > 0 && (
-      <>
+      <section id="shop-categories" aria-labelledby="home-categories-title">
         <div class="sec">
-          <h2>Shop by category</h2>
-          <a href="/shop/">Browse all</a>
+          <h2 id="home-categories-title">Shop by category</h2>
+          <a href="/shop/">All products</a>
         </div>
-        <section class="cats">
+        <div class="category-tiles">
           {quickCategories.map((c) => (
-            <a href={catUrl(c)} lang={languageOf(c.name)}>
-              <img src={c.thumb} alt="" loading="lazy" decoding="async" width="150" height="150" />
-              {c.name}
-              {c.minPrice > 0 && <small>From {taka(c.minPrice)}</small>}
+            <a href={catUrl(c)}>
+              <img {...c.photo} sizes={c.photo.srcset ? "(min-width: 768px) 112px, 88px" : undefined}
+                alt="" loading="lazy" decoding="async" width="112" height="112" />
+              <strong lang={languageOf(c.name)}>{c.name}</strong>
+              <span>{c.count} {c.count === 1 ? "product" : "products"}</span>
             </a>
           ))}
-        </section>
+        </div>
         {moreCategories.length > 0 && <details class="more-categories">
           <summary>More categories</summary>
           <nav class="cat-pills" aria-label="More product categories">
             {moreCategories.map((c) => <a href={catUrl(c)} lang={languageOf(c.name)}>{c.name}</a>)}
           </nav>
         </details>}
-      </>
+      </section>
     )}
-    {sections.map((h: any) => (
-      <>
+
+    <nav class="shop-guide" aria-label="Shopping information">
+      <a href="/how-to-buy/#delivery"><strong data-delivery-coverage>{nationwide ? "Delivery across Bangladesh" : "Delivery information"}</strong><span data-delivery-feature>{freeArea ? `Free delivery in ${freeArea.area}` : "See the cost before ordering"}</span></a>
+      <a href="/how-to-buy/"><strong data-payment-feature>{(payments.find((p: any) => p.id === "cod") || payments[0])?.label || "Payment options"}</strong><span>Order without an account</span></a>
+      <a href="/contact-us/"><strong>Contact the shop</strong><span>{SITE.phone ? `Call ${SITE.phone}` : "Send us a message"}</span></a>
+      {merchantReturnURL && <a href={merchantReturnURL}><strong>Returns &amp; exchanges</strong><span>Check the shop’s policy</span></a>}
+    </nav>
+
+    {SITE.banners.length > 0 && (
+      <div class="banners">
+        {SITE.banners.map((b: any) => (
+          <a href={b.link || "/shop/"}>
+            <img {...responsiveImage(b.image, b.image, [320, 640, 960])} alt={b.title || "Explore featured products"} loading="lazy" decoding="async" />
+          </a>
+        ))}
+      </div>
+    )}
+
+    {shelves.map((h: any, index: number) => (
+      <section aria-labelledby={`home-section-${index}`}>
         <div class="sec">
-          <h2>{h.title}</h2>
+          <h2 id={`home-section-${index}`}>{h.title}</h2>
           <a href={h.cat === "on-sale" ? "/offers/" : catUrl(cats.find((c: any) => c.slug === h.cat) || { path: h.cat })}>All {h.title.toLowerCase()}</a>
         </div>
-        <section class="grid">
-          {h.items.slice(0, h.count || 8).map((p: any) => <Card p={p} />)}
-        </section>
-      </>
+        <div class="grid product-shelf">
+          {h.items.map((p: any) => <Card p={p} deferPhoto />)}
+        </div>
+      </section>
     ))}
+    <section data-recent-wrap hidden>
+      <div class="sec">
+        <h2>Recently viewed</h2>
+      </div>
+      <div class="grid product-shelf" data-recent></div>
+    </section>
     <section class="prose" aria-labelledby="shopping-help-title">
       <h2 id="shopping-help-title">Delivery and support</h2>
       <p>
@@ -117,11 +134,183 @@ const freeArea = freeLocalArea(LIVE);
         <a href="/contact-us/">contact the shop</a>. Already ordered? <a href="/track/">Track your order</a>.
       </p>
     </section>
-    <section data-recent-wrap hidden>
-      <div class="sec">
-        <h2>Recently viewed</h2>
-      </div>
-      <div class="grid" data-recent></div>
-    </section>
   </div>
 </Base>
+
+<style>
+  .home-hero {
+    display: grid;
+    gap: 16px;
+    align-items: center;
+    margin-block: 12px 0;
+    padding: clamp(16px, 4.2vw, 48px);
+    border: 1px solid #e4cfc1;
+    border-radius: 22px;
+    background: #f8ede5;
+    color: #3d2026;
+  }
+  .home-hero h1 {
+    margin: 0 0 8px;
+    font-size: clamp(2rem, 6.6vw, 4.125rem);
+    letter-spacing: -.055em;
+    line-height: 1.1;
+  }
+  .home-hero h1 em {
+    color: var(--brand2);
+    font-style: normal;
+  }
+  .hero-title {
+    font-size: clamp(1rem, 2.2vw, 1.375rem);
+    font-weight: 750;
+    margin: 0;
+  }
+  .hero-description {
+    max-width: 40ch;
+    margin: 4px 0 0;
+    color: #614b4c;
+    line-height: 1.5;
+  }
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin-top: 12px;
+  }
+  .hero-actions .btn { padding-inline: 16px; }
+  .hero-actions .link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch);
+    color: var(--brand2);
+    font-size: .875rem;
+    font-weight: 650;
+  }
+  .hero-feature {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px 10px 6px;
+    border: 1px solid #e3cbbd;
+    border-radius: 16px;
+    background: radial-gradient(ellipse at 27% 40%, #faf0e7, #eed7c9 75%);
+    isolation: isolate;
+  }
+  .hero-feature img {
+    width: min(100%, 180px);
+    height: auto;
+    aspect-ratio: 1;
+    object-fit: contain;
+    justify-self: center;
+    mix-blend-mode: multiply;
+  }
+  .hero-feature-details {
+    min-width: 0;
+    display: grid;
+    gap: 5px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+  .hero-feature-details strong { font-size: .875rem; }
+  .hero-feature-details .price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 6px; margin: 0; }
+  .hero-feature-details .price s { margin: 0; }
+  .hero-feature-link {
+    color: var(--brand2);
+    font-size: .875rem;
+    font-weight: 650;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  #shop-categories { scroll-margin-top: 8px; }
+  .sec a::after { content: none; }
+  .category-tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .category-tiles a {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 5px;
+    justify-items: center;
+    align-items: end;
+    min-width: 0;
+    padding: 9px 5px;
+    border: 1px solid #e7d8cd;
+    border-radius: 14px;
+    background: #f6ebe1;
+    font-size: .875rem;
+    line-height: 1.25;
+    text-align: center;
+    overflow-wrap: anywhere;
+    isolation: isolate;
+  }
+  .category-tiles a:nth-child(even) { background: #eaece4; border-color: #dce1d5; }
+  .category-tiles a:hover { border-color: var(--brand2); }
+  .category-tiles img {
+    width: min(100%, 88px);
+    aspect-ratio: 1;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+  }
+  .category-tiles span { color: var(--mute); font-size: .8125rem; }
+  .shop-guide {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    margin-block: 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    overflow: hidden;
+    background: var(--line);
+  }
+  .shop-guide a {
+    display: grid;
+    align-content: start;
+    gap: 3px;
+    padding: 12px;
+    background: white;
+    overflow-wrap: anywhere;
+  }
+  .shop-guide a:focus-visible { outline-offset: -4px; }
+  .shop-guide a:hover { background: #fff8f5; }
+  .shop-guide strong { color: var(--brand2); font-size: .875rem; }
+  .shop-guide span { color: var(--mute); font-size: .8125rem; line-height: 1.4; }
+  .product-shelf {
+    display: grid;
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - .75rem) / 2.17);
+    gap: .75rem;
+    padding: 4px 4px 10px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline proximity;
+    scroll-padding-inline: 4px;
+    scrollbar-color: #b89993 transparent;
+  }
+  .product-shelf > :global(.card) { scroll-snap-align: start; }
+  .product-shelf :global(.shelf-thumb) { aspect-ratio: 1; }
+  @media (min-width: 600px) {
+    .product-shelf { grid-auto-columns: calc((100% - 1.5rem) / 3.18); }
+    .shop-guide { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+  }
+  @media (min-width: 768px) {
+    .home-hero { gap: clamp(20px, 4vw, 58px); }
+    .home-hero.has-featured-product { grid-template-columns: minmax(0, 1fr) minmax(0, 1.06fr); }
+    .hero-feature { padding: 18px; }
+    .hero-feature img { width: min(100%, 260px); }
+    .hero-feature-details { gap: 8px; }
+    .hero-feature-details strong { font-size: clamp(.9375rem, 1.5vw, 1.25rem); }
+    .category-tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+    .category-tiles a { padding: 12px 8px; font-size: .9375rem; }
+    .category-tiles img { width: min(100%, 112px); }
+  }
+  @media (min-width: 861px) {
+    #shop-categories { scroll-margin-top: 128px; }
+  }
+  @media (min-width: 1024px) {
+    .product-shelf { grid-auto-columns: calc((100% - 2.25rem) / 4.15); }
+  }
+</style>

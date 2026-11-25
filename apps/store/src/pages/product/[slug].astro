@@ -24,13 +24,14 @@ const stars = rating(p);
 const localOnlyNote = "Delivery available only in Jashore.";
 // Suppress the imported shop-wide boilerplate while preserving product-specific notes.
 const short = String(p.short ?? "")
-  .replace(/^Cash on delivery available\. Delivery time 4-7 days\. Free delivery in Jashore\.\s*/, "")
-  .replace(/Delivery time 4-7 days\. (?=Delivery available only in Jashore\.)/, "");
-const localDeliveryOnly = short.includes(localOnlyNote);
-const productSummary = short.replace(localOnlyNote, "").trim();
+  .replace(/^Cash on delivery available\.\s*Delivery time 4[-–]7 days\.\s*Free delivery in Jashore\.\s*/i, "")
+  .replace(/(?:^|\s)Delivery time 4[-–]7 days\.\s*/gi, " ");
+const showJashoreLabel = p.jashoreOnly ?? short.includes(localOnlyNote);
+const deliveryZones = LIVE.delivery.filter((zone: any) => !showJashoreLabel || zone.id === "jashore");
+const productSummary = short.replaceAll(localOnlyNote, "").trim();
 const cashPayment = LIVE.payments.find((method: any) => method.enabled && method.id === "cod");
 const snippetText = plainText(productSummary || p.desc);
-const deliverySummary = localDeliveryOnly ? "Delivery in Jashore only" : deliveryZonesText(LIVE);
+const deliverySummary = showJashoreLabel ? "Delivery in Jashore only" : deliveryZonesText(LIVE);
 const description = `${p.name} price in Bangladesh is ${taka(p.price)} at ${spacedSiteName}. ${p.inStock ? "In stock" : "Currently sold out"}. ${deliverySummary}.${snippetText ? ` ${snippetText}` : ""}`;
 const seo = recordSEO(p, description);
 const brandName = attributeValues(p, "brand")[0];
@@ -39,9 +40,7 @@ const mainImage = p.images[0];
 const displayImage = (image: any) => responsiveImage(image?.src, image?.src || image?.thumb, [320, 640]);
 const imageSet = displayImage(mainImage);
 const thumbnail = (image: any) => responsiveImage(image.src, image.thumb || image.src, [160]).src;
-const photoArrows = mainImage?.src && p.images.length > 1
-  ? [{ step: -1, label: "Previous photo" }, { step: 1, label: "Next photo" }]
-  : [];
+const multiplePhotos = mainImage?.src && p.images.length > 1;
 const firstPhotoPosition = `Photo 1 of ${p.images.length}`;
 const ld = {
   "@context": "https://schema.org",
@@ -103,7 +102,6 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
   image={seo.image || publicImage(mainImage?.src)}
   type="product"
   preconnectCloudinary
-  localDeliveryOnly={localDeliveryOnly}
 >
   <Fragment slot="head">
     {mainImage?.src && (
@@ -148,20 +146,16 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
         </div>
         <p class="product-terms">
           <span data-cod-label hidden={!cashPayment}>{cashPayment?.label}</span>
-          <a class="link" href="#purchase-info-title">{localDeliveryOnly ? "Delivery in Jashore only" : "Delivery & payment"}</a>
+          {showJashoreLabel && <span class="delivery-label" data-jashore-label>Jashore only</span>}
+          <a class="link" href="#purchase-info-title">Delivery &amp; payment</a>
         </p>
       </div>
       <div class="product-gallery" data-photo-gallery data-photo-sizes={gallerySizes} role="group" aria-label="Product photos">
-        <div class="photo-stage">
-          {mainImage?.src ? <button class="stage photo-zoom" type="button" data-zoom-trigger aria-haspopup="dialog" aria-label={`Enlarge photo of ${p.name}`}>
-            <img class="main" data-main {...imageSet} sizes={imageSet.srcset ? gallerySizes : undefined}
-              data-zoom={sizedImage(mainImage?.src, 960)} alt={mainImage?.alt || p.name} width="600" height="600" draggable="false" decoding="sync" fetchpriority="high" />
-          </button> : <div class="stage"><img class="main" {...imageSet} alt="Product photo unavailable" width="600" height="600" /></div>}
-          {photoArrows.map(({ step, label }) => (
-            <button class="photo-arrow" type="button" data-photo-step={step} aria-label={label}></button>
-          ))}
-        </div>
-        {photoArrows.length > 0 && (
+        {mainImage?.src ? <button class="stage photo-zoom" type="button" data-zoom-trigger aria-haspopup="dialog" aria-label={`Enlarge photo of ${p.name}`}>
+          <img class="main" data-main {...imageSet} sizes={imageSet.srcset ? gallerySizes : undefined}
+            data-zoom={sizedImage(mainImage?.src, 960)} alt={mainImage?.alt || p.name} width="600" height="600" draggable="false" decoding="sync" fetchpriority="high" />
+        </button> : <div class="stage"><img class="main" {...imageSet} alt="Product photo unavailable" width="600" height="600" /></div>}
+        {multiplePhotos && (
           <>
             <div class="gal" role="group" aria-label="Choose a photo">
               {p.images.map((i: any, n: number) => {
@@ -178,19 +172,29 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
         {mainImage?.src && (
           <template data-photo-dialog>
             <dialog class="lightbox" aria-label="Enlarged product photos">
-              <button class="x" type="button" data-close-photo aria-label="Close enlarged photo" autofocus>×</button>
+              <div class="photo-viewer-head">
+                <button type="button" data-close-photo aria-label="Close enlarged photo" autofocus>Close</button>
+              </div>
               <img data-expanded-photo alt="" draggable="false" />
-              {photoArrows.map(({ step, label }) => (
-                <button class="photo-arrow" type="button" data-photo-step={step} aria-label={label}></button>
-              ))}
-              {photoArrows.length > 0 && <span class="sr-only" role="status" data-photo-position>{firstPhotoPosition}</span>}
+              {multiplePhotos && <div class="photo-viewer-controls" role="group" aria-label="Photo navigation">
+                <button type="button" data-photo-step="-1" aria-label="Previous photo">Previous</button>
+                <span role="status" data-photo-position>{firstPhotoPosition}</span>
+                <button type="button" data-photo-step="1" aria-label="Next photo">Next</button>
+              </div>}
             </dialog>
           </template>
         )}
       </div>
       <div class="product-details">
         <div class="buy">
-          <label class="product-qty">Quantity <input class="qty" data-qty type="number" min="1" max="20" value="1" /></label>
+          <div class="product-qty">
+            <label for="product-quantity">Quantity</label>
+            <div class="quantity-stepper">
+              <button type="button" data-qty-step="-1" aria-label="Decrease quantity" disabled>−</button>
+              <input id="product-quantity" class="qty" data-qty type="number" inputmode="numeric" min="1" max="20" value="1" disabled={!p.inStock} />
+              <button type="button" data-qty-step="1" aria-label="Increase quantity" disabled={!p.inStock}>+</button>
+            </div>
+          </div>
           <button class="btn" type="button" data-primary-buy data-add={p.id} data-label="Buy now" data-buy="1" disabled={!p.inStock}>
             {p.inStock ? "Buy now" : "Sold out"}
           </button>
@@ -201,16 +205,15 @@ const waText = encodeURIComponent(`Hi, I have a question about ${p.name}.\n${url
         </div>
         <section class="purchase-info" aria-labelledby="purchase-info-title">
           <h2 id="purchase-info-title">Delivery &amp; payment</h2>
-          {localDeliveryOnly ? (
-            <p class="delivery local-delivery"><strong>{localOnlyNote}</strong> <a class="link" href="/contact-us/">Ask the shop about delivery</a>.</p>
-          ) : <ul class="delivery" data-delivery>
-            {LIVE.delivery.map((z: any) => (
+          <ul class="delivery" data-delivery data-jashore-only={showJashoreLabel || undefined} hidden={!deliveryZones.length}>
+            {deliveryZones.map((z: any) => (
               <li>{z.label}: <b>{z.fee && !(LIVE.freeOver > 0 && p.price >= LIVE.freeOver) ? taka(z.fee) : "Free"}</b>{z.days && `, ${z.days}`}</li>
             ))}
-          </ul>}
+          </ul>
           <p class="meta" data-payment-summary>{LIVE.payments.filter((m: any) => m.enabled).map((m: any) => m.label).join(" · ") || "Contact the shop for payment options"}</p>
           <div class="purchase-links">
             <a class="link" href="/how-to-buy/">How to order</a>
+            {showJashoreLabel && <a class="link" href="/contact-us/">Ask about delivery</a>}
             {merchantReturnURL && <a class="link" href={merchantReturnURL}>Returns and exchanges</a>}
           </div>
           {SITE.returns && <p class="meta">{SITE.returns}</p>}

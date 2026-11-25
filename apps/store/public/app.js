@@ -115,15 +115,20 @@
 
   async function items() {
     if (index) return index;
-    rawIndex ||= fetch("/search-index.json")
-      .then((r) => {
-        if (!r.ok) throw new Error();
-        return r.json();
-      })
-      .catch((e) => {
-        rawIndex = null;
-        throw e;
-      });
+    if (!rawIndex) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      rawIndex = fetch("/search-index.json", { signal: controller.signal })
+        .then((r) => {
+          if (!r.ok) throw new Error();
+          return r.json();
+        })
+        .catch((e) => {
+          rawIndex = null;
+          throw e;
+        })
+        .finally(() => clearTimeout(timer));
+    }
     const raw = await rawIndex;
     if (index) return index; // simultaneous cart, search and recent-item renders share one merge
     const list = raw.map((p) => ({ ...p }));
@@ -189,12 +194,7 @@
       e.textContent = !units ? "Sold out" : left ? `Only ${units} left` : "In stock";
       e.classList.toggle("no", !units);
     });
-    const addBtn = $("[data-add]");
-    if (addBtn) {
-      $$("[data-qty]").forEach((i) => {
-        i.max = maxFor(addBtn.dataset.add);
-      });
-    }
+    syncQuantity();
     $$("[data-card]").forEach((c) => {
       const s = stock[c.dataset.id];
       c.dataset.price = s ? s[0] : c.dataset.price;
@@ -225,7 +225,15 @@
     const zoneLabel = zone => String(zone?.label || "").trim().replace(/\s+/g, " ");
     const nationwideLabel = /^(?:outside (?:of )?(?:jashore|jessore|যশোর)|nationwide(?: delivery)?|(?:(?:all of|across) )?bangladesh|সারা বাংলাদেশ|যশোরের বাইরে)$/i;
     const nationwide = zones.some(zone => nationwideLabel.test(zoneLabel(zone)));
-    $$("[data-delivery-coverage]").forEach(el => { el.textContent = nationwide ? "Delivery across Bangladesh" : "Delivery information"; });
+    $$("[data-delivery-coverage]").forEach(el => {
+      el.textContent = nationwide ? "Delivery across Bangladesh" : "Delivery information";
+    });
+    const times = $("[data-delivery-times]");
+    if (times) {
+      const estimates = zones.filter(zone => zone.days);
+      times.innerHTML = estimates.map(zone => `<li><strong>${esc(zone.label)}</strong> · Estimated delivery in ${esc(zone.days)}</li>`).join("");
+      times.hidden = !estimates.length;
+    }
     const deliveryFeature = $("[data-delivery-feature]");
     if (deliveryFeature) {
       const zone = zones.find(z => z.fee === 0 && zoneLabel(z) && !nationwideLabel.test(zoneLabel(z)));
@@ -358,7 +366,25 @@
     <div class="body"><a class="name" href="/product/${esc(p.slug)}/">${esc(p.name)}</a>
     <div class="price" data-price-for="${p.id}">${priceHtml(p.price, p.regular)}</div>
     <span class="card-stock" data-stock-for="${p.id}">${p.inStock ? "In stock" : "Sold out"}</span>
-    <button class="btn small" data-add="${p.id}" data-label="Add to cart" ${p.inStock ? "" : "disabled"}>${p.inStock ? "Add to cart" : "Sold out"}</button></div></article>`;
+    <button type="button" class="btn small" data-add="${p.id}" data-label="Add to cart" ${p.inStock ? "" : "disabled"}>${p.inStock ? "Add to cart" : "Sold out"}</button></div></article>`;
+
+  function shelfPhotos() {
+    const templates = $$("template[data-shelf-photo]");
+    if (!templates.length) return;
+    const show = template => template?.replaceWith(template.content);
+    if (!window.IntersectionObserver) {
+      templates.forEach(show);
+      return;
+    }
+    // Native lazy loading alone can fetch pictures far outside a horizontal shelf.
+    const observer = new IntersectionObserver(entries => {
+      entries.filter(entry => entry.isIntersecting).forEach(({ target }) => {
+        show($("template[data-shelf-photo]", target));
+        observer.unobserve(target);
+      });
+    }, { rootMargin: "160px 0px" });
+    templates.forEach(template => observer.observe(template.parentElement));
+  }
 
   async function renderWish() {
     const el = $("[data-wishlist]");
@@ -586,11 +612,15 @@
         lines
           .map(
             (l) =>
-              `<div class="row"><span>${esc(l.p.name)} × ${l.qty}${l.p.inStock ? "" : " <b>(sold out)</b>"}</span><b>${taka(l.p.price * l.qty)}</b></div>`,
+              `<div class="checkout-item">
+                <img src="${esc(l.p.thumb || "/placeholder.svg")}" alt="" width="44" height="44" loading="lazy" decoding="async">
+                <div>${esc(l.p.name)}<small>Qty ${l.qty}${l.p.inStock ? "" : " · Sold out"}</small></div>
+                <b>${taka(l.p.price * l.qty)}</b>
+              </div>`,
           )
           .join("") +
         (discount ? `<div class="row"><span>Discount (${esc(code)})</span><b>−${taka(discount)}</b></div>` : "") +
-        `<div class="row"><span>Delivery charge</span><b>${!zone ? "Choose your area" : fee ? taka(fee) : "Free"}</b></div>` +
+        `<div class="row"><span>Delivery charge</span><b>${!zone ? "Choose delivery area" : fee ? taka(fee) : "Free"}</b></div>` +
         (fee > 0 && pieces > 1 ? `<p class="meta">${deliveryQuantityNote(pieces)}</p>` : "") +
         `<div class="row total"><span>${zone ? "Total" : discount ? "Subtotal after discount" : "Subtotal"}</span><span>${taka(total)}</span></div>`;
       const estimate = $("[data-checkout-total]", f);
@@ -789,7 +819,35 @@
       ${(o.items || []).some((i) => i.id) ? `<button class="btn ghost" data-again="${esc(JSON.stringify(o.items.map((i) => ({ id: i.id, qty: i.qty }))))}">Buy again</button>` : ""}</div>`;
   };
 
-  // The delivery lines on a product page, so the charge is no surprise at checkout.
+  function syncQuantity() {
+    const quantity = $("[data-qty]");
+    if (!quantity) return;
+    const product = quantity.closest("[data-product]");
+    const limit = $("[data-primary-buy]", product).disabled ? 0 : maxFor(product.dataset.product);
+    quantity.disabled = limit === 0;
+    quantity.max = Math.max(1, limit);
+    if (quantity.valueAsNumber > +quantity.max) quantity.value = quantity.max;
+    const selected = Math.max(1, Math.floor(quantity.valueAsNumber) || 1);
+    $('[data-qty-step="-1"]', product).disabled = !limit || selected <= 1;
+    $('[data-qty-step="1"]', product).disabled = selected >= limit;
+  }
+
+  function productQuantity() {
+    const quantity = $("[data-qty]");
+    if (!quantity) return;
+    quantity.addEventListener("input", () => {
+      syncQuantity();
+      applyDelivery();
+    });
+    $$("[data-qty-step]").forEach(button => button.addEventListener("click", () => {
+      if (button.dataset.qtyStep === "1") quantity.stepUp();
+      else quantity.stepDown();
+      quantity.dispatchEvent(new Event("input"));
+    }));
+    syncQuantity();
+  }
+
+  // Update the delivery lines before checkout when the selected quantity changes.
   function applyDelivery() {
     const el = $("[data-delivery]");
     if (!el || !live) return;
@@ -797,7 +855,11 @@
     const selected = Math.max(1, Math.floor(+$("[data-qty]", product).value) || 1);
     const quantity = Math.min(maxFor(product.dataset.product) || 1, selected);
     const price = stock[product.dataset.product]?.[0] ?? +product.dataset.price;
-    const delivery = (Array.isArray(live.delivery) ? live.delivery : []).map((zone) => ({ ...zone, fee: deliveryCharge(zone, live, price * quantity, quantity) }));
+    const localOnly = el.hasAttribute("data-jashore-only");
+    const delivery = (Array.isArray(live.delivery) ? live.delivery : [])
+      .filter(zone => !localOnly || zone.id === "jashore")
+      .map(zone => ({ ...zone, fee: deliveryCharge(zone, live, price * quantity, quantity) }));
+    el.hidden = !delivery.length;
     const free = live.freeOver > 0 ? `<li>Free delivery on orders of ${taka(live.freeOver)} or more</li>` : "";
     const quantityNote = quantity > 1 && delivery.some((zone) => zone.fee > 0) ? `<li>${deliveryQuantityNote(quantity)}</li>` : "";
     el.innerHTML =
@@ -924,10 +986,6 @@
     };
     const move = (step) => selectPhoto(current + step);
     const connectNavigation = (area, surface) => {
-      area.addEventListener("click", (event) => {
-        const step = event.target.closest("[data-photo-step]");
-        if (step) move(Number(step.dataset.photoStep));
-      });
       area.addEventListener("keydown", (event) => {
         if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
         if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
@@ -953,6 +1011,8 @@
         trigger.focus({ preventScroll: true });
       };
       box.addEventListener("click", (event) => {
+        const step = event.target.closest("[data-photo-step]");
+        if (step) move(Number(step.dataset.photoStep));
         if (event.target === box || event.target.closest("[data-close-photo]")) close();
       });
       box.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
@@ -1204,7 +1264,9 @@
   rememberProduct();
   badges();
   grids();
+  shelfPhotos();
   suggestions();
+  productQuantity();
   buyBar();
   productGallery();
   track();
@@ -1215,6 +1277,5 @@
     simpleForm(f, "/reviews", REVIEW_THANKS, { product: +f.dataset.review }),
   );
   renderDynamic();
-  $("[data-qty]")?.addEventListener("input", applyDelivery);
   loadStock();
 })();

@@ -243,10 +243,11 @@ func applyContentUpdates(ctx context.Context) error {
 			Kind, Slug, Replaces string
 			Data                 map[string]any
 		}
-		Names  []struct{ Kind, Slug, Name string }
-		Remove []struct{ Kind, Slug string }
-		Text   []struct{ Field, Find, To string } // product wording only, never a name or price
-		SQL    []string
+		Names           []struct{ Kind, Slug, Name string }
+		Remove          []struct{ Kind, Slug string }
+		Text            []struct{ Field, Find, To string } // product wording only, never a name or price
+		SQL             []string
+		SQLWithDefaults []string
 	}
 	if err := json.Unmarshal(contentUpdates, &list); err != nil {
 		return err
@@ -294,6 +295,11 @@ func applyContentUpdates(ctx context.Context) error {
 			}
 			for _, q := range u.SQL {
 				if _, err = tx.Exec(ctx, q); err != nil {
+					return err
+				}
+			}
+			for _, q := range u.SQLWithDefaults {
+				if _, err = tx.Exec(ctx, q, string(defaultsJSON)); err != nil {
 					return err
 				}
 			}

@@ -41,7 +41,8 @@ export const spacedSiteName = SITE.name.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
 // {phone}, {email} and {name} let the admin write text on Pages that stays right when those details change.
 const escapeHTML=(s: string)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
 export const fill = (text = "") =>
-  text.replaceAll("{phone}", escapeHTML(SITE.phone)).replaceAll("{email}", escapeHTML(SITE.email)).replaceAll("{name}", escapeHTML(SITE.name));
+  text.replaceAll("{phone}", escapeHTML(SITE.phone)).replaceAll("{email}", escapeHTML(SITE.email))
+    .replaceAll("{name}", escapeHTML(SITE.name)).replaceAll("{returns}", escapeHTML(SITE.returns));
 export const siteUrl = (path: string) => new URL(path, import.meta.env.SITE).href;
 export const LIVE: any = { ...defaults.live, ...store.live }; // only a fallback: the browser reads /api/stock
 
